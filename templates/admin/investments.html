@@ -1,0 +1,84 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Manage Investments{% endblock %}
+
+{% block admin_content %}
+<div class="flex gap-2 mb-5">
+  {% for status in ['all', 'active', 'completed'] %}
+  <button onclick="filterRows('{{ status }}')"
+    class="filter-tab px-4 py-2 rounded-lg text-sm font-semibold transition-all
+    {% if status == 'all' %}bg-forest-950 text-white{% else %}bg-white text-gray-500 hover:bg-gray-100 border border-gray-200{% endif %}"
+    data-status="{{ status }}">
+    {{ status.title() }}
+  </button>
+  {% endfor %}
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-xs text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100">
+          <th class="px-5 py-3 font-medium">Investor</th>
+          <th class="px-5 py-3 font-medium">Plan</th>
+          <th class="px-5 py-3 font-medium">Invested</th>
+          <th class="px-5 py-3 font-medium">Expected Return</th>
+          <th class="px-5 py-3 font-medium">ROI</th>
+          <th class="px-5 py-3 font-medium">Maturity Date</th>
+          <th class="px-5 py-3 font-medium">Status</th>
+          <th class="px-5 py-3 font-medium">Action</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for inv in investments %}
+        <tr class="hover:bg-gray-50 inv-row" data-status="{{ inv.status }}">
+          <td class="px-5 py-4">
+            <p class="font-medium text-gray-900">{{ inv.full_name }}</p>
+            <p class="text-xs text-gray-400">{{ inv.email }}</p>
+          </td>
+          <td class="px-5 py-4">
+            <span class="bg-forest-50 text-forest-700 text-xs font-semibold px-2.5 py-1 rounded-full">{{ inv.plan_name }}</span>
+          </td>
+          <td class="px-5 py-4 font-bold text-gray-900">{{ inv.amount | naira }}</td>
+          <td class="px-5 py-4 font-bold text-green-600">{{ inv.expected_return | naira }}</td>
+          <td class="px-5 py-4 text-forest-700 font-semibold">{{ inv.roi_percent }}%</td>
+          <td class="px-5 py-4 text-gray-500 text-xs">{{ inv.end_date | date_fmt }}</td>
+          <td class="px-5 py-4">
+            <span class="{{ inv.status | status_badge }} badge">{{ inv.status.title() }}</span>
+          </td>
+          <td class="px-5 py-4">
+            {% if inv.status == 'active' %}
+            <form method="POST" action="{{ url_for('admin_complete_investment', inv_id=inv.id) }}">
+              <button class="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold text-xs px-3 py-1.5 rounded-lg transition-colors">
+                ✓ Mark Complete
+              </button>
+            </form>
+            {% else %}
+            <span class="text-xs text-gray-300">Completed</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if not investments %}
+    <div class="text-center py-16">
+      <i data-lucide="inbox" class="w-10 h-10 text-gray-200 mx-auto mb-3"></i>
+      <p class="text-gray-400">No investments found</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function filterRows(status) {
+  document.querySelectorAll('.inv-row').forEach(row => {
+    row.style.display = (status === 'all' || row.dataset.status === status) ? '' : 'none';
+  });
+  document.querySelectorAll('.filter-tab').forEach(btn => {
+    const active = btn.dataset.status === status;
+    btn.className = 'filter-tab px-4 py-2 rounded-lg text-sm font-semibold transition-all ' +
+      (active ? 'bg-forest-950 text-white' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200');
+  });
+}
+</script>
+{% endblock %}

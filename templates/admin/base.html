@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="flex h-screen bg-gray-100 overflow-hidden">
+
+  <!-- Admin Sidebar -->
+  <aside class="fixed inset-y-0 left-0 z-50 w-60 bg-gray-900 flex flex-col lg:static lg:z-auto">
+    <div class="px-5 py-4 border-b border-white/10">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-gold-500 flex items-center justify-center">
+          <span class="text-forest-950 font-bold text-sm">A</span>
+        </div>
+        <div>
+          <p class="text-white font-bold text-sm">AgroVest</p>
+          <p class="text-gray-400 text-xs">Admin Panel</p>
+        </div>
+      </div>
+    </div>
+
+    <nav class="flex-1 px-3 py-4 overflow-y-auto space-y-1">
+      {% set admin_links = [
+        ('admin_dashboard', 'layout-dashboard', 'Dashboard'),
+        ('admin_users', 'users', 'Users'),
+        ('admin_deposits', 'wallet', 'Deposits'),
+        ('admin_withdrawals', 'banknote', 'Withdrawals'),
+        ('admin_investments', 'trending-up', 'Investments'),
+      ] %}
+      {% for endpoint, icon, label in admin_links %}
+      <a href="{{ url_for(endpoint) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
+        {% if request.endpoint == endpoint %}bg-gold-500 text-gray-900{% else %}text-gray-400 hover:bg-white/10 hover:text-white{% endif %}">
+        <i data-lucide="{{ icon }}" class="w-4 h-4 flex-shrink-0"></i> {{ label }}
+      </a>
+      {% endfor %}
+
+      <div class="pt-4 border-t border-white/10">
+        <a href="{{ url_for('index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/10 hover:text-white transition-all">
+          <i data-lucide="external-link" class="w-4 h-4"></i> View Site
+        </a>
+        <a href="{{ url_for('logout') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 transition-all">
+          <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+        </a>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <header class="bg-white border-b border-gray-200 px-6 h-14 flex items-center justify-between flex-shrink-0">
+      <h1 class="font-semibold text-gray-900">{% block admin_title %}Admin Dashboard{% endblock %}</h1>
+      <div class="flex items-center gap-2">
+        <span class="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full">ADMIN</span>
+        <span class="text-sm text-gray-500">{{ current_user.full_name if current_user else 'Admin' }}</span>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-6">
+      {% block admin_content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% endblock %}

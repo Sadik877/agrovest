@@ -1,0 +1,116 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Admin Dashboard{% endblock %}
+
+{% block admin_content %}
+<!-- Stats -->
+<div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+  {% set admin_stats = [
+    ('users', 'Total Users', stats.total_users, 'bg-blue-600'),
+    ('trending-up', 'Active Investments', stats.active_investments, 'bg-forest-700'),
+    ('wallet', 'Pending Deposits', stats.pending_deposits, 'bg-amber-600'),
+    ('banknote', 'Pending Withdrawals', stats.pending_withdrawals, 'bg-red-600'),
+    ('dollar-sign', 'Total Invested', stats.total_invested | naira, 'bg-purple-600'),
+    ('check-circle', 'Total Paid Out', stats.total_paid_out | naira, 'bg-emerald-600'),
+  ] %}
+  {% for icon, label, value, bg in admin_stats %}
+  <div class="{{ bg }} rounded-xl p-4 text-white">
+    <i data-lucide="{{ icon }}" class="w-5 h-5 mb-2 opacity-70"></i>
+    <p class="font-bold text-lg">{{ value }}</p>
+    <p class="text-xs opacity-70">{{ label }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Pending Actions -->
+<div class="grid lg:grid-cols-2 gap-6 mb-6">
+  <!-- Pending Deposits -->
+  <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-gray-900">Pending Deposits</h2>
+      <a href="{{ url_for('admin_deposits') }}" class="text-xs text-blue-600 hover:underline">View All</a>
+    </div>
+    {% if pending_deps %}
+    <div class="space-y-3">
+      {% for dep in pending_deps[:5] %}
+      <div class="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100">
+        <div>
+          <p class="text-sm font-semibold text-gray-900">{{ dep.full_name }}</p>
+          <p class="text-xs text-gray-400">{{ dep.created_at | date_fmt }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-gray-900 text-sm">{{ dep.amount | naira }}</span>
+          <form method="POST" action="{{ url_for('admin_approve_deposit', dep_id=dep.id) }}" class="inline">
+            <button class="bg-green-600 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg hover:bg-green-700">✓</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-400 text-sm text-center py-6">No pending deposits</p>
+    {% endif %}
+  </div>
+
+  <!-- Pending Withdrawals -->
+  <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-gray-900">Pending Withdrawals</h2>
+      <a href="{{ url_for('admin_withdrawals') }}" class="text-xs text-blue-600 hover:underline">View All</a>
+    </div>
+    {% if pending_wds %}
+    <div class="space-y-3">
+      {% for wd in pending_wds[:5] %}
+      <div class="flex items-center justify-between p-3 bg-red-50 rounded-xl border border-red-100">
+        <div>
+          <p class="text-sm font-semibold text-gray-900">{{ wd.full_name }}</p>
+          <p class="text-xs text-gray-400">{{ wd.bank_name }} · {{ wd.account_number }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-gray-900 text-sm">{{ wd.amount | naira }}</span>
+          <form method="POST" action="{{ url_for('admin_approve_withdrawal', wd_id=wd.id) }}" class="inline">
+            <button class="bg-green-600 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg hover:bg-green-700">✓</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-400 text-sm text-center py-6">No pending withdrawals</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Recent Users -->
+<div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="font-semibold text-gray-900">Recent Users</h2>
+    <a href="{{ url_for('admin_users') }}" class="text-xs text-blue-600 hover:underline">View All</a>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-xs text-gray-400 uppercase tracking-wider border-b border-gray-100">
+          <th class="pb-3 font-medium">Name</th>
+          <th class="pb-3 font-medium">Email</th>
+          <th class="pb-3 font-medium">Balance</th>
+          <th class="pb-3 font-medium">Joined</th>
+          <th class="pb-3 font-medium">Status</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for u in recent_users %}
+        <tr class="hover:bg-gray-50">
+          <td class="py-3 font-medium text-gray-900">{{ u.full_name }}</td>
+          <td class="py-3 text-gray-500">{{ u.email }}</td>
+          <td class="py-3 font-semibold text-forest-700">{{ u.balance | naira }}</td>
+          <td class="py-3 text-gray-400">{{ u.created_at | date_fmt }}</td>
+          <td class="py-3">
+            <span class="{{ 'badge-success' if u.is_active else 'badge-error' }} badge">{{ 'Active' if u.is_active else 'Suspended' }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
