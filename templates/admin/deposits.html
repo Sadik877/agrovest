@@ -46,7 +46,7 @@
           <td class="px-5 py-4 font-mono text-xs text-gray-400">{{ dep.reference }}</td>
           <td class="px-5 py-4">
             {% if dep.proof_filename %}
-            <a href="{{ url_for('static', filename='uploads/' + dep.proof_filename) }}" target="_blank"
+            <a href="{{ url_for('uploaded_file', filename=dep.proof_filename) }}" target="_blank"
               class="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline font-medium">
               <i data-lucide="file-image" class="w-3.5 h-3.5"></i> View
             </a>
