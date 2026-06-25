@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}Investment Plans — AgroVest Pro{% endblock %}
+
+{% block body %}
+{% include "partials/navbar.html" %}
+
+<!-- Hero -->
+<section class="relative pt-32 pb-16 bg-forest-950 grain overflow-hidden">
+  <div class="absolute inset-0 bg-gradient-to-br from-forest-950 to-dark"></div>
+  <div class="absolute inset-0" style="background: radial-gradient(ellipse at 30% 60%, rgba(201,168,76,0.1) 0%, transparent 60%)"></div>
+  <div class="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 text-center">
+    <span class="inline-block text-xs font-bold text-gold-500 uppercase tracking-widest mb-4">Investment Plans</span>
+    <h1 class="font-display text-4xl sm:text-5xl font-bold text-white mb-4">
+      Choose Your <span class="text-gold-400">Growth Plan</span>
+    </h1>
+    <p class="text-gray-300 text-lg max-w-2xl mx-auto">
+      Four tiers of agricultural investment opportunities — from starter to elite. All plans are backed by verified commercial farms across Nigeria.
+    </p>
+  </div>
+</section>
+
+<!-- Plan Comparison Bar -->
+<section class="bg-white border-b border-gray-100 sticky top-20 z-40 shadow-sm">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6">
+    <div class="flex overflow-x-auto gap-1 py-3">
+      {% for plan in plans %}
+      <a href="#{{ plan.slug }}" class="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-forest-50 text-sm font-medium text-gray-600 hover:text-forest-800 transition-colors">
+        <span>{{ plan.icon }}</span> {{ plan.name }}
+        <span class="bg-forest-100 text-forest-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ plan.roi_percent }}%</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Plans Detail -->
+<section class="py-20 bg-gray-50">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 space-y-16">
+    {% for plan in plans %}
+    <div id="{{ plan.slug }}" class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-on-scroll
+        {% if loop.index == 3 %}ring-2 ring-gold-400{% endif %}">
+
+      {% if loop.index == 3 %}
+      <div class="bg-gold-500 text-forest-950 text-sm font-bold text-center py-2 tracking-widest uppercase">⭐ Most Popular Plan</div>
+      {% endif %}
+
+      <div class="grid lg:grid-cols-5 gap-0">
+        <!-- Left: Overview -->
+        <div class="lg:col-span-2 p-8 {% if loop.index % 2 == 0 %}bg-forest-950{% else %}bg-gradient-to-br from-forest-950 to-forest-800{% endif %}">
+          <div class="text-5xl mb-4">{{ plan.icon }}</div>
+          <h2 class="font-display text-2xl font-bold text-white mb-2">{{ plan.name }}</h2>
+          <p class="text-gray-300 text-sm mb-6">{{ plan.description }}</p>
+
+          <div class="space-y-3 mb-8">
+            <div class="flex items-center justify-between bg-white/10 rounded-xl px-4 py-3">
+              <span class="text-gray-300 text-sm">Min Investment</span>
+              <span class="text-gold-400 font-bold">₦{{ '{:,.0f}'.format(plan.min_amount) }}</span>
+            </div>
+            {% if plan.max_amount %}
+            <div class="flex items-center justify-between bg-white/10 rounded-xl px-4 py-3">
+              <span class="text-gray-300 text-sm">Max Investment</span>
+              <span class="text-gold-400 font-bold">₦{{ '{:,.0f}'.format(plan.max_amount) }}</span>
+            </div>
+            {% else %}
+            <div class="flex items-center justify-between bg-white/10 rounded-xl px-4 py-3">
+              <span class="text-gray-300 text-sm">Max Investment</span>
+              <span class="text-gold-400 font-bold">Unlimited</span>
+            </div>
+            {% endif %}
+            <div class="flex items-center justify-between bg-white/10 rounded-xl px-4 py-3">
+              <span class="text-gray-300 text-sm">Duration</span>
+              <span class="text-white font-bold">{{ plan.duration_days }} Days</span>
+            </div>
+            <div class="flex items-center justify-between bg-white/10 rounded-xl px-4 py-3">
+              <span class="text-gray-300 text-sm">ROI</span>
+              <span class="text-green-400 font-bold text-lg">{{ plan.roi_percent }}%</span>
+            </div>
+          </div>
+
+          <a href="{{ url_for('register') }}" class="block text-center bg-gold-500 hover:bg-gold-600 text-forest-950 font-bold py-3.5 rounded-xl transition-all shadow-lg">
+            Invest in {{ plan.name }}
+          </a>
+        </div>
+
+        <!-- Right: Details + Calculator -->
+        <div class="lg:col-span-3 p-8">
+          <div class="grid sm:grid-cols-2 gap-8">
+            <!-- Features -->
+            <div>
+              <h3 class="font-semibold text-gray-900 mb-4">Plan Features</h3>
+              <ul class="space-y-3">
+                {% for feature in plan.features %}
+                <li class="flex items-start gap-2.5">
+                  <div class="w-5 h-5 rounded-full bg-forest-100 flex items-center justify-center mt-0.5 flex-shrink-0">
+                    <i data-lucide="check" class="w-3 h-3 text-forest-700"></i>
+                  </div>
+                  <span class="text-gray-600 text-sm">{{ feature }}</span>
+                </li>
+                {% endfor %}
+              </ul>
+
+              <!-- Farming Types -->
+              <h3 class="font-semibold text-gray-900 mt-6 mb-4">Farming Sectors</h3>
+              <div class="flex flex-wrap gap-2">
+                {% set sectors = {
+                  1: ['🌽 Maize', '🍅 Tomatoes', '🥜 Groundnuts'],
+                  2: ['🌾 Rice', '🥬 Vegetables', '🐟 Aquaculture', '🍠 Cassava'],
+                  3: ['🌾 Rice', '🐄 Livestock', '🐟 Aquaculture', '🌰 Soy', '🍌 Plantain'],
+                  4: ['🌾 Rice', '🐄 Beef Cattle', '🐔 Poultry', '🐟 Fish Farm', '🌱 Organic Crops', '🍊 Citrus']
+                } %}
+                {% for sector in sectors[plan.id] %}
+                <span class="bg-gray-100 text-gray-600 text-xs px-3 py-1.5 rounded-full font-medium">{{ sector }}</span>
+                {% endfor %}
+              </div>
+            </div>
+
+            <!-- ROI Calculator -->
+            <div>
+              <h3 class="font-semibold text-gray-900 mb-4">ROI Calculator</h3>
+              <div class="bg-gray-50 rounded-2xl p-5">
+                <label class="block text-xs text-gray-500 mb-2">Enter Investment Amount</label>
+                <div class="relative mb-4">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">₦</span>
+                  <input type="number"
+                    id="calc-input-{{ plan.id }}"
+                    placeholder="{{ '{:,.0f}'.format(plan.min_amount) }}"
+                    min="{{ plan.min_amount }}"
+                    {% if plan.max_amount %}max="{{ plan.max_amount }}"{% endif %}
+                    value="{{ plan.min_amount }}"
+                    oninput="calculateROI({{ plan.id }}, {{ plan.roi_percent }}, {{ plan.min_amount }}, {{ plan.max_amount or 0 }})"
+                    class="w-full bg-white border border-gray-200 rounded-xl pl-7 pr-4 py-2.5 text-sm focus:outline-none focus:border-forest-500" />
+                </div>
+
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-500">Principal</span>
+                    <span class="font-semibold text-gray-900" id="calc-principal-{{ plan.id }}">₦{{ '{:,.0f}'.format(plan.min_amount) }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-500">ROI ({{ plan.roi_percent }}%)</span>
+                    <span class="font-semibold text-green-600" id="calc-roi-{{ plan.id }}">₦{{ '{:,.0f}'.format(plan.min_amount * plan.roi_percent / 100) }}</span>
+                  </div>
+                  <div class="border-t border-gray-200 pt-2 flex justify-between">
+                    <span class="font-bold text-gray-900">Total Return</span>
+                    <span class="font-bold text-forest-700 text-base" id="calc-total-{{ plan.id }}">₦{{ '{:,.0f}'.format(plan.min_amount * (1 + plan.roi_percent / 100)) }}</span>
+                  </div>
+                  <div class="flex justify-between text-xs text-gray-400">
+                    <span>Daily Earnings</span>
+                    <span id="calc-daily-{{ plan.id }}">₦{{ '{:,.0f}'.format(plan.min_amount * plan.roi_percent / 100 / plan.duration_days) }}/day</span>
+                  </div>
+                </div>
+
+                <div class="mt-4 bg-forest-50 rounded-xl p-3 text-xs text-forest-700 font-medium text-center">
+                  Matures after {{ plan.duration_days }} days → funds released to wallet
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- Comparison Table -->
+<section class="py-20 bg-white">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-12 animate-on-scroll">
+      <h2 class="font-display text-3xl font-bold text-gray-900">Plan Comparison</h2>
+      <p class="text-gray-400 mt-2">Side-by-side overview of all investment tiers</p>
+    </div>
+
+    <div class="overflow-x-auto animate-on-scroll">
+      <table class="w-full border-collapse">
+        <thead>
+          <tr>
+            <th class="text-left p-4 text-sm font-semibold text-gray-500 bg-gray-50 rounded-tl-xl">Feature</th>
+            {% for plan in plans %}
+            <th class="p-4 text-center bg-gray-50 {{ 'bg-forest-950 text-white' if loop.index == 3 else '' }} {{ 'rounded-tr-xl' if loop.last else '' }}">
+              <span class="block text-lg mb-1">{{ plan.icon }}</span>
+              <span class="text-sm font-bold {{ 'text-white' if loop.index == 3 else 'text-gray-900' }}">{{ plan.name }}</span>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% set rows = [
+            ('Min Investment', ['₦10,000', '₦50,000', '₦200,000', '₦1,000,000']),
+            ('Duration', ['30 Days', '45 Days', '60 Days', '90 Days']),
+            ('ROI', ['15%', '25%', '40%', '60%']),
+            ('Referral Bonus', ['5%', '5%', '5%', '5%']),
+            ('Support Level', ['Basic', 'Priority', 'VIP 24/7', 'Dedicated Manager']),
+            ('Reports', ['Monthly', 'Monthly', 'Weekly', 'Daily']),
+            ('Early Withdrawal', ['✗', '✗', '✓', '✓']),
+            ('Farm Visits', ['✗', '✗', '✗', '✓']),
+          ] %}
+          {% for feature, values in rows %}
+          <tr class="hover:bg-gray-50">
+            <td class="p-4 text-sm text-gray-600 font-medium">{{ feature }}</td>
+            {% for val in values %}
+            <td class="p-4 text-center text-sm {{ 'font-bold text-forest-700' if loop.index == 3 else 'text-gray-700' }}">{{ val }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td class="p-4 rounded-bl-xl"></td>
+            {% for plan in plans %}
+            <td class="p-4 text-center {{ 'rounded-br-xl' if loop.last else '' }}">
+              <a href="{{ url_for('register') }}" class="inline-block text-xs font-bold px-4 py-2 rounded-lg transition-all
+                {{ 'bg-gold-500 hover:bg-gold-600 text-forest-950' if loop.index == 3 else 'bg-forest-950 hover:bg-forest-800 text-white' }}">
+                Start →
+              </a>
+            </td>
+            {% endfor %}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- Risk Disclosure -->
+<section class="bg-amber-50 border-t border-amber-200 py-10">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6">
+    <div class="flex items-start gap-4">
+      <i data-lucide="alert-triangle" class="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5"></i>
+      <div>
+        <h3 class="font-semibold text-amber-900 mb-2">Risk Disclosure</h3>
+        <p class="text-amber-700 text-sm leading-relaxed">
+          Agricultural investments carry inherent risks including weather events, market price fluctuations, and crop failures. While AgroVest Pro maintains diversified portfolios and insurance buffers to protect investor capital, past returns are not a guarantee of future performance. Only invest funds you can afford to keep locked for the plan duration. Please read our full <a href="#" class="underline font-semibold">Risk Disclosure Document</a> before investing.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% include "partials/footer.html" %}
+
+<script>
+function calculateROI(planId, roiPct, minAmt, maxAmt) {
+  const input = document.getElementById('calc-input-' + planId);
+  let amount = parseFloat(input.value) || minAmt;
+  if (amount < minAmt) amount = minAmt;
+  if (maxAmt > 0 && amount > maxAmt) amount = maxAmt;
+
+  const roi = amount * roiPct / 100;
+  const total = amount + roi;
+
+  // Get duration from plan data
+  const durations = { {% for p in plans %}{{ p.id }}: {{ p.duration_days }},{% endfor %} };
+  const days = durations[planId];
+
+  const fmt = n => '₦' + n.toLocaleString('en-NG', { minimumFractionDigits: 0 });
+
+  document.getElementById('calc-principal-' + planId).textContent = fmt(amount);
+  document.getElementById('calc-roi-' + planId).textContent = fmt(roi);
+  document.getElementById('calc-total-' + planId).textContent = fmt(total);
+  document.getElementById('calc-daily-' + planId).textContent = fmt(Math.round(roi / days)) + '/day';
+}
+
+// Initialize all calculators
+{% for plan in plans %}
+calculateROI({{ plan.id }}, {{ plan.roi_percent }}, {{ plan.min_amount }}, {{ plan.max_amount or 0 }});
+{% endfor %}
+</script>
+{% endblock %}

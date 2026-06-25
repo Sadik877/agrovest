@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+{% block title %}AgroVest Pro — Invest in Nigeria's Agricultural Future{% endblock %}
+
+{% block body %}
+{% include "partials/navbar.html" %}
+
+<!-- ══════════════════════════════════════════
+     HERO SECTION
+══════════════════════════════════════════ -->
+<section class="relative min-h-screen flex items-center overflow-hidden grain bg-forest-950">
+  <!-- Background layers -->
+  <div class="absolute inset-0 bg-gradient-to-br from-forest-950 via-forest-900 to-dark opacity-90"></div>
+  <div class="absolute inset-0" style="background-image: radial-gradient(ellipse at 70% 50%, rgba(201,168,76,0.12) 0%, transparent 60%);"></div>
+
+  <!-- Floating particles -->
+  <div class="absolute inset-0 overflow-hidden pointer-events-none">
+    {% for i in range(8) %}
+    <div class="absolute rounded-full bg-gold-500/10 animate-pulse-slow"
+         style="width:{{ [80,120,60,100,90,70,110,85][loop.index0] }}px;
+                height:{{ [80,120,60,100,90,70,110,85][loop.index0] }}px;
+                top:{{ [10,70,40,20,80,55,30,65][loop.index0] }}%;
+                left:{{ [5,80,25,60,15,45,75,90][loop.index0] }}%;
+                animation-delay:{{ loop.index0 * 0.7 }}s;"></div>
+    {% endfor %}
+  </div>
+
+  <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 w-full py-32 lg:py-0">
+    <div class="grid lg:grid-cols-2 gap-12 items-center min-h-screen">
+      <!-- Left -->
+      <div>
+        <div class="inline-flex items-center gap-2 glass rounded-full px-4 py-2 mb-6">
+          <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+          <span class="text-xs font-semibold text-green-300 uppercase tracking-widest">Live Investment Platform</span>
+        </div>
+
+        <h1 class="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
+          Grow Your Wealth<br/>
+          <span class="text-gold-500">Through Agriculture</span>
+        </h1>
+
+        <p class="text-gray-300 text-lg leading-relaxed mb-8 max-w-xl">
+          Invest in verified Nigerian farming projects and earn up to <strong class="text-gold-400">60% ROI</strong> in 30–90 days. Safe, transparent, and managed by agricultural experts.
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-4 mb-12">
+          <a href="{{ url_for('register') }}" class="inline-flex items-center justify-center gap-2 bg-gold-500 hover:bg-gold-600 text-forest-950 font-bold px-8 py-4 rounded-xl transition-all shadow-2xl hover:shadow-gold-500/30 hover:-translate-y-0.5">
+            Start Investing Now <i data-lucide="arrow-right" class="w-5 h-5"></i>
+          </a>
+          <a href="{{ url_for('plans') }}" class="inline-flex items-center justify-center gap-2 glass hover:bg-white/10 text-white font-semibold px-8 py-4 rounded-xl transition-all">
+            View Plans <i data-lucide="eye" class="w-5 h-5"></i>
+          </a>
+        </div>
+
+        <!-- Trust badges -->
+        <div class="flex flex-wrap gap-6">
+          <div class="flex items-center gap-2 text-gray-400 text-sm">
+            <i data-lucide="shield-check" class="w-4 h-4 text-green-400"></i> SEC Registered
+          </div>
+          <div class="flex items-center gap-2 text-gray-400 text-sm">
+            <i data-lucide="lock" class="w-4 h-4 text-green-400"></i> 256-bit Encryption
+          </div>
+          <div class="flex items-center gap-2 text-gray-400 text-sm">
+            <i data-lucide="users" class="w-4 h-4 text-green-400"></i> 10,000+ Investors
+          </div>
+        </div>
+      </div>
+
+      <!-- Right – Stats Card -->
+      <div class="lg:flex justify-end hidden">
+        <div class="glass rounded-2xl p-8 w-full max-w-md">
+          <div class="flex items-center justify-between mb-6">
+            <span class="text-white/60 text-sm">Platform Performance</span>
+            <span class="badge badge-success">↑ Live</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-white/5 rounded-xl p-4">
+              <p class="text-2xl font-display font-bold text-gold-400" data-count="{{ stats.total_users }}">0</p>
+              <p class="text-xs text-white/50 mt-1">Total Investors</p>
+            </div>
+            <div class="bg-white/5 rounded-xl p-4">
+              <p class="text-2xl font-display font-bold text-green-400" data-count="{{ stats.active_investments }}">0</p>
+              <p class="text-xs text-white/50 mt-1">Active Plans</p>
+            </div>
+            <div class="bg-white/5 rounded-xl p-4">
+              <p class="text-xl font-display font-bold text-white" data-naira="{{ stats.total_invested }}">₦0</p>
+              <p class="text-xs text-white/50 mt-1">Total Invested</p>
+            </div>
+            <div class="bg-white/5 rounded-xl p-4">
+              <p class="text-xl font-display font-bold text-green-300" data-naira="{{ stats.total_paid }}">₦0</p>
+              <p class="text-xs text-white/50 mt-1">Total Paid Out</p>
+            </div>
+          </div>
+
+          <!-- Mini plans preview -->
+          <div class="space-y-3">
+            {% for plan in plans %}
+            <div class="flex items-center justify-between glass rounded-lg p-3">
+              <div class="flex items-center gap-2">
+                <span class="text-lg">{{ plan.icon }}</span>
+                <span class="text-sm text-white font-medium">{{ plan.name }}</span>
+              </div>
+              <span class="text-gold-400 font-bold text-sm">{{ plan.roi_percent }}% ROI</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scroll indicator -->
+  <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/40">
+    <span class="text-xs">Scroll</span>
+    <div class="w-px h-8 bg-white/20 relative overflow-hidden">
+      <div class="absolute inset-0 bg-gold-500 animate-bounce origin-top scale-y-50"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     STATS BAR
+══════════════════════════════════════════ -->
+<section class="bg-forest-950 py-8 border-y border-gold-500/20">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+      <div>
+        <p class="text-2xl font-display font-bold text-gold-400">₦2.4B+</p>
+        <p class="text-xs text-gray-400 mt-1">Total Investment Volume</p>
+      </div>
+      <div>
+        <p class="text-2xl font-display font-bold text-gold-400">10,000+</p>
+        <p class="text-xs text-gray-400 mt-1">Happy Investors</p>
+      </div>
+      <div>
+        <p class="text-2xl font-display font-bold text-gold-400">98.7%</p>
+        <p class="text-xs text-gray-400 mt-1">On-time Payout Rate</p>
+      </div>
+      <div>
+        <p class="text-2xl font-display font-bold text-gold-400">5 Years</p>
+        <p class="text-xs text-gray-400 mt-1">Operating Experience</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     HOW IT WORKS
+══════════════════════════════════════════ -->
+<section class="py-20 bg-white">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-14 animate-on-scroll">
+      <span class="inline-block text-xs font-bold text-gold-600 uppercase tracking-widest mb-3">Simple Process</span>
+      <h2 class="font-display text-3xl sm:text-4xl font-bold text-gray-900">How AgroVest Works</h2>
+      <p class="text-gray-500 mt-3 max-w-xl mx-auto">Start earning in four easy steps.</p>
+    </div>
+
+    <div class="grid md:grid-cols-4 gap-8 relative">
+      <!-- Connector line -->
+      <div class="hidden md:block absolute top-10 left-[12.5%] right-[12.5%] h-0.5 bg-gradient-to-r from-forest-600 via-gold-500 to-forest-600 z-0"></div>
+
+      {% set steps = [
+        ('user-plus', 'Create Account', 'Register in under 2 minutes with your email and phone number.'),
+        ('wallet', 'Fund Your Wallet', 'Deposit via bank transfer, USSD, or mobile money.'),
+        ('trending-up', 'Choose a Plan', 'Select from our four investment tiers based on your goals.'),
+        ('banknote', 'Earn & Withdraw', 'Receive your principal plus ROI directly to your bank account.'),
+      ] %}
+      {% for icon, title, desc in steps %}
+      <div class="relative z-10 text-center animate-on-scroll" style="animation-delay: {{ loop.index0 * 0.15 }}s">
+        <div class="w-20 h-20 rounded-2xl bg-forest-950 flex items-center justify-center mx-auto mb-4 shadow-xl shadow-forest-950/30">
+          <i data-lucide="{{ icon }}" class="w-8 h-8 text-gold-400"></i>
+        </div>
+        <span class="text-xs font-bold text-forest-600 uppercase tracking-widest">Step {{ loop.index }}</span>
+        <h3 class="font-semibold text-gray-900 mt-1 mb-2">{{ title }}</h3>
+        <p class="text-gray-500 text-sm leading-relaxed">{{ desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     INVESTMENT PLANS
+══════════════════════════════════════════ -->
+<section class="py-20 bg-gray-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-14 animate-on-scroll">
+      <span class="inline-block text-xs font-bold text-gold-600 uppercase tracking-widest mb-3">Investment Plans</span>
+      <h2 class="font-display text-3xl sm:text-4xl font-bold text-gray-900">Choose Your Growth Path</h2>
+      <p class="text-gray-500 mt-3 max-w-xl mx-auto">Every plan is backed by real farming operations across Nigeria's agricultural belt.</p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {% for plan in plans %}
+      <div class="relative bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-on-scroll {% if loop.index == 3 %}ring-2 ring-gold-500{% endif %}"
+           style="animation-delay: {{ loop.index0 * 0.1 }}s">
+        {% if loop.index == 3 %}
+        <div class="absolute top-0 left-0 right-0 bg-gold-500 text-forest-950 text-xs font-bold text-center py-1.5 uppercase tracking-widest">Most Popular</div>
+        {% endif %}
+        <div class="p-6 {{ 'pt-10' if loop.index == 3 else '' }}">
+          <div class="text-4xl mb-4">{{ plan.icon }}</div>
+          <h3 class="font-display font-bold text-lg text-gray-900 mb-1">{{ plan.name }}</h3>
+          <p class="text-gray-400 text-xs mb-5">{{ plan.description }}</p>
+
+          <div class="flex items-baseline gap-1 mb-2">
+            <span class="text-4xl font-display font-bold text-forest-800">{{ plan.roi_percent }}%</span>
+            <span class="text-gray-400 text-sm">ROI</span>
+          </div>
+          <p class="text-sm text-gray-500 mb-5">in {{ plan.duration_days }} days</p>
+
+          <div class="text-xs text-gray-400 mb-5">
+            Min: <span class="font-semibold text-gray-700">₦{{ '{:,.0f}'.format(plan.min_amount) }}</span>
+            {% if plan.max_amount %}
+            · Max: <span class="font-semibold text-gray-700">₦{{ '{:,.0f}'.format(plan.max_amount) }}</span>
+            {% else %}
+            · No maximum
+            {% endif %}
+          </div>
+
+          <ul class="space-y-2 mb-6">
+            {% for feature in plan.features %}
+            <li class="flex items-center gap-2 text-xs text-gray-600">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5 text-forest-600 flex-shrink-0"></i>
+              {{ feature }}
+            </li>
+            {% endfor %}
+          </ul>
+
+          <a href="{{ url_for('register') }}" class="block text-center py-3 rounded-xl font-semibold text-sm transition-all
+            {% if loop.index == 3 %}bg-gold-500 hover:bg-gold-600 text-forest-950 shadow-lg{% else %}bg-forest-950 hover:bg-forest-800 text-white{% endif %}">
+            Invest Now
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="text-center mt-10">
+      <a href="{{ url_for('plans') }}" class="inline-flex items-center gap-2 text-forest-700 font-semibold hover:text-forest-900 transition-colors">
+        View full plan details <i data-lucide="arrow-right" class="w-4 h-4"></i>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     TESTIMONIALS
+══════════════════════════════════════════ -->
+<section class="py-20 bg-forest-950 relative grain overflow-hidden">
+  <div class="absolute inset-0 bg-gradient-to-b from-transparent to-dark/50 pointer-events-none"></div>
+  <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-14 animate-on-scroll">
+      <span class="inline-block text-xs font-bold text-gold-500 uppercase tracking-widest mb-3">Testimonials</span>
+      <h2 class="font-display text-3xl sm:text-4xl font-bold text-white">What Our Investors Say</h2>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-6">
+      {% set testimonials = [
+        ('Adaeze Okonkwo', 'Lagos', '⭐⭐⭐⭐⭐', 'I invested ₦150,000 in the Green Harvest Plan and received ₦187,500 after 45 days. AgroVest is the real deal!', 'Medical Doctor'),
+        ('Emeka Duru', 'Abuja', '⭐⭐⭐⭐⭐', 'As a civil servant, I was skeptical at first. But my Premium Agro investment returned 40% in two months. Now I invest every cycle.', 'Civil Servant'),
+        ('Fatima Aliyu', 'Kano', '⭐⭐⭐⭐⭐', 'The referral system is a bonus! I have earned over ₦45,000 just from referring friends. Plus my own investments are doing great.', 'Business Owner'),
+        ('Chukwudi Nwachukwu', 'Port Harcourt', '⭐⭐⭐⭐⭐', 'Started with the Starter Farm at ₦25,000. Now I\'m on Elite Farm. The growth has been incredible over the past year.', 'Engineer'),
+        ('Bisi Adeyemi', 'Ibadan', '⭐⭐⭐⭐⭐', 'Withdrawals are fast! I received my money the same day. Customer service is also very responsive on WhatsApp.', 'Teacher'),
+        ('Uche Obi', 'Enugu', '⭐⭐⭐⭐⭐', 'AgroVest helped me save and invest for my children\'s education. The returns are consistent and the platform is easy to use.', 'Accountant'),
+      ] %}
+      {% for name, city, stars, review, role in testimonials %}
+      <div class="glass rounded-2xl p-6 animate-on-scroll" style="animation-delay: {{ loop.index0 * 0.1 }}s">
+        <div class="text-base mb-3">{{ stars }}</div>
+        <p class="text-gray-300 text-sm leading-relaxed mb-5">"{{ review }}"</p>
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-gold-500/20 flex items-center justify-center">
+            <span class="text-gold-400 font-bold text-sm">{{ name[0] }}</span>
+          </div>
+          <div>
+            <p class="text-white font-semibold text-sm">{{ name }}</p>
+            <p class="text-gray-500 text-xs">{{ role }} · {{ city }}</p>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     FAQ
+══════════════════════════════════════════ -->
+<section class="py-20 bg-white">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-14 animate-on-scroll">
+      <span class="inline-block text-xs font-bold text-gold-600 uppercase tracking-widest mb-3">FAQ</span>
+      <h2 class="font-display text-3xl sm:text-4xl font-bold text-gray-900">Common Questions</h2>
+    </div>
+
+    <div class="space-y-4">
+      {% set faqs = [
+        ('How does AgroVest generate returns?', 'We partner with verified commercial farms across Nigeria — rice, cassava, maize, poultry, and aquaculture. Revenue from farm sales funds investor returns. Every farm is independently audited.'),
+        ('Is my investment safe?', 'We maintain an insurance buffer and diversify across multiple farming projects to minimize risk. We have maintained 98.7% payout consistency over 5 years.'),
+        ('When can I withdraw my earnings?', 'After your investment matures (plan duration), the full amount plus ROI is credited to your wallet. You can then request withdrawal to your Nigerian bank account within 24 hours.'),
+        ('What is the minimum deposit?', 'You can start with as little as ₦1,000 to fund your wallet. The minimum investment for the Starter Farm plan is ₦10,000.'),
+        ('How does the referral program work?', 'Share your unique referral link. When a friend registers and makes their first investment, you earn 5% of their investment amount as commission, credited instantly to your wallet.'),
+        ('Is AgroVest registered?', 'Yes. AgroVest Pro is registered with the Corporate Affairs Commission (CAC) of Nigeria and operates within applicable investment regulations.'),
+      ] %}
+      {% for q, a in faqs %}
+      <div class="border border-gray-100 rounded-xl overflow-hidden animate-on-scroll" style="animation-delay: {{ loop.index0 * 0.08 }}s">
+        <button onclick="toggleFaq(this)" class="w-full flex items-center justify-between p-5 text-left hover:bg-gray-50 transition-colors">
+          <span class="font-semibold text-gray-900 text-sm">{{ q }}</span>
+          <i data-lucide="chevron-down" class="w-5 h-5 text-gray-400 flex-shrink-0 transition-transform"></i>
+        </button>
+        <div class="faq-body hidden px-5 pb-5">
+          <p class="text-gray-500 text-sm leading-relaxed">{{ a }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     CTA BANNER
+══════════════════════════════════════════ -->
+<section class="py-20 bg-gradient-to-r from-forest-950 to-dark relative overflow-hidden">
+  <div class="absolute right-0 top-0 w-96 h-96 bg-gold-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+  <div class="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 text-center animate-on-scroll">
+    <h2 class="font-display text-3xl sm:text-5xl font-bold text-white mb-4">
+      Ready to Grow Your Money?
+    </h2>
+    <p class="text-gray-300 mb-8 text-lg max-w-xl mx-auto">Join over 10,000 Nigerians earning consistent returns from agricultural investments.</p>
+    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+      <a href="{{ url_for('register') }}" class="bg-gold-500 hover:bg-gold-600 text-forest-950 font-bold px-10 py-4 rounded-xl transition-all shadow-xl hover:-translate-y-0.5">
+        Create Free Account
+      </a>
+      <a href="{{ url_for('contact') }}" class="glass hover:bg-white/10 text-white font-semibold px-10 py-4 rounded-xl transition-all">
+        Talk to an Agent
+      </a>
+    </div>
+  </div>
+</section>
+
+{% include "partials/footer.html" %}
+
+<script>
+  // Counter animation
+  function animateCounter(el) {
+    const target = parseFloat(el.dataset.count || el.dataset.naira || '0');
+    const isNaira = 'naira' in el.dataset;
+    const duration = 2000;
+    const steps = 60;
+    const step = target / steps;
+    let current = 0;
+    const timer = setInterval(() => {
+      current = Math.min(current + step, target);
+      if (isNaira) {
+        el.textContent = '₦' + (current / 1000000).toFixed(1) + 'M';
+      } else {
+        el.textContent = Math.floor(current).toLocaleString();
+      }
+      if (current >= target) clearInterval(timer);
+    }, duration / steps);
+  }
+
+  const counters = document.querySelectorAll('[data-count], [data-naira]');
+  const counterObserver = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        animateCounter(e.target);
+        counterObserver.unobserve(e.target);
+      }
+    });
+  });
+  counters.forEach(c => counterObserver.observe(c));
+
+  // FAQ toggle
+  function toggleFaq(btn) {
+    const body = btn.nextElementSibling;
+    const icon = btn.querySelector('[data-lucide]');
+    body.classList.toggle('hidden');
+    icon.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
+  }
+</script>
+{% endblock %}

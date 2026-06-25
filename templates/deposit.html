@@ -1,0 +1,118 @@
+{% extends "dashboard_base.html" %}
+{% block page_title %}Deposit Funds{% endblock %}
+{% block page_subtitle %}Add money to your AgroVest wallet{% endblock %}
+
+{% block dashboard_content %}
+<div class="max-w-4xl mx-auto grid lg:grid-cols-5 gap-6">
+  <!-- Form -->
+  <div class="lg:col-span-3 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+    <h2 class="font-semibold text-gray-900 mb-6">Make a Deposit</h2>
+
+    <!-- Bank Details -->
+    <div class="bg-forest-50 border border-forest-200 rounded-xl p-5 mb-6">
+      <p class="font-semibold text-forest-800 text-sm mb-3">🏦 Transfer to this Account</p>
+      <div class="space-y-2 text-sm">
+        <div class="flex justify-between">
+          <span class="text-gray-500">Bank Name</span>
+          <span class="font-bold text-gray-900">Zenith Bank</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-500">Account Number</span>
+          <span class="font-bold text-gray-900 font-mono">2089 234 567</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-500">Account Name</span>
+          <span class="font-bold text-gray-900">AgroVest Nigeria Ltd</span>
+        </div>
+      </div>
+      <div class="mt-3 pt-3 border-t border-forest-200">
+        <p class="text-xs text-forest-600">After transfer, submit your proof below. Your balance will be updated within 30 minutes.</p>
+      </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('deposit') }}" enctype="multipart/form-data" class="space-y-5">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Deposit Amount (₦)</label>
+        <div class="relative">
+          <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">₦</span>
+          <input type="number" name="amount" required min="1000" placeholder="0.00"
+            class="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-3 text-gray-900 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
+        </div>
+        <p class="text-xs text-gray-400 mt-1">Minimum deposit: ₦1,000</p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+        <select name="payment_method" required
+          class="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-900 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500">
+          <option value="">Select method...</option>
+          <option value="bank_transfer">Bank Transfer</option>
+          <option value="ussd">USSD Transfer</option>
+          <option value="mobile_money">Mobile Money</option>
+          <option value="cash_deposit">Cash Deposit</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Payment Proof <span class="text-gray-400">(receipt/screenshot)</span></label>
+        <div id="drop-zone" class="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-forest-400 transition-colors" onclick="document.getElementById('proof-file').click()">
+          <i data-lucide="upload-cloud" class="w-8 h-8 text-gray-300 mx-auto mb-2"></i>
+          <p class="text-sm text-gray-400">Click to upload or drag and drop</p>
+          <p class="text-xs text-gray-300 mt-1">PNG, JPG, PDF — Max 5MB</p>
+          <p id="file-name" class="text-xs text-forest-600 font-medium mt-2"></p>
+        </div>
+        <input type="file" name="proof" id="proof-file" accept=".png,.jpg,.jpeg,.pdf" class="hidden"
+          onchange="document.getElementById('file-name').textContent = this.files[0]?.name || ''" />
+      </div>
+
+      <button type="submit" class="w-full bg-forest-950 hover:bg-forest-800 text-white font-bold py-3.5 rounded-xl transition-colors shadow-lg">
+        Submit Deposit Request
+      </button>
+    </form>
+  </div>
+
+  <!-- History -->
+  <div class="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+    <h2 class="font-semibold text-gray-900 mb-5">Deposit History</h2>
+    {% if deposits %}
+    <div class="space-y-3">
+      {% for dep in deposits %}
+      <div class="border border-gray-100 rounded-xl p-4">
+        <div class="flex items-center justify-between mb-1">
+          <span class="font-bold text-gray-900 text-sm">{{ dep.amount | naira }}</span>
+          <span class="{{ dep.status | status_badge }} badge">{{ dep.status.title() }}</span>
+        </div>
+        <p class="text-xs text-gray-400">{{ dep.payment_method.replace('_', ' ').title() }}</p>
+        <p class="text-xs text-gray-300">{{ dep.created_at | date_fmt }}</p>
+        <p class="text-xs font-mono text-gray-300 mt-1">{{ dep.reference }}</p>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-10">
+      <i data-lucide="inbox" class="w-10 h-10 text-gray-200 mx-auto mb-3"></i>
+      <p class="text-gray-400 text-sm">No deposits yet</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+// Drag and drop
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('border-forest-400'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('border-forest-400'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('border-forest-400');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const input = document.getElementById('proof-file');
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    document.getElementById('file-name').textContent = file.name;
+  }
+});
+</script>
+{% endblock %}

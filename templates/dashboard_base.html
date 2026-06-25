@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="flex h-screen bg-gray-50 overflow-hidden">
+
+  <!-- ── Sidebar ── -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-forest-950 flex flex-col transition-transform duration-300 -translate-x-full lg:translate-x-0 lg:static lg:z-auto">
+    <!-- Logo -->
+    <div class="px-6 py-5 border-b border-white/10">
+      <a href="{{ url_for('index') }}" class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-gold-500 flex items-center justify-center flex-shrink-0">
+          <span class="text-forest-950 font-display font-bold">A</span>
+        </div>
+        <span class="font-display font-bold text-lg text-white">Agro<span class="text-gold-500">Vest</span></span>
+      </a>
+    </div>
+
+    <!-- User Info -->
+    <div class="px-4 py-4 border-b border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-gold-500/20 flex items-center justify-center flex-shrink-0">
+          <span class="text-gold-400 font-bold">{{ current_user.full_name[0] if current_user else 'U' }}</span>
+        </div>
+        <div class="min-w-0">
+          <p class="text-white text-sm font-semibold truncate">{{ current_user.full_name if current_user else 'User' }}</p>
+          <p class="text-gray-400 text-xs truncate">{{ current_user.email if current_user else '' }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-3 py-4 overflow-y-auto">
+      <div class="space-y-1">
+        <a href="{{ url_for('dashboard') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all {% if request.endpoint == 'dashboard' %}bg-gold-500 text-forest-950{% else %}text-gray-300 hover:bg-white/10 hover:text-white{% endif %}">
+          <i data-lucide="layout-dashboard" class="w-4 h-4 flex-shrink-0"></i> Overview
+        </a>
+        <a href="{{ url_for('invest') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all {% if request.endpoint == 'invest' %}bg-gold-500 text-forest-950{% else %}text-gray-300 hover:bg-white/10 hover:text-white{% endif %}">
+          <i data-lucide="trending-up" class="w-4 h-4 flex-shrink-0"></i> Invest Now
+        </a>
+        <a href="{{ url_for('deposit') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all {% if request.endpoint == 'deposit' %}bg-gold-500 text-forest-950{% else %}text-gray-300 hover:bg-white/10 hover:text-white{% endif %}">
+          <i data-lucide="wallet" class="w-4 h-4 flex-shrink-0"></i> Deposit
+        </a>
+        <a href="{{ url_for('withdraw') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all {% if request.endpoint == 'withdraw' %}bg-gold-500 text-forest-950{% else %}text-gray-300 hover:bg-white/10 hover:text-white{% endif %}">
+          <i data-lucide="banknote" class="w-4 h-4 flex-shrink-0"></i> Withdraw
+        </a>
+
+        <div class="pt-4 pb-2">
+          <p class="text-xs text-gray-600 uppercase tracking-widest px-3">Account</p>
+        </div>
+        <a href="{{ url_for('plans') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-white/10 hover:text-white transition-all">
+          <i data-lucide="package" class="w-4 h-4 flex-shrink-0"></i> View Plans
+        </a>
+        <a href="{{ url_for('index') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-white/10 hover:text-white transition-all">
+          <i data-lucide="home" class="w-4 h-4 flex-shrink-0"></i> Homepage
+        </a>
+        <a href="{{ url_for('logout') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all">
+          <i data-lucide="log-out" class="w-4 h-4 flex-shrink-0"></i> Log Out
+        </a>
+      </div>
+    </nav>
+
+    <!-- Balance -->
+    <div class="px-4 py-4 border-t border-white/10">
+      <div class="bg-gold-500/10 rounded-xl p-3">
+        <p class="text-gold-400 text-xs font-medium mb-1">Wallet Balance</p>
+        <p class="text-white font-display font-bold text-xl">{{ current_user.balance | naira if current_user else '₦0.00' }}</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Overlay (mobile) -->
+  <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-40 lg:hidden hidden" onclick="closeSidebar()"></div>
+
+  <!-- ── Main Content ── -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- Topbar -->
+    <header class="bg-white border-b border-gray-100 px-4 sm:px-6 h-16 flex items-center justify-between flex-shrink-0">
+      <div class="flex items-center gap-4">
+        <button onclick="openSidebar()" class="lg:hidden text-gray-500 hover:text-gray-700">
+          <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+        <div>
+          <h1 class="font-semibold text-gray-900 text-base">{% block page_title %}Dashboard{% endblock %}</h1>
+          <p class="text-xs text-gray-400">{% block page_subtitle %}Welcome back{% endblock %}</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <!-- Notifications -->
+        <div class="relative">
+          <button id="notif-btn" onclick="toggleNotifications()" class="relative w-9 h-9 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+            <i data-lucide="bell" class="w-4 h-4 text-gray-600"></i>
+            {% if unread_count > 0 %}
+            <span class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{{ unread_count }}</span>
+            {% endif %}
+          </button>
+
+          <!-- Notifications dropdown -->
+          <div id="notif-panel" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <span class="font-semibold text-gray-900 text-sm">Notifications</span>
+              <button onclick="markAllRead()" class="text-xs text-forest-600 hover:text-forest-800 font-medium">Mark all read</button>
+            </div>
+            <div class="max-h-72 overflow-y-auto">
+              {% set notifications = [] %}
+              {% if current_user %}
+                {# notifications injected via context in dashboard route #}
+              {% endif %}
+              <div id="notif-list" class="divide-y divide-gray-50">
+                <p class="text-gray-400 text-xs text-center py-6">Loading...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Avatar -->
+        <div class="w-9 h-9 rounded-full bg-forest-950 flex items-center justify-center">
+          <span class="text-gold-400 font-bold text-sm">{{ current_user.full_name[0] if current_user else 'U' }}</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6">
+      {% block dashboard_content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<script>
+  function openSidebar() {
+    document.getElementById('sidebar').style.transform = 'translateX(0)';
+    document.getElementById('sidebar-overlay').classList.remove('hidden');
+  }
+  function closeSidebar() {
+    document.getElementById('sidebar').style.transform = '';
+    document.getElementById('sidebar-overlay').classList.add('hidden');
+  }
+  function toggleNotifications() {
+    document.getElementById('notif-panel').classList.toggle('hidden');
+  }
+  function markAllRead() {
+    fetch("{{ url_for('mark_notifications_read') }}", { method: 'POST', headers: {'Content-Type': 'application/json'} });
+    document.querySelectorAll('.notif-dot').forEach(d => d.remove());
+    const badge = document.querySelector('#notif-btn span');
+    if (badge) badge.remove();
+  }
+  // Close dropdown on outside click
+  document.addEventListener('click', (e) => {
+    const panel = document.getElementById('notif-panel');
+    const btn = document.getElementById('notif-btn');
+    if (!panel.contains(e.target) && !btn.contains(e.target)) {
+      panel.classList.add('hidden');
+    }
+  });
+</script>
+{% endblock %}
