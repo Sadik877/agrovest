@@ -19,8 +19,21 @@ from werkzeug.utils import secure_filename
 # ─────────────────────────────────────────────
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'agrovest-super-secret-key-2024-change-in-prod')
-app.config['DATABASE'] = os.path.join(app.root_path, 'database.db')
-app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
+
+# On Render the app root may be read-only; use /tmp for writable storage
+# Locally it will just use the project folder
+_BASE_DIR = os.environ.get('RENDER_TMP', None)
+if _BASE_DIR:
+    # Running on Render — use /tmp which is always writable
+    _DATA_DIR = '/tmp/agrovest_data'
+else:
+    # Local development — store next to app.py
+    _DATA_DIR = app.root_path
+
+os.makedirs(_DATA_DIR, exist_ok=True)
+
+app.config['DATABASE'] = os.path.join(_DATA_DIR, 'database.db')
+app.config['UPLOAD_FOLDER'] = os.path.join(_DATA_DIR, 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 
@@ -237,11 +250,16 @@ def get_current_user():
 
 @app.context_processor
 def inject_user():
-    user = get_current_user()
+    user = None
     unread = 0
-    if user:
-        unread = query_db("SELECT COUNT(*) as c FROM notifications WHERE user_id=? AND is_read=0",
-                          [user['id']], one=True)['c']
+    try:
+        user = get_current_user()
+        if user:
+            row = query_db("SELECT COUNT(*) as c FROM notifications WHERE user_id=? AND is_read=0",
+                           [user['id']], one=True)
+            unread = row['c'] if row else 0
+    except Exception:
+        pass
     return dict(current_user=user, unread_count=unread, plans=INVESTMENT_PLANS)
 
 # ─────────────────────────────────────────────
@@ -249,12 +267,15 @@ def inject_user():
 # ─────────────────────────────────────────────
 @app.route('/')
 def index():
-    stats = {
-        'total_users': query_db("SELECT COUNT(*) as c FROM users WHERE is_admin=0", one=True)['c'],
-        'total_invested': query_db("SELECT COALESCE(SUM(amount),0) as s FROM investments", one=True)['s'],
-        'active_investments': query_db("SELECT COUNT(*) as c FROM investments WHERE status='active'", one=True)['c'],
-        'total_paid': query_db("SELECT COALESCE(SUM(amount),0) as s FROM withdrawals WHERE status='approved'", one=True)['s'],
-    }
+    try:
+        stats = {
+            'total_users': query_db("SELECT COUNT(*) as c FROM users WHERE is_admin=0", one=True)['c'],
+            'total_invested': query_db("SELECT COALESCE(SUM(amount),0) as s FROM investments", one=True)['s'],
+            'active_investments': query_db("SELECT COUNT(*) as c FROM investments WHERE status='active'", one=True)['c'],
+            'total_paid': query_db("SELECT COALESCE(SUM(amount),0) as s FROM withdrawals WHERE status='approved'", one=True)['s'],
+        }
+    except Exception:
+        stats = {'total_users': 0, 'total_invested': 0, 'active_investments': 0, 'total_paid': 0}
     return render_template('index.html', stats=stats, plans=INVESTMENT_PLANS)
 
 @app.route('/about')
@@ -745,6 +766,15 @@ def admin_complete_investment(inv_id):
 
 
 # ─────────────────────────────────────────────
+# Serve uploaded files (works both locally and on Render /tmp)
+# ─────────────────────────────────────────────
+from flask import send_from_directory
+
+@app.route('/uploads/<path:filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# ─────────────────────────────────────────────
 # Error Handlers
 # ─────────────────────────────────────────────
 @app.errorhandler(403)
@@ -765,34 +795,48 @@ def server_error(e):
 @app.template_filter('naira')
 def naira_filter(value):
     try:
-        return f'₦{float(value):,.2f}'
+        v = float(value) if value is not None else 0.0
+        return f'₦{v:,.2f}'
     except (TypeError, ValueError):
         return '₦0.00'
 
 @app.template_filter('date_fmt')
 def date_fmt(value, fmt='%d %b %Y'):
+    if not value:
+        return '—'
     if isinstance(value, str):
         try:
             value = datetime.fromisoformat(value)
         except Exception:
             return value
-    return value.strftime(fmt) if value else ''
+    try:
+        return value.strftime(fmt)
+    except Exception:
+        return str(value)
 
 @app.template_filter('status_badge')
 def status_badge(status):
     badges = {
-        'pending': 'badge-warning',
-        'approved': 'badge-success',
-        'rejected': 'badge-error',
-        'active': 'badge-info',
+        'pending':   'badge-warning',
+        'approved':  'badge-success',
+        'rejected':  'badge-error',
+        'active':    'badge-info',
         'completed': 'badge-success',
     }
-    return badges.get(status, 'badge-neutral')
+    return badges.get(str(status).lower() if status else '', 'badge-neutral')
 
 # ─────────────────────────────────────────────
-# Run
+# Initialize DB at import time (works with gunicorn on Render)
+# ─────────────────────────────────────────────
+with app.app_context():
+    try:
+        init_db()
+    except Exception as _e:
+        import traceback
+        traceback.print_exc()
+
+# ─────────────────────────────────────────────
+# Run (local dev only — Render uses gunicorn)
 # ─────────────────────────────────────────────
 if __name__ == '__main__':
-    with app.app_context():
-        init_db()
-    app.run(debug=True, port=5000)
+    app.run(debug=False, port=5000, host='0.0.0.0')
