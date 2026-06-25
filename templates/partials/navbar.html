@@ -1,0 +1,77 @@
+<!-- Public Navigation -->
+<nav id="navbar" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300" x-data="{ open: false }">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="flex items-center justify-between h-16 md:h-20">
+      <!-- Logo -->
+      <a href="{{ url_for('index') }}" class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-lg bg-gold-500 flex items-center justify-center shadow-lg">
+          <span class="text-forest-950 font-display font-bold text-lg">A</span>
+        </div>
+        <span class="font-display font-bold text-xl text-white">Agro<span class="text-gold-500">Vest</span></span>
+      </a>
+
+      <!-- Desktop Links -->
+      <div class="hidden md:flex items-center gap-8">
+        <a href="{{ url_for('index') }}" class="nav-link text-sm font-medium text-white/80 hover:text-gold-400 transition-colors">Home</a>
+        <a href="{{ url_for('about') }}" class="nav-link text-sm font-medium text-white/80 hover:text-gold-400 transition-colors">About</a>
+        <a href="{{ url_for('plans') }}" class="nav-link text-sm font-medium text-white/80 hover:text-gold-400 transition-colors">Investment Plans</a>
+        <a href="{{ url_for('contact') }}" class="nav-link text-sm font-medium text-white/80 hover:text-gold-400 transition-colors">Contact</a>
+      </div>
+
+      <!-- CTA -->
+      <div class="hidden md:flex items-center gap-3">
+        {% if current_user %}
+          <a href="{{ url_for('dashboard') }}" class="flex items-center gap-2 bg-gold-500 hover:bg-gold-600 text-forest-950 font-semibold text-sm px-5 py-2.5 rounded-lg transition-all shadow-lg">
+            <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+          </a>
+        {% else %}
+          <a href="{{ url_for('login') }}" class="text-sm font-medium text-white/80 hover:text-white transition-colors">Log In</a>
+          <a href="{{ url_for('register') }}" class="bg-gold-500 hover:bg-gold-600 text-forest-950 font-semibold text-sm px-5 py-2.5 rounded-lg transition-all shadow-lg">Get Started</a>
+        {% endif %}
+      </div>
+
+      <!-- Mobile Toggle -->
+      <button id="nav-toggle" class="md:hidden text-white p-2">
+        <i data-lucide="menu" class="w-6 h-6"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile Menu -->
+  <div id="mobile-menu" class="hidden md:hidden glass border-t border-white/10">
+    <div class="px-4 py-4 space-y-2">
+      <a href="{{ url_for('index') }}" class="block text-white/80 hover:text-gold-400 py-2 text-sm font-medium">Home</a>
+      <a href="{{ url_for('about') }}" class="block text-white/80 hover:text-gold-400 py-2 text-sm font-medium">About</a>
+      <a href="{{ url_for('plans') }}" class="block text-white/80 hover:text-gold-400 py-2 text-sm font-medium">Investment Plans</a>
+      <a href="{{ url_for('contact') }}" class="block text-white/80 hover:text-gold-400 py-2 text-sm font-medium">Contact</a>
+      <div class="pt-2 border-t border-white/10 flex gap-3">
+        {% if current_user %}
+          <a href="{{ url_for('dashboard') }}" class="flex-1 text-center bg-gold-500 text-forest-950 font-semibold text-sm py-2.5 rounded-lg">Dashboard</a>
+        {% else %}
+          <a href="{{ url_for('login') }}" class="flex-1 text-center border border-white/20 text-white text-sm py-2.5 rounded-lg">Log In</a>
+          <a href="{{ url_for('register') }}" class="flex-1 text-center bg-gold-500 text-forest-950 font-semibold text-sm py-2.5 rounded-lg">Get Started</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</nav>
+
+<script>
+  // Navbar scroll effect
+  const navbar = document.getElementById('navbar');
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 50) {
+      navbar.style.background = 'rgba(10,74,47,0.95)';
+      navbar.style.backdropFilter = 'blur(12px)';
+      navbar.style.boxShadow = '0 4px 30px rgba(0,0,0,0.3)';
+    } else {
+      navbar.style.background = 'transparent';
+      navbar.style.backdropFilter = 'none';
+      navbar.style.boxShadow = 'none';
+    }
+  });
+  // Mobile menu
+  document.getElementById('nav-toggle').addEventListener('click', () => {
+    document.getElementById('mobile-menu').classList.toggle('hidden');
+  });
+</script>
