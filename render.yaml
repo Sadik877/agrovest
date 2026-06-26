@@ -5,11 +5,11 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --workers 2 --bind 0.0.0.0:$PORT --timeout 120
     envVars:
-      - key: SECRET_KEY
+      - key: sb_secret_JI7_6GPh-cGMC5xtVd3iPg_489nhmhU
         generateValue: true
-      - key: DATABASE_URL
+      - key: https://igtfcidpbfwnegolcadb.supabase.co
         sync: false          # You paste this from Supabase manually
       - key: RENDER_TMP
         value: "true"
       - key: PYTHON_VERSION
-        value: "3.11.0"
+        value: "3.14"
