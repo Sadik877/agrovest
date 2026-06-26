@@ -6,10 +6,10 @@
 <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
   {% set admin_stats = [
     ('users', 'Total Users', stats.total_users, 'bg-blue-600'),
+    ('package', 'Active Plans', stats.total_plans, 'bg-indigo-600'),
     ('trending-up', 'Active Investments', stats.active_investments, 'bg-forest-700'),
     ('wallet', 'Pending Deposits', stats.pending_deposits, 'bg-amber-600'),
     ('banknote', 'Pending Withdrawals', stats.pending_withdrawals, 'bg-red-600'),
-    ('dollar-sign', 'Total Invested', stats.total_invested | naira, 'bg-purple-600'),
     ('check-circle', 'Total Paid Out', stats.total_paid_out | naira, 'bg-emerald-600'),
   ] %}
   {% for icon, label, value, bg in admin_stats %}

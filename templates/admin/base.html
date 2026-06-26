@@ -30,11 +30,12 @@
     <!-- Nav Links -->
     <nav class="flex-1 px-3 py-4 overflow-y-auto space-y-1">
       {% set admin_links = [
-        ('admin_dashboard', 'layout-dashboard', 'Dashboard'),
-        ('admin_users',     'users',            'Users'),
-        ('admin_deposits',  'wallet',           'Deposits'),
-        ('admin_withdrawals','banknote',        'Withdrawals'),
-        ('admin_investments','trending-up',     'Investments'),
+        ('admin_dashboard',  'layout-dashboard', 'Dashboard'),
+        ('admin_users',      'users',            'Users'),
+        ('admin_plans',      'package',          'Plans'),
+        ('admin_deposits',   'wallet',           'Deposits'),
+        ('admin_withdrawals','banknote',         'Withdrawals'),
+        ('admin_investments','trending-up',      'Investments'),
       ] %}
       {% for endpoint, icon, label in admin_links %}
       <a href="{{ url_for(endpoint) }}"
