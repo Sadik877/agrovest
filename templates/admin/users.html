@@ -51,11 +51,6 @@
           </td>
           <td class="px-6 py-4">
             <div class="flex items-center gap-2">
-              <!-- Edit -->
-              <a href="{{ url_for('admin_user_edit', user_id=u.id) }}"
-                class="bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors">
-                Edit
-              </a>
               <!-- Credit -->
               <button onclick="openCreditModal({{ u.id }}, '{{ u.full_name }}')"
                 class="bg-green-100 hover:bg-green-200 text-green-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors">

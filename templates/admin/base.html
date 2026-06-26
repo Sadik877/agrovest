@@ -3,16 +3,11 @@
 {% block body %}
 <div class="flex h-screen bg-gray-100 overflow-hidden">
 
-  <!-- ── Admin Sidebar ── -->
-  <aside id="admin-sidebar"
-    class="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 flex flex-col
-           -translate-x-full lg:translate-x-0 lg:static lg:z-auto
-           transition-transform duration-300 ease-in-out">
-
-    <!-- Logo -->
-    <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+  <!-- Admin Sidebar -->
+  <aside class="fixed inset-y-0 left-0 z-50 w-60 bg-gray-900 flex flex-col lg:static lg:z-auto">
+    <div class="px-5 py-4 border-b border-white/10">
       <div class="flex items-center gap-2">
-        <div class="w-8 h-8 rounded-lg bg-gold-500 flex items-center justify-center flex-shrink-0">
+        <div class="w-8 h-8 rounded-lg bg-gold-500 flex items-center justify-center">
           <span class="text-forest-950 font-bold text-sm">A</span>
         </div>
         <div>
@@ -20,107 +15,47 @@
           <p class="text-gray-400 text-xs">Admin Panel</p>
         </div>
       </div>
-      <!-- Close button (mobile only) -->
-      <button onclick="closeAdminSidebar()"
-        class="lg:hidden text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
-        <i data-lucide="x" class="w-5 h-5"></i>
-      </button>
     </div>
 
-    <!-- Nav Links -->
     <nav class="flex-1 px-3 py-4 overflow-y-auto space-y-1">
       {% set admin_links = [
-        ('admin_dashboard',  'layout-dashboard', 'Dashboard'),
-        ('admin_users',      'users',            'Users'),
-        ('admin_plans',      'package',          'Plans'),
-        ('admin_deposits',   'wallet',           'Deposits'),
-        ('admin_withdrawals','banknote',         'Withdrawals'),
-        ('admin_investments','trending-up',      'Investments'),
+        ('admin_dashboard', 'layout-dashboard', 'Dashboard'),
+        ('admin_users', 'users', 'Users'),
+        ('admin_deposits', 'wallet', 'Deposits'),
+        ('admin_withdrawals', 'banknote', 'Withdrawals'),
+        ('admin_investments', 'trending-up', 'Investments'),
       ] %}
       {% for endpoint, icon, label in admin_links %}
-      <a href="{{ url_for(endpoint) }}"
-         onclick="closeAdminSidebar()"
-         class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-           {% if request.endpoint == endpoint %}
-             bg-gold-500 text-gray-900
-           {% else %}
-             text-gray-400 hover:bg-white/10 hover:text-white
-           {% endif %}">
-        <i data-lucide="{{ icon }}" class="w-4 h-4 flex-shrink-0"></i>
-        {{ label }}
+      <a href="{{ url_for(endpoint) }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
+        {% if request.endpoint == endpoint %}bg-gold-500 text-gray-900{% else %}text-gray-400 hover:bg-white/10 hover:text-white{% endif %}">
+        <i data-lucide="{{ icon }}" class="w-4 h-4 flex-shrink-0"></i> {{ label }}
       </a>
       {% endfor %}
 
-      <div class="pt-4 border-t border-white/10 space-y-1">
-        <a href="{{ url_for('index') }}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                  text-gray-400 hover:bg-white/10 hover:text-white transition-all">
+      <div class="pt-4 border-t border-white/10">
+        <a href="{{ url_for('index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/10 hover:text-white transition-all">
           <i data-lucide="external-link" class="w-4 h-4"></i> View Site
         </a>
-        <a href="{{ url_for('logout') }}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
-                  text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all">
+        <a href="{{ url_for('logout') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 transition-all">
           <i data-lucide="log-out" class="w-4 h-4"></i> Logout
         </a>
       </div>
     </nav>
   </aside>
 
-  <!-- Dark overlay (mobile only) -->
-  <div id="admin-overlay"
-       onclick="closeAdminSidebar()"
-       class="fixed inset-0 bg-black/60 z-40 lg:hidden hidden transition-opacity duration-300">
-  </div>
-
-  <!-- ── Main Content ── -->
-  <div class="flex-1 flex flex-col overflow-hidden min-w-0">
-
-    <!-- Top Header -->
-    <header class="bg-white border-b border-gray-200 px-4 sm:px-6 h-14 flex items-center justify-between flex-shrink-0">
-      <div class="flex items-center gap-3">
-        <!-- Hamburger (mobile only) -->
-        <button onclick="openAdminSidebar()"
-          class="lg:hidden text-gray-500 hover:text-gray-800 p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-          <i data-lucide="menu" class="w-5 h-5"></i>
-        </button>
-        <h1 class="font-semibold text-gray-900 text-sm sm:text-base truncate">
-          {% block admin_title %}Admin Dashboard{% endblock %}
-        </h1>
-      </div>
-
-      <div class="flex items-center gap-2 flex-shrink-0">
-        <span class="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full hidden sm:inline">ADMIN</span>
-        <div class="w-8 h-8 rounded-full bg-forest-950 flex items-center justify-center">
-          <span class="text-gold-400 font-bold text-xs">
-            {{ current_user.full_name[0] if current_user else 'A' }}
-          </span>
-        </div>
+  <!-- Main -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <header class="bg-white border-b border-gray-200 px-6 h-14 flex items-center justify-between flex-shrink-0">
+      <h1 class="font-semibold text-gray-900">{% block admin_title %}Admin Dashboard{% endblock %}</h1>
+      <div class="flex items-center gap-2">
+        <span class="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full">ADMIN</span>
+        <span class="text-sm text-gray-500">{{ current_user.full_name if current_user else 'Admin' }}</span>
       </div>
     </header>
 
-    <!-- Page Content -->
-    <main class="flex-1 overflow-y-auto p-4 sm:p-6">
+    <main class="flex-1 overflow-y-auto p-6">
       {% block admin_content %}{% endblock %}
     </main>
   </div>
 </div>
-
-<script>
-  function openAdminSidebar() {
-    document.getElementById('admin-sidebar').classList.remove('-translate-x-full');
-    document.getElementById('admin-overlay').classList.remove('hidden');
-    document.body.style.overflow = 'hidden'; // prevent background scroll
-  }
-
-  function closeAdminSidebar() {
-    document.getElementById('admin-sidebar').classList.add('-translate-x-full');
-    document.getElementById('admin-overlay').classList.add('hidden');
-    document.body.style.overflow = '';
-  }
-
-  // Close on Escape key
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeAdminSidebar();
-  });
-</script>
 {% endblock %}
