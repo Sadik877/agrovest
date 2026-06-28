@@ -105,10 +105,6 @@
               <button onclick="markAllRead()" class="text-xs text-forest-600 hover:text-forest-800 font-medium">Mark all read</button>
             </div>
             <div class="max-h-72 overflow-y-auto">
-              {% set notifications = [] %}
-              {% if current_user %}
-                {# notifications injected via context in dashboard route #}
-              {% endif %}
               <div id="notif-list" class="divide-y divide-gray-50">
                 <p class="text-gray-400 text-xs text-center py-6">Loading...</p>
               </div>
@@ -141,11 +137,53 @@
     document.getElementById('sidebar-overlay').classList.add('hidden');
     document.body.style.overflow = '';
   }
+
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const notifIconFor = (type) => ({
+    success: 'check-circle', error: 'x-circle', warning: 'alert-triangle',
+  })[type] || 'info';
+  const notifColorFor = (type) => ({
+    success: 'text-green-500', error: 'text-red-500', warning: 'text-amber-500',
+  })[type] || 'text-blue-500';
+
+  function renderNotifications(items) {
+    const list = document.getElementById('notif-list');
+    if (!items.length) {
+      list.innerHTML = '<p class="text-gray-400 text-xs text-center py-6">No notifications yet</p>';
+      return;
+    }
+    list.innerHTML = items.map(n => `
+      <div class="px-4 py-3 flex items-start gap-3 ${n.is_read ? '' : 'bg-gold-50/40'}">
+        <i data-lucide="${notifIconFor(n.type)}" class="w-4 h-4 mt-0.5 flex-shrink-0 ${notifColorFor(n.type)}"></i>
+        <div class="flex-1 min-w-0">
+          <p class="text-xs text-gray-700">${n.message}</p>
+          <p class="text-[11px] text-gray-400 mt-0.5">${n.created_at}</p>
+        </div>
+      </div>`).join('');
+    if (window.lucide) lucide.createIcons();
+  }
+
+  function loadNotifications() {
+    fetch("{{ url_for('list_notifications') }}")
+      .then(r => r.json())
+      .then(data => renderNotifications(data.notifications || []))
+      .catch(() => {
+        document.getElementById('notif-list').innerHTML =
+          '<p class="text-gray-400 text-xs text-center py-6">Could not load notifications</p>';
+      });
+  }
+
   function toggleNotifications() {
-    document.getElementById('notif-panel').classList.toggle('hidden');
+    const panel = document.getElementById('notif-panel');
+    const wasHidden = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden');
+    if (wasHidden) loadNotifications();
   }
   function markAllRead() {
-    fetch("{{ url_for('mark_notifications_read') }}", { method: 'POST', headers: {'Content-Type': 'application/json'} });
+    fetch("{{ url_for('mark_notifications_read') }}", {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+    }).then(() => loadNotifications());
     document.querySelectorAll('.notif-dot').forEach(d => d.remove());
     const badge = document.querySelector('#notif-btn span');
     if (badge) badge.remove();

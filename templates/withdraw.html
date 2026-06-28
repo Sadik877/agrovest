@@ -23,6 +23,7 @@
     </div>
 
     <form method="POST" action="{{ url_for('withdraw') }}" class="space-y-5">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-2">Withdrawal Amount (₦)</label>
         <div class="relative">

@@ -21,6 +21,7 @@
 
     <div class="glass rounded-2xl p-8">
       <form method="POST" action="{{ url_for('login') }}" class="space-y-5">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
           <label class="block text-sm font-medium text-gray-200 mb-2">Email Address</label>
           <div class="relative">

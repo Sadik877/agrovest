@@ -20,6 +20,7 @@
 
     <div class="glass rounded-2xl p-8">
       <form method="POST" action="{{ url_for('register') }}" class="space-y-5">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="sm:col-span-2">
             <label class="block text-sm font-medium text-gray-200 mb-2">Full Name</label>

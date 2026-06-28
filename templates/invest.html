@@ -80,6 +80,7 @@
       </div>
 
       <form method="POST" action="{{ url_for('invest') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="plan_id" id="form-plan-id" />
 
         <div class="mb-5">
