@@ -111,5 +111,119 @@ ALTER TABLE public.withdrawals   DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.referrals     DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications DISABLE ROW LEVEL SECURITY;
 
+-- ════════════════════════════════════════════
+-- Indexes — every column the app filters or sorts by gets one.
+-- Without these, every dashboard/admin list does a full table scan
+-- that gets slower as the platform grows.
+-- ════════════════════════════════════════════
+CREATE INDEX IF NOT EXISTS idx_users_email          ON public.users(email);
+CREATE INDEX IF NOT EXISTS idx_users_referral_code  ON public.users(referral_code);
+CREATE INDEX IF NOT EXISTS idx_users_referred_by    ON public.users(referred_by);
+
+CREATE INDEX IF NOT EXISTS idx_investments_user_id  ON public.investments(user_id);
+CREATE INDEX IF NOT EXISTS idx_investments_status   ON public.investments(status);
+CREATE INDEX IF NOT EXISTS idx_investments_end_date ON public.investments(end_date);
+
+CREATE INDEX IF NOT EXISTS idx_deposits_user_id     ON public.deposits(user_id);
+CREATE INDEX IF NOT EXISTS idx_deposits_status      ON public.deposits(status);
+CREATE INDEX IF NOT EXISTS idx_deposits_reference    ON public.deposits(reference);
+
+CREATE INDEX IF NOT EXISTS idx_withdrawals_user_id  ON public.withdrawals(user_id);
+CREATE INDEX IF NOT EXISTS idx_withdrawals_status   ON public.withdrawals(status);
+
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer_id ON public.referrals(referrer_id);
+CREATE INDEX IF NOT EXISTS idx_referrals_referred_id ON public.referrals(referred_id);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id  ON public.notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read  ON public.notifications(user_id, is_read);
+
+-- ════════════════════════════════════════════
+-- Auto-maintain updated_at on deposits/withdrawals.
+-- (The app never set this column itself, so every row's updated_at
+--  was permanently stuck at its created_at value — this fixes that.)
+-- ════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_deposits_updated_at ON public.deposits;
+CREATE TRIGGER trg_deposits_updated_at
+    BEFORE UPDATE ON public.deposits
+    FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_withdrawals_updated_at ON public.withdrawals;
+CREATE TRIGGER trg_withdrawals_updated_at
+    BEFORE UPDATE ON public.withdrawals
+    FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ════════════════════════════════════════════
+-- Atomic balance adjustment — fixes a real money bug.
+--
+-- The old app code did: "read user.balance in Python, subtract the
+-- amount, write the new value back". If a user double-clicked Submit,
+-- or had two tabs open, two requests could both read the SAME starting
+-- balance before either one wrote back, letting them spend more than
+-- they actually have. This function takes a row lock (FOR UPDATE) and
+-- does the read-check-write as a single atomic database operation, so
+-- concurrent requests are serialized correctly.
+--
+-- Called from app.py via: supabase.rpc('agrovest_adjust_balance', {...})
+-- ════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public.agrovest_adjust_balance(
+    p_user_id                      BIGINT,
+    p_balance_delta                NUMERIC DEFAULT 0,
+    p_total_invested_delta         NUMERIC DEFAULT 0,
+    p_total_earnings_delta         NUMERIC DEFAULT 0,
+    p_referral_earnings_delta      NUMERIC DEFAULT 0,
+    p_require_sufficient_balance   BOOLEAN DEFAULT FALSE
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_balance NUMERIC;
+BEGIN
+    SELECT balance INTO v_balance FROM public.users WHERE id = p_user_id FOR UPDATE;
+
+    IF v_balance IS NULL THEN
+        RETURN FALSE;  -- user doesn't exist
+    END IF;
+
+    IF p_require_sufficient_balance AND (v_balance + p_balance_delta) < 0 THEN
+        RETURN FALSE;  -- insufficient funds — abort, nothing is written
+    END IF;
+
+    UPDATE public.users
+    SET balance           = balance + p_balance_delta,
+        total_invested    = total_invested + p_total_invested_delta,
+        total_earnings    = total_earnings + p_total_earnings_delta,
+        referral_earnings = referral_earnings + p_referral_earnings_delta
+    WHERE id = p_user_id;
+
+    RETURN TRUE;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.agrovest_adjust_balance TO service_role, authenticated, anon;
+
 -- Done! Tables are ready.
 SELECT 'AgroVest tables created successfully!' AS status;
+
+-- ════════════════════════════════════════════
+-- OPTIONAL — persistent deposit-proof storage
+--
+-- Render's disk is ephemeral: anything saved to /tmp or the local
+-- filesystem is wiped on every deploy and every restart. By default
+-- this app still works fine (deposit proofs just won't survive a
+-- redeploy). To persist them permanently instead, uncomment the line
+-- below to create a private Storage bucket, then set
+-- USE_SUPABASE_STORAGE=true in your environment variables.
+-- ════════════════════════════════════════════
+-- INSERT INTO storage.buckets (id, name, public)
+-- VALUES ('deposit-proofs', 'deposit-proofs', false)
+-- ON CONFLICT (id) DO NOTHING;

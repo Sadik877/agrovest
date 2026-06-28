@@ -7,9 +7,28 @@ services:
     envVars:
       - key: SECRET_KEY
         generateValue: true
-      - key: DATABASE_URL
-        sync: false          # You paste this from Supabase manually
-      - key: RENDER_TMP
-        value: "true"
+
+      # ── Required: from Supabase Dashboard → Project Settings → API ──
+      # SUPABASE_URL  = "Project URL"      e.g. https://abcxyzproject.supabase.co
+      # SUPABASE_KEY  = "service_role" key  (NOT the "anon" / "public" key —
+      #                  the service_role key is required because the app
+      #                  manages its own auth/admin checks and needs to read
+      #                  and write every table regardless of row-level policy)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+
+      # ── Optional: persist deposit-proof uploads in Supabase Storage instead
+      #     of Render's local disk, which is wiped on every deploy/restart.
+      #     Run the bucket-creation block at the bottom of supabase_setup.sql
+      #     first, then set this to "true". Safe to leave as "false" (default) —
+      #     uploads still work, they just won't survive a redeploy.
+      - key: USE_SUPABASE_STORAGE
+        value: "false"
+
+      # NOTE: RENDER=true is set automatically by Render itself — you do not
+      # need to add it. The app uses it to detect HTTPS-only cookies and the
+      # ephemeral /tmp upload path.
       - key: PYTHON_VERSION
-        value: "3.11.0"
+        value: "3.11.15"
