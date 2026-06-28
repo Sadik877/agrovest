@@ -40,6 +40,7 @@
         <div class="flex items-center gap-2">
           <span class="font-bold text-gray-900 text-sm">{{ dep.amount | naira }}</span>
           <form method="POST" action="{{ url_for('admin_approve_deposit', dep_id=dep.id) }}" class="inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="bg-green-600 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg hover:bg-green-700">✓</button>
           </form>
         </div>
@@ -68,6 +69,7 @@
         <div class="flex items-center gap-2">
           <span class="font-bold text-gray-900 text-sm">{{ wd.amount | naira }}</span>
           <form method="POST" action="{{ url_for('admin_approve_withdrawal', wd_id=wd.id) }}" class="inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="bg-green-600 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg hover:bg-green-700">✓</button>
           </form>
         </div>

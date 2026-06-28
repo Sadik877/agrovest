@@ -48,6 +48,7 @@
           <td class="px-5 py-4">
             {% if inv.status == 'active' %}
             <form method="POST" action="{{ url_for('admin_complete_investment', inv_id=inv.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold text-xs px-3 py-1.5 rounded-lg transition-colors">
                 ✓ Mark Complete
               </button>

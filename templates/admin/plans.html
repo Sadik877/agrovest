@@ -84,6 +84,7 @@
         <i data-lucide="pencil" class="w-3.5 h-3.5"></i> Edit
       </a>
       <form method="POST" action="{{ url_for('admin_plan_toggle', plan_id=plan.id) }}" class="flex-1">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button class="w-full flex items-center justify-center gap-1.5 font-semibold text-xs py-2.5 rounded-lg transition-colors
           {% if plan.is_active %}bg-amber-50 hover:bg-amber-100 text-amber-700{% else %}bg-green-50 hover:bg-green-100 text-green-700{% endif %}">
           <i data-lucide="{{ 'eye-off' if plan.is_active else 'eye' }}" class="w-3.5 h-3.5"></i>
@@ -122,6 +123,7 @@
       Plans with active investments cannot be deleted. Deactivate them instead.
     </p>
     <form method="POST" id="delete-form" class="flex gap-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="button" onclick="document.getElementById('delete-modal').classList.add('hidden')"
         class="flex-1 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600">Cancel</button>
       <button type="submit"
