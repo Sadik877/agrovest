@@ -38,25 +38,42 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
 REFERRAL_COMMISSION = 5  # percent
 
 # ─────────────────────────────────────────────
-# Supabase Client
+# Supabase Client  — lazy init so env vars are
+# read at request time, not at import time
 # ─────────────────────────────────────────────
-SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
-SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')  # use service_role key for backend
-
 _sb = None
 
 def get_sb():
-    """Return a cached Supabase client."""
+    """Return a cached Supabase client (reads env vars lazily)."""
     global _sb
     if _sb is None:
-        if not SUPABASE_URL or not SUPABASE_KEY:
+        url = os.environ.get('SUPABASE_URL', '').strip()
+        key = os.environ.get('SUPABASE_KEY', '').strip()
+
+        if not url or not key:
+            missing = []
+            if not url: missing.append('SUPABASE_URL')
+            if not key: missing.append('SUPABASE_KEY')
             raise RuntimeError(
-                "SUPABASE_URL and SUPABASE_KEY environment variables are not set. "
-                "Add them to your Render environment variables."
+                f"Missing environment variables: {', '.join(missing)}. "
+                "Go to Render → your service → Environment → Add Environment Variable."
             )
+
+        if not url.startswith('https://'):
+            raise RuntimeError(
+                f"SUPABASE_URL looks wrong: '{url[:50]}'. "
+                "It must start with https:// e.g. https://abcxyz.supabase.co"
+            )
+
         from supabase import create_client
-        _sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+        _sb = create_client(url, key)
+        print(f"✓ Supabase connected to {url[:40]}...")
     return _sb
+
+def reset_sb():
+    """Force reconnect (used after env var changes)."""
+    global _sb
+    _sb = None
 
 # ─────────────────────────────────────────────
 # DB helper wrappers (thin layer over supabase-py v2)
@@ -276,6 +293,40 @@ def inject_globals():
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
+# ─────────────────────────────────────────────
+# Env-var health check — shown instead of 500
+# when Supabase credentials are missing/wrong
+# ─────────────────────────────────────────────
+def check_env():
+    """Return (ok, missing_list, errors_list)."""
+    url = os.environ.get('SUPABASE_URL', '').strip()
+    key = os.environ.get('SUPABASE_KEY', '').strip()
+    missing, errors = [], []
+    if not url:
+        missing.append('SUPABASE_URL')
+    elif not url.startswith('https://'):
+        errors.append(f'SUPABASE_URL must start with https:// — got: {url[:60]}')
+    if not key:
+        missing.append('SUPABASE_KEY')
+    return (len(missing) == 0 and len(errors) == 0), missing, errors
+
+@app.before_request
+def guard_env():
+    """Block all routes with a setup page if env vars are missing."""
+    # Allow static files always
+    if request.endpoint in ('static', 'uploaded_file', 'setup_page'):
+        return
+    ok, missing, errors = check_env()
+    if not ok:
+        return render_template('setup.html', missing=missing, errors=errors), 503
+
+@app.route('/setup')
+def setup_page():
+    ok, missing, errors = check_env()
+    return render_template('setup.html', missing=missing, errors=errors,
+                           ok=ok), 200 if ok else 503
 
 # ─────────────────────────────────────────────
 # Public Pages
@@ -1081,13 +1132,19 @@ def status_badge(status):
 
 
 # ═════════════════════════════════════════════
-# Startup
+# Startup — only seed DB if env vars are present
 # ═════════════════════════════════════════════
 with app.app_context():
-    try:
-        init_db()
-    except Exception as _e:
-        print(f"⚠ Startup DB init skipped: {_e}")
+    url = os.environ.get('SUPABASE_URL', '').strip()
+    key = os.environ.get('SUPABASE_KEY', '').strip()
+    if url and key and url.startswith('https://'):
+        try:
+            init_db()
+            print("✓ AgroVest Pro started with Supabase connection")
+        except Exception as _e:
+            print(f"⚠ DB seed skipped (tables may not exist yet — run supabase_setup.sql): {_e}")
+    else:
+        print("⚠ SUPABASE_URL / SUPABASE_KEY not set — visit /setup for instructions")
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
