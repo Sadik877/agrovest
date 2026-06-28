@@ -7,6 +7,19 @@ test before and after the fix.
 
 ## 🔴 Critical — would break deployment entirely
 
+- **DNS resolution errors during cold start weren't being retried.** Right
+  after a fresh deploy or restart, Render's container network can take a
+  second or two to come fully up, so the first few calls to Supabase fail
+  with `[Errno -2] Name or service not known`. The retry logic didn't
+  recognize this as a transient error, so it gave up instantly. Worse,
+  `init_db()` printed "✓ Default plans seeded" even when every single insert
+  had just failed for this reason — and because seeding only ran when the
+  plans table was *completely* empty, a partial failure (e.g. 2 of 4 plans
+  inserted before a hiccup) would permanently skip seeding on every future
+  restart. Fixed by: (1) recognizing DNS failures as retryable, (2) adding a
+  short retry-with-backoff specifically around startup connectivity, and
+  (3) seeding each plan independently by slug, so a restart always fills in
+  whatever's still missing instead of an all-or-nothing check.
 - **`render.yaml` and `.env.example` configured the wrong environment
   variables.** They told you to set `DATABASE_URL` (a Postgres connection
   string) — but `app.py` only ever reads `SUPABASE_URL` and `SUPABASE_KEY`

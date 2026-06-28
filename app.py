@@ -124,7 +124,14 @@ def reset_sb():
 # DB helper wrappers (thin layer over supabase-py v2)
 # ─────────────────────────────────────────────
 _TRANSIENT_HINTS = ('timeout', 'timed out', 'connection', 'temporarily unavailable',
-                     'reset by peer', 'broken pipe', '502', '503', '504')
+                     'reset by peer', 'broken pipe', '502', '503', '504',
+                     # DNS resolution failures — common for the first second or two
+                     # after a fresh deploy/restart, before the container's network
+                     # is fully up. Almost always resolves itself on retry.
+                     'name or service not known', 'nodename nor servname',
+                     'temporary failure in name resolution', 'getaddrinfo',
+                     'no address associated with hostname', 'errno -2',
+                     'network is unreachable')
 
 def _is_transient(exc):
     msg = str(exc).lower()
@@ -329,13 +336,50 @@ def resolve_proof_url(proof_filename):
 # This just seeds admin + default plans if missing.
 # ─────────────────────────────────────────────
 def init_db():
-    try:
-        sb = get_sb()
+    default_plans = [
+        {'name': 'Starter Farm',  'slug': 'starter',      'icon': '🌱',
+         'description': 'Perfect entry point for new agricultural investors.',
+         'min_amount': 10000, 'max_amount': 49999,  'roi_percent': 15, 'duration_days': 30,
+         'features': 'Daily ROI updates|Email notifications|Basic support',
+         'sort_order': 1, 'is_active': True},
+        {'name': 'Green Harvest', 'slug': 'green-harvest','icon': '🌿',
+         'description': 'Mid-range plan with diversified crop investments.',
+         'min_amount': 50000, 'max_amount': 199999, 'roi_percent': 25, 'duration_days': 45,
+         'features': 'Daily ROI updates|Priority support|Monthly reports|Referral bonus',
+         'sort_order': 2, 'is_active': True},
+        {'name': 'Premium Agro',  'slug': 'premium-agro', 'icon': '🌾',
+         'description': 'Premium returns from large-scale farming operations.',
+         'min_amount': 200000, 'max_amount': 999999, 'roi_percent': 40, 'duration_days': 60,
+         'features': 'Daily ROI updates|24/7 VIP support|Weekly reports|Higher referral bonus|Early withdrawal option',
+         'sort_order': 3, 'is_active': True},
+        {'name': 'Elite Farm',    'slug': 'elite',        'icon': '👑',
+         'description': 'Elite tier for serious investors seeking maximum returns.',
+         'min_amount': 1000000, 'max_amount': None, 'roi_percent': 60, 'duration_days': 90,
+         'features': 'Daily ROI updates|Dedicated account manager|Daily reports|Maximum referral bonus|Flexible withdrawal|Farm visit opportunity',
+         'sort_order': 4, 'is_active': True},
+    ]
 
+    # Ride out the brief DNS/network window right after a fresh deploy or
+    # restart, before retrying anything that needs real DB access below.
+    connected = False
+    for attempt in range(6):
+        try:
+            sb_count('users')  # cheapest possible call — just proves connectivity
+            connected = True
+            break
+        except Exception as e:
+            print(f"⚠ DB not reachable yet (attempt {attempt + 1}/6): {e}")
+            time.sleep(1.5 * (attempt + 1))
+            reset_sb()
+    if not connected:
+        print("⚠ DB init warning: could not reach Supabase after several attempts — "
+              "will keep retrying on incoming requests.")
+        return
+
+    try:
         # Seed admin if not exists
-        admin = sb_one('users', [('email', 'eq', 'admin@agrovest.ng')])
-        if not admin:
-            sb_insert('users', {
+        if not sb_one('users', [('email', 'eq', 'admin@agrovest.ng')]):
+            admin = sb_insert('users', {
                 'full_name': 'AgroVest Admin',
                 'email': 'admin@agrovest.ng',
                 'phone': '08000000000',
@@ -348,36 +392,26 @@ def init_db():
                 'total_earnings': 0,
                 'referral_earnings': 0,
             })
-            print("✓ Admin user seeded")
+            print("✓ Admin user seeded" if admin else
+                  "⚠ Admin user seed FAILED — will retry on next restart")
 
-        # Seed default plans if none exist
-        plans = sb_all('plans')
-        if not plans:
-            default_plans = [
-                {'name': 'Starter Farm',  'slug': 'starter',      'icon': '🌱',
-                 'description': 'Perfect entry point for new agricultural investors.',
-                 'min_amount': 10000, 'max_amount': 49999,  'roi_percent': 15, 'duration_days': 30,
-                 'features': 'Daily ROI updates|Email notifications|Basic support',
-                 'sort_order': 1, 'is_active': True},
-                {'name': 'Green Harvest', 'slug': 'green-harvest','icon': '🌿',
-                 'description': 'Mid-range plan with diversified crop investments.',
-                 'min_amount': 50000, 'max_amount': 199999, 'roi_percent': 25, 'duration_days': 45,
-                 'features': 'Daily ROI updates|Priority support|Monthly reports|Referral bonus',
-                 'sort_order': 2, 'is_active': True},
-                {'name': 'Premium Agro',  'slug': 'premium-agro', 'icon': '🌾',
-                 'description': 'Premium returns from large-scale farming operations.',
-                 'min_amount': 200000, 'max_amount': 999999, 'roi_percent': 40, 'duration_days': 60,
-                 'features': 'Daily ROI updates|24/7 VIP support|Weekly reports|Higher referral bonus|Early withdrawal option',
-                 'sort_order': 3, 'is_active': True},
-                {'name': 'Elite Farm',    'slug': 'elite',        'icon': '👑',
-                 'description': 'Elite tier for serious investors seeking maximum returns.',
-                 'min_amount': 1000000, 'max_amount': None, 'roi_percent': 60, 'duration_days': 90,
-                 'features': 'Daily ROI updates|Dedicated account manager|Daily reports|Maximum referral bonus|Flexible withdrawal|Farm visit opportunity',
-                 'sort_order': 4, 'is_active': True},
-            ]
-            for p in default_plans:
-                sb_insert('plans', p)
-            print("✓ Default plans seeded")
+        # Seed default plans one-by-one (not "only if the table is totally
+        # empty") so a partial failure on a previous attempt gets healed
+        # automatically instead of leaving the platform permanently short
+        # a plan or two.
+        seeded, failed = 0, 0
+        for p in default_plans:
+            if not sb_one('plans', [('slug', 'eq', p['slug'])]):
+                if sb_insert('plans', p):
+                    seeded += 1
+                else:
+                    failed += 1
+        if seeded:
+            print(f"✓ {seeded} plan(s) seeded")
+        if failed:
+            print(f"⚠ {failed} plan(s) FAILED to seed — will retry on next restart")
+        if not seeded and not failed:
+            print("✓ Plans already seeded")
 
         print("✓ Database ready")
     except Exception as e:
