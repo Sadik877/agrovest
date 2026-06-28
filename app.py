@@ -1,22 +1,17 @@
 """
 AgroVest Pro - Agricultural Investment Platform
-Backend: Flask + Supabase (PostgreSQL via psycopg2)
+Backend: Flask + Supabase (supabase-py client — pure Python, no C extensions)
 """
 
 import os
 import uuid
-import traceback
 from datetime import datetime, timedelta
 from functools import wraps
 
-import psycopg2
-import psycopg2.extras
 from flask import (Flask, render_template, request, redirect, url_for,
                    flash, session, g, jsonify, abort, send_from_directory)
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
 
-# Load .env in development
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -31,215 +26,200 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'agrovest-dev-secret-cha
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
 
-# Upload folder — /tmp on Render, local otherwise
-_DATA_DIR = '/tmp/agrovest_data' if os.environ.get('RENDER_TMP') else os.path.join(app.root_path, 'static', 'uploads')
-os.makedirs(_DATA_DIR if os.environ.get('RENDER_TMP') else _DATA_DIR, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = _DATA_DIR if os.environ.get('RENDER_TMP') else os.path.join(app.root_path, 'static', 'uploads')
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+# Upload folder
+if os.environ.get('RENDER_TMP'):
+    _UPLOAD_DIR = '/tmp/agrovest_uploads'
+else:
+    _UPLOAD_DIR = os.path.join(app.root_path, 'static', 'uploads')
+os.makedirs(_UPLOAD_DIR, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = _UPLOAD_DIR
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
 REFERRAL_COMMISSION = 5  # percent
 
 # ─────────────────────────────────────────────
-# Supabase / PostgreSQL Connection
+# Supabase Client
 # ─────────────────────────────────────────────
-DATABASE_URL = os.environ.get('DATABASE_URL', '')
+SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')  # use service_role key for backend
 
-def get_db():
-    """Return a per-request psycopg2 connection."""
-    if 'db' not in g:
-        if not DATABASE_URL:
+_sb = None
+
+def get_sb():
+    """Return a cached Supabase client."""
+    global _sb
+    if _sb is None:
+        if not SUPABASE_URL or not SUPABASE_KEY:
             raise RuntimeError(
-                "DATABASE_URL environment variable is not set. "
-                "Add it to your .env file or Render environment variables."
+                "SUPABASE_URL and SUPABASE_KEY environment variables are not set. "
+                "Add them to your Render environment variables."
             )
-        g.db = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    return g.db
-
-@app.teardown_appcontext
-def close_db(error):
-    db = g.pop('db', None)
-    if db is not None:
-        db.close()
-
-def query_db(query, args=(), one=False, commit=False):
-    """Execute a query. Returns last-inserted id if commit=True."""
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(query, args)
-    if commit:
-        conn.commit()
-        # For INSERT ... RETURNING id — or fallback to lastrowid
-        try:
-            row = cur.fetchone()
-            return row['id'] if row else None
-        except Exception:
-            return None
-    rv = cur.fetchall()
-    return (rv[0] if rv else None) if one else rv
+        from supabase import create_client
+        _sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+    return _sb
 
 # ─────────────────────────────────────────────
-# Database Schema Initializer
+# DB helper wrappers (thin layer over supabase-py v2)
+# ─────────────────────────────────────────────
+def _apply_filters(q, filters):
+    """Apply a list of (col, op, val) filters to a supabase query."""
+    for f in (filters or []):
+        col, op, val = f
+        if op == 'eq':   q = q.eq(col, val)
+        elif op == 'neq': q = q.neq(col, val)
+        elif op == 'lt':  q = q.lt(col, val)
+        elif op == 'gte': q = q.gte(col, val)
+        elif op == 'in':  q = q.in_(col, val)
+    return q
+
+def sb_all(table, filters=None, order=None, limit=None):
+    """Fetch all rows. order can be a single (col, dir) or list of them."""
+    try:
+        q = get_sb().table(table).select('*')
+        q = _apply_filters(q, filters)
+        if order:
+            # Normalise to list of (col, dir) tuples
+            if isinstance(order, (list, tuple)) and len(order) == 2 and isinstance(order[0], str):
+                order = [order]   # single tuple e.g. ('created_at', 'desc')
+            for item in order:
+                col, direction = item
+                q = q.order(col, desc=(str(direction).lower() == 'desc'))
+        if limit:
+            q = q.limit(limit)
+        r = q.execute()
+        return r.data or []
+    except Exception as e:
+        print(f'sb_all error ({table}): {e}')
+        return []
+
+def sb_one(table, filters):
+    """Fetch a single row or None."""
+    rows = sb_all(table, filters=filters, limit=1)
+    return rows[0] if rows else None
+
+def sb_insert(table, data):
+    """Insert a row and return the inserted record."""
+    try:
+        r = get_sb().table(table).insert(data).execute()
+        return r.data[0] if r.data else None
+    except Exception as e:
+        print(f'sb_insert error ({table}): {e}')
+        return None
+
+def sb_update(table, data, filters):
+    """Update rows matching filters."""
+    try:
+        q = get_sb().table(table).update(data)
+        q = _apply_filters(q, filters)
+        q.execute()
+    except Exception as e:
+        print(f'sb_update error ({table}): {e}')
+
+def sb_delete(table, filters):
+    """Delete rows matching filters."""
+    try:
+        q = get_sb().table(table).delete()
+        q = _apply_filters(q, filters)
+        q.execute()
+    except Exception as e:
+        print(f'sb_delete error ({table}): {e}')
+
+def sb_count(table, filters=None):
+    """Count matching rows using Supabase count API."""
+    try:
+        q = get_sb().table(table).select('*', count='exact').limit(1)
+        q = _apply_filters(q, filters)
+        r = q.execute()
+        return r.count if r.count is not None else 0
+    except Exception as e:
+        print(f'sb_count error ({table}): {e}')
+        return 0
+
+def sb_sum(table, col, filters=None):
+    """Sum a numeric column in Python (Supabase free tier has no SQL aggregates)."""
+    try:
+        rows = sb_all(table, filters=filters)
+        return sum(float(r.get(col) or 0) for r in rows)
+    except Exception as e:
+        print(f'sb_sum error ({table}/{col}): {e}')
+        return 0
+
+def notify(user_id, message, ntype='info'):
+    sb_insert('notifications', {'user_id': user_id, 'message': message, 'type': ntype})
+
+# ─────────────────────────────────────────────
+# Database Initializer — runs SQL via Supabase RPC
+# We create tables using Supabase Dashboard SQL editor instead.
+# This just seeds admin + default plans if missing.
 # ─────────────────────────────────────────────
 def init_db():
-    """Create tables and seed default data in Supabase."""
-    conn = get_db()
-    cur = conn.cursor()
+    try:
+        sb = get_sb()
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            full_name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            phone TEXT,
-            password_hash TEXT NOT NULL,
-            referral_code TEXT UNIQUE NOT NULL,
-            referred_by INTEGER REFERENCES users(id),
-            balance NUMERIC DEFAULT 0,
-            total_invested NUMERIC DEFAULT 0,
-            total_earnings NUMERIC DEFAULT 0,
-            referral_earnings NUMERIC DEFAULT 0,
-            is_admin BOOLEAN DEFAULT FALSE,
-            is_active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-    """)
+        # Seed admin if not exists
+        admin = sb_one('users', [('email', 'eq', 'admin@agrovest.ng')])
+        if not admin:
+            sb_insert('users', {
+                'full_name': 'AgroVest Admin',
+                'email': 'admin@agrovest.ng',
+                'phone': '08000000000',
+                'password_hash': generate_password_hash('Admin@2024!'),
+                'referral_code': 'ADMIN001',
+                'is_admin': True,
+                'is_active': True,
+                'balance': 0,
+                'total_invested': 0,
+                'total_earnings': 0,
+                'referral_earnings': 0,
+            })
+            print("✓ Admin user seeded")
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS plans (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            slug TEXT UNIQUE NOT NULL,
-            icon TEXT DEFAULT '🌱',
-            description TEXT,
-            min_amount NUMERIC NOT NULL DEFAULT 10000,
-            max_amount NUMERIC,
-            roi_percent NUMERIC NOT NULL DEFAULT 10,
-            duration_days INTEGER NOT NULL DEFAULT 30,
-            features TEXT DEFAULT '',
-            is_active BOOLEAN DEFAULT TRUE,
-            sort_order INTEGER DEFAULT 0,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-    """)
+        # Seed default plans if none exist
+        plans = sb_all('plans')
+        if not plans:
+            default_plans = [
+                {'name': 'Starter Farm',  'slug': 'starter',      'icon': '🌱',
+                 'description': 'Perfect entry point for new agricultural investors.',
+                 'min_amount': 10000, 'max_amount': 49999,  'roi_percent': 15, 'duration_days': 30,
+                 'features': 'Daily ROI updates|Email notifications|Basic support',
+                 'sort_order': 1, 'is_active': True},
+                {'name': 'Green Harvest', 'slug': 'green-harvest','icon': '🌿',
+                 'description': 'Mid-range plan with diversified crop investments.',
+                 'min_amount': 50000, 'max_amount': 199999, 'roi_percent': 25, 'duration_days': 45,
+                 'features': 'Daily ROI updates|Priority support|Monthly reports|Referral bonus',
+                 'sort_order': 2, 'is_active': True},
+                {'name': 'Premium Agro',  'slug': 'premium-agro', 'icon': '🌾',
+                 'description': 'Premium returns from large-scale farming operations.',
+                 'min_amount': 200000, 'max_amount': 999999, 'roi_percent': 40, 'duration_days': 60,
+                 'features': 'Daily ROI updates|24/7 VIP support|Weekly reports|Higher referral bonus|Early withdrawal option',
+                 'sort_order': 3, 'is_active': True},
+                {'name': 'Elite Farm',    'slug': 'elite',        'icon': '👑',
+                 'description': 'Elite tier for serious investors seeking maximum returns.',
+                 'min_amount': 1000000, 'max_amount': None, 'roi_percent': 60, 'duration_days': 90,
+                 'features': 'Daily ROI updates|Dedicated account manager|Daily reports|Maximum referral bonus|Flexible withdrawal|Farm visit opportunity',
+                 'sort_order': 4, 'is_active': True},
+            ]
+            for p in default_plans:
+                sb_insert('plans', p)
+            print("✓ Default plans seeded")
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS investments (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id),
-            plan_id INTEGER REFERENCES plans(id),
-            plan_name TEXT NOT NULL,
-            amount NUMERIC NOT NULL,
-            roi_percent NUMERIC NOT NULL,
-            expected_return NUMERIC NOT NULL,
-            duration_days INTEGER NOT NULL,
-            start_date TIMESTAMPTZ DEFAULT NOW(),
-            end_date TIMESTAMPTZ NOT NULL,
-            status TEXT DEFAULT 'active',
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS deposits (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id),
-            amount NUMERIC NOT NULL,
-            payment_method TEXT NOT NULL,
-            proof_filename TEXT,
-            reference TEXT UNIQUE NOT NULL,
-            status TEXT DEFAULT 'pending',
-            admin_note TEXT,
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            updated_at TIMESTAMPTZ DEFAULT NOW()
-        );
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS withdrawals (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id),
-            amount NUMERIC NOT NULL,
-            bank_name TEXT NOT NULL,
-            account_number TEXT NOT NULL,
-            account_name TEXT NOT NULL,
-            status TEXT DEFAULT 'pending',
-            admin_note TEXT,
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            updated_at TIMESTAMPTZ DEFAULT NOW()
-        );
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS referrals (
-            id SERIAL PRIMARY KEY,
-            referrer_id INTEGER NOT NULL REFERENCES users(id),
-            referred_id INTEGER NOT NULL REFERENCES users(id),
-            commission NUMERIC DEFAULT 0,
-            status TEXT DEFAULT 'pending',
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS notifications (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id),
-            message TEXT NOT NULL,
-            type TEXT DEFAULT 'info',
-            is_read BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-    """)
-
-    conn.commit()
-
-    # ── Seed admin user ──
-    cur.execute("SELECT id FROM users WHERE email='admin@agrovest.ng'")
-    if not cur.fetchone():
-        cur.execute("""
-            INSERT INTO users (full_name, email, phone, password_hash, referral_code, is_admin)
-            VALUES (%s,%s,%s,%s,%s,%s)
-        """, ('AgroVest Admin', 'admin@agrovest.ng', '08000000000',
-              generate_password_hash('Admin@2024!'), 'ADMIN001', True))
-        conn.commit()
-
-    # ── Seed default plans if none exist ──
-    cur.execute("SELECT COUNT(*) as c FROM plans")
-    row = cur.fetchone()
-    if not row or row['c'] == 0:
-        default_plans = [
-            ('Starter Farm',  'starter',      '🌱', 'Perfect entry point for new agricultural investors.',
-             10000, 49999,  15, 30, 'Daily ROI updates|Email notifications|Basic support', 1),
-            ('Green Harvest', 'green-harvest','🌿', 'Mid-range plan with diversified crop investments.',
-             50000, 199999, 25, 45, 'Daily ROI updates|Priority support|Monthly reports|Referral bonus', 2),
-            ('Premium Agro',  'premium-agro', '🌾', 'Premium returns from large-scale farming operations.',
-             200000,999999, 40, 60, 'Daily ROI updates|24/7 VIP support|Weekly reports|Higher referral bonus|Early withdrawal option', 3),
-            ('Elite Farm',    'elite',        '👑', 'Elite tier for serious investors seeking maximum returns.',
-             1000000, None, 60, 90, 'Daily ROI updates|Dedicated account manager|Daily reports|Maximum referral bonus|Flexible withdrawal|Farm visit opportunity', 4),
-        ]
-        for p in default_plans:
-            cur.execute("""
-                INSERT INTO plans (name,slug,icon,description,min_amount,max_amount,roi_percent,duration_days,features,sort_order)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """, p)
-        conn.commit()
+        print("✓ Database ready")
+    except Exception as e:
+        print(f"⚠ DB init warning: {e}")
 
 # ─────────────────────────────────────────────
-# Plan Helper — always fetch live from DB
+# Plan Helper
 # ─────────────────────────────────────────────
 def get_plans(active_only=True):
-    q = "SELECT * FROM plans"
-    q += " WHERE is_active=TRUE" if active_only else ""
-    q += " ORDER BY sort_order ASC, id ASC"
-    rows = query_db(q)
+    filters = [('is_active', 'eq', True)] if active_only else []
+    rows = sb_all('plans', filters=filters, order=[('sort_order', 'asc'), ('id', 'asc')])
     plans = []
-    for r in (rows or []):
+    for r in rows:
         p = dict(r)
         p['features'] = [f.strip() for f in (p.get('features') or '').split('|') if f.strip()]
-        p['min_amount'] = float(p['min_amount'] or 0)
+        p['min_amount'] = float(p.get('min_amount') or 0)
         p['max_amount'] = float(p['max_amount']) if p.get('max_amount') else None
-        p['roi_percent'] = float(p['roi_percent'] or 0)
+        p['roi_percent'] = float(p.get('roi_percent') or 0)
         plans.append(p)
     return plans
 
@@ -260,15 +240,15 @@ def admin_required(f):
     def decorated(*args, **kwargs):
         if 'user_id' not in session:
             return redirect(url_for('login'))
-        user = query_db("SELECT * FROM users WHERE id=%s", [session['user_id']], one=True)
-        if not user or not user['is_admin']:
+        user = sb_one('users', [('id', 'eq', session['user_id'])])
+        if not user or not user.get('is_admin'):
             abort(403)
         return f(*args, **kwargs)
     return decorated
 
 def get_current_user():
     if 'user_id' in session:
-        return query_db("SELECT * FROM users WHERE id=%s", [session['user_id']], one=True)
+        return sb_one('users', [('id', 'eq', session['user_id'])])
     return None
 
 @app.context_processor
@@ -276,18 +256,22 @@ def inject_globals():
     user, unread, plans = None, 0, []
     try:
         user = get_current_user()
+    except Exception as e:
+        print(f"inject_globals get_current_user error: {e}")
+    try:
         if user:
-            row = query_db(
-                "SELECT COUNT(*) as c FROM notifications WHERE user_id=%s AND is_read=FALSE",
-                [user['id']], one=True)
-            unread = row['c'] if row else 0
+            unread = sb_count('notifications',
+                              [('user_id', 'eq', user['id']), ('is_read', 'eq', False)])
+    except Exception as e:
+        print(f"inject_globals unread count error: {e}")
+    try:
         plans = get_plans()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"inject_globals get_plans error: {e}")
     return dict(current_user=user, unread_count=unread, plans=plans)
 
 # ─────────────────────────────────────────────
-# Serve Uploaded Files
+# Serve Uploads
 # ─────────────────────────────────────────────
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
@@ -300,10 +284,10 @@ def uploaded_file(filename):
 def index():
     try:
         stats = {
-            'total_users':        query_db("SELECT COUNT(*) as c FROM users WHERE is_admin=FALSE", one=True)['c'],
-            'total_invested':     query_db("SELECT COALESCE(SUM(amount),0) as s FROM investments", one=True)['s'],
-            'active_investments': query_db("SELECT COUNT(*) as c FROM investments WHERE status='active'", one=True)['c'],
-            'total_paid':         query_db("SELECT COALESCE(SUM(amount),0) as s FROM withdrawals WHERE status='approved'", one=True)['s'],
+            'total_users':        sb_count('users', [('is_admin', 'eq', False)]),
+            'total_invested':     sb_sum('investments', 'amount'),
+            'active_investments': sb_count('investments', [('status', 'eq', 'active')]),
+            'total_paid':         sb_sum('withdrawals', 'amount', [('status', 'eq', 'approved')]),
         }
     except Exception:
         stats = {'total_users': 0, 'total_invested': 0, 'active_investments': 0, 'total_paid': 0}
@@ -348,7 +332,7 @@ def register():
             errors.append('Password must be at least 8 characters.')
         if password != confirm:
             errors.append('Passwords do not match.')
-        if query_db("SELECT id FROM users WHERE email=%s", [email], one=True):
+        if sb_one('users', [('email', 'eq', email)]):
             errors.append('Email already registered.')
 
         if errors:
@@ -356,27 +340,30 @@ def register():
                 flash(e, 'error')
             return render_template('register.html', ref_code=ref_input)
 
-        new_ref = full_name.upper().replace(' ', '')[:4] + str(uuid.uuid4())[:6].upper()
+        new_ref    = full_name.upper().replace(' ', '')[:4] + str(uuid.uuid4())[:6].upper()
         referred_by = None
         if ref_input:
-            ref_row = query_db("SELECT id FROM users WHERE referral_code=%s", [ref_input], one=True)
-            if ref_row:
-                referred_by = ref_row['id']
+            referrer = sb_one('users', [('referral_code', 'eq', ref_input)])
+            if referrer:
+                referred_by = referrer['id']
 
-        new_id = query_db("""
-            INSERT INTO users (full_name,email,phone,password_hash,referral_code,referred_by)
-            VALUES (%s,%s,%s,%s,%s,%s) RETURNING id
-        """, [full_name, email, phone, generate_password_hash(password), new_ref, referred_by],
-        commit=True)
+        new_user = sb_insert('users', {
+            'full_name': full_name, 'email': email, 'phone': phone,
+            'password_hash': generate_password_hash(password),
+            'referral_code': new_ref, 'referred_by': referred_by,
+            'balance': 0, 'total_invested': 0,
+            'total_earnings': 0, 'referral_earnings': 0,
+            'is_admin': False, 'is_active': True,
+        })
 
-        if referred_by and new_id:
-            query_db("INSERT INTO referrals (referrer_id,referred_id) VALUES (%s,%s) RETURNING id",
-                     [referred_by, new_id], commit=True)
-
-        if new_id:
-            query_db("INSERT INTO notifications (user_id,message,type) VALUES (%s,%s,%s) RETURNING id",
-                     [new_id, f'Welcome to AgroVest, {full_name}! Your account is ready.', 'success'],
-                     commit=True)
+        if new_user:
+            new_id = new_user['id']
+            if referred_by:
+                sb_insert('referrals', {
+                    'referrer_id': referred_by, 'referred_id': new_id,
+                    'commission': 0, 'status': 'pending'
+                })
+            notify(new_id, f'Welcome to AgroVest, {full_name}! Your account is ready.', 'success')
 
         flash('Account created! Please log in.', 'success')
         return redirect(url_for('login'))
@@ -392,17 +379,17 @@ def login():
     if request.method == 'POST':
         email    = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
-        user     = query_db("SELECT * FROM users WHERE email=%s", [email], one=True)
+        user     = sb_one('users', [('email', 'eq', email)])
 
         if user and check_password_hash(user['password_hash'], password):
-            if not user['is_active']:
+            if not user.get('is_active'):
                 flash('Your account has been suspended. Contact support.', 'error')
                 return render_template('login.html')
             session.permanent = True
             session['user_id']  = user['id']
-            session['is_admin'] = bool(user['is_admin'])
+            session['is_admin'] = bool(user.get('is_admin'))
             flash(f'Welcome back, {user["full_name"].split()[0]}!', 'success')
-            return redirect(url_for('admin_dashboard') if user['is_admin'] else url_for('dashboard'))
+            return redirect(url_for('admin_dashboard') if user.get('is_admin') else url_for('dashboard'))
         else:
             flash('Invalid email or password.', 'error')
 
@@ -423,47 +410,48 @@ def logout():
 @login_required
 def dashboard():
     user = get_current_user()
-    active_investments = query_db(
-        "SELECT * FROM investments WHERE user_id=%s AND status='active' ORDER BY created_at DESC",
-        [user['id']])
-    recent_deposits = query_db(
-        "SELECT * FROM deposits WHERE user_id=%s ORDER BY created_at DESC LIMIT 5", [user['id']])
-    recent_withdrawals = query_db(
-        "SELECT * FROM withdrawals WHERE user_id=%s ORDER BY created_at DESC LIMIT 5", [user['id']])
-    referrals = query_db("""
-        SELECT u.full_name, u.created_at, r.commission, r.status
-        FROM referrals r JOIN users u ON u.id=r.referred_id
-        WHERE r.referrer_id=%s ORDER BY r.created_at DESC
-    """, [user['id']])
-    notifications = query_db(
-        "SELECT * FROM notifications WHERE user_id=%s ORDER BY created_at DESC LIMIT 10", [user['id']])
+    uid  = user['id']
+    active_investments = sb_all('investments',
+        filters=[('user_id','eq',uid),('status','eq','active')],
+        order=('created_at','desc'))
+    recent_deposits = sb_all('deposits',
+        filters=[('user_id','eq',uid)], order=('created_at','desc'), limit=5)
+    recent_withdrawals = sb_all('withdrawals',
+        filters=[('user_id','eq',uid)], order=('created_at','desc'), limit=5)
+    notifications = sb_all('notifications',
+        filters=[('user_id','eq',uid)], order=('created_at','desc'), limit=10)
+
+    # Referrals with referred user names
+    raw_refs = sb_all('referrals', filters=[('referrer_id','eq',uid)],
+                      order=('created_at','desc'))
+    referrals = []
+    for r in raw_refs:
+        referred_user = sb_one('users', [('id','eq',r['referred_id'])])
+        referrals.append({**r, 'full_name': referred_user['full_name'] if referred_user else 'Unknown'})
 
     return render_template('dashboard.html',
-        user=user,
-        active_investments=active_investments,
-        recent_deposits=recent_deposits,
-        recent_withdrawals=recent_withdrawals,
-        referrals=referrals,
-        notifications=notifications)
+        user=user, active_investments=active_investments,
+        recent_deposits=recent_deposits, recent_withdrawals=recent_withdrawals,
+        referrals=referrals, notifications=notifications)
 
 
 @app.route('/dashboard/invest', methods=['GET', 'POST'])
 @login_required
 def invest():
-    user  = get_current_user()
+    user      = get_current_user()
     all_plans = get_plans()
 
     if request.method == 'POST':
         plan_id = request.form.get('plan_id', 0, type=int)
         amount  = request.form.get('amount',  0, type=float)
 
-        plan = query_db("SELECT * FROM plans WHERE id=%s AND is_active=TRUE", [plan_id], one=True)
+        plan = sb_one('plans', [('id','eq',plan_id),('is_active','eq',True)])
         if not plan:
             flash('Invalid plan selected.', 'error')
             return redirect(url_for('invest'))
 
         min_a = float(plan['min_amount'])
-        max_a = float(plan['max_amount']) if plan['max_amount'] else None
+        max_a = float(plan['max_amount']) if plan.get('max_amount') else None
 
         if amount < min_a:
             flash(f'Minimum investment for {plan["name"]} is ₦{min_a:,.0f}', 'error')
@@ -477,32 +465,43 @@ def invest():
 
         roi_pct         = float(plan['roi_percent'])
         expected_return = amount + (amount * roi_pct / 100)
-        end_date        = datetime.utcnow() + timedelta(days=int(plan['duration_days']))
+        end_date        = (datetime.utcnow() + timedelta(days=int(plan['duration_days']))).isoformat()
 
-        query_db("UPDATE users SET balance=balance-%s, total_invested=total_invested+%s WHERE id=%s RETURNING id",
-                 [amount, amount, user['id']], commit=True)
+        sb_update('users', {
+            'balance':        float(user['balance']) - amount,
+            'total_invested': float(user['total_invested']) + amount,
+        }, [('id','eq',user['id'])])
 
-        query_db("""
-            INSERT INTO investments (user_id,plan_id,plan_name,amount,roi_percent,expected_return,duration_days,end_date)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
-        """, [user['id'], plan_id, plan['name'], amount, roi_pct, expected_return,
-              int(plan['duration_days']), end_date], commit=True)
+        sb_insert('investments', {
+            'user_id': user['id'], 'plan_id': plan_id,
+            'plan_name': plan['name'], 'amount': amount,
+            'roi_percent': roi_pct, 'expected_return': expected_return,
+            'duration_days': int(plan['duration_days']),
+            'end_date': end_date, 'status': 'active',
+        })
 
         # Referral commission
-        if user['referred_by']:
-            commission = amount * REFERRAL_COMMISSION / 100
-            query_db("UPDATE users SET balance=balance+%s, referral_earnings=referral_earnings+%s WHERE id=%s RETURNING id",
-                     [commission, commission, user['referred_by']], commit=True)
-            query_db("UPDATE referrals SET commission=commission+%s, status='active' WHERE referrer_id=%s AND referred_id=%s RETURNING id",
-                     [commission, user['referred_by'], user['id']], commit=True)
-            query_db("INSERT INTO notifications (user_id,message,type) VALUES (%s,%s,%s) RETURNING id",
-                     [user['referred_by'], f'You earned ₦{commission:,.2f} referral commission!', 'success'],
-                     commit=True)
+        if user.get('referred_by'):
+            commission  = amount * REFERRAL_COMMISSION / 100
+            referrer    = sb_one('users', [('id','eq',user['referred_by'])])
+            if referrer:
+                sb_update('users', {
+                    'balance':           float(referrer['balance']) + commission,
+                    'referral_earnings': float(referrer['referral_earnings']) + commission,
+                }, [('id','eq',referrer['id'])])
+                # Update referral record commission
+                ref_row = sb_one('referrals', [
+                    ('referrer_id','eq',user['referred_by']),
+                    ('referred_id','eq',user['id'])
+                ])
+                if ref_row:
+                    sb_update('referrals', {
+                        'commission': float(ref_row['commission']) + commission,
+                        'status': 'active'
+                    }, [('id','eq',ref_row['id'])])
+                notify(referrer['id'], f'You earned ₦{commission:,.2f} referral commission!', 'success')
 
-        query_db("INSERT INTO notifications (user_id,message,type) VALUES (%s,%s,%s) RETURNING id",
-                 [user['id'], f'Investment of ₦{amount:,.2f} in {plan["name"]} activated!', 'success'],
-                 commit=True)
-
+        notify(user['id'], f'Investment of ₦{amount:,.2f} in {plan["name"]} activated!', 'success')
         flash(f'Investment activated! Expected return: ₦{expected_return:,.2f}', 'success')
         return redirect(url_for('dashboard'))
 
@@ -533,19 +532,18 @@ def deposit():
             proof.save(os.path.join(app.config['UPLOAD_FOLDER'], proof_filename))
 
         reference = 'AGV' + uuid.uuid4().hex[:10].upper()
-        query_db("""
-            INSERT INTO deposits (user_id,amount,payment_method,proof_filename,reference)
-            VALUES (%s,%s,%s,%s,%s) RETURNING id
-        """, [user['id'], amount, payment_method, proof_filename, reference], commit=True)
-
-        query_db("INSERT INTO notifications (user_id,message,type) VALUES (%s,%s,%s) RETURNING id",
-                 [user['id'], f'Deposit request of ₦{amount:,.2f} submitted. Awaiting confirmation.', 'info'],
-                 commit=True)
-
+        sb_insert('deposits', {
+            'user_id': user['id'], 'amount': amount,
+            'payment_method': payment_method,
+            'proof_filename': proof_filename,
+            'reference': reference, 'status': 'pending',
+        })
+        notify(user['id'], f'Deposit of ₦{amount:,.2f} submitted. Awaiting confirmation.', 'info')
         flash('Deposit submitted! Confirmed within 30 minutes.', 'success')
         return redirect(url_for('dashboard'))
 
-    deposits = query_db("SELECT * FROM deposits WHERE user_id=%s ORDER BY created_at DESC", [user['id']])
+    deposits = sb_all('deposits', filters=[('user_id','eq',user['id'])],
+                      order=('created_at','desc'))
     return render_template('deposit.html', user=user, deposits=deposits)
 
 
@@ -567,21 +565,18 @@ def withdraw():
             flash('Insufficient balance.', 'error')
             return redirect(url_for('withdraw'))
 
-        query_db("UPDATE users SET balance=balance-%s WHERE id=%s RETURNING id",
-                 [amount, user['id']], commit=True)
-        query_db("""
-            INSERT INTO withdrawals (user_id,amount,bank_name,account_number,account_name)
-            VALUES (%s,%s,%s,%s,%s) RETURNING id
-        """, [user['id'], amount, bank_name, account_number, account_name], commit=True)
-
-        query_db("INSERT INTO notifications (user_id,message,type) VALUES (%s,%s,%s) RETURNING id",
-                 [user['id'], f'Withdrawal request of ₦{amount:,.2f} submitted.', 'info'],
-                 commit=True)
-
+        sb_update('users', {'balance': float(user['balance']) - amount}, [('id','eq',user['id'])])
+        sb_insert('withdrawals', {
+            'user_id': user['id'], 'amount': amount,
+            'bank_name': bank_name, 'account_number': account_number,
+            'account_name': account_name, 'status': 'pending',
+        })
+        notify(user['id'], f'Withdrawal of ₦{amount:,.2f} submitted.', 'info')
         flash('Withdrawal submitted! Processing within 24 hours.', 'success')
         return redirect(url_for('dashboard'))
 
-    withdrawals = query_db("SELECT * FROM withdrawals WHERE user_id=%s ORDER BY created_at DESC", [user['id']])
+    withdrawals = sb_all('withdrawals', filters=[('user_id','eq',user['id'])],
+                         order=('created_at','desc'))
     return render_template('withdraw.html', user=user, withdrawals=withdrawals)
 
 
@@ -589,7 +584,7 @@ def withdraw():
 @login_required
 def mark_notifications_read():
     user = get_current_user()
-    query_db("UPDATE notifications SET is_read=TRUE WHERE user_id=%s RETURNING id", [user['id']], commit=True)
+    sb_update('notifications', {'is_read': True}, [('user_id','eq',user['id'])])
     return jsonify({'status': 'ok'})
 
 
@@ -599,27 +594,66 @@ def mark_notifications_read():
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
-    stats = {
-        'total_users':        query_db("SELECT COUNT(*) as c FROM users WHERE is_admin=FALSE", one=True)['c'],
-        'total_invested':     query_db("SELECT COALESCE(SUM(amount),0) as s FROM investments", one=True)['s'],
-        'pending_deposits':   query_db("SELECT COUNT(*) as c FROM deposits WHERE status='pending'", one=True)['c'],
-        'pending_withdrawals':query_db("SELECT COUNT(*) as c FROM withdrawals WHERE status='pending'", one=True)['c'],
-        'total_paid_out':     query_db("SELECT COALESCE(SUM(amount),0) as s FROM withdrawals WHERE status='approved'", one=True)['s'],
-        'active_investments': query_db("SELECT COUNT(*) as c FROM investments WHERE status='active'", one=True)['c'],
-        'total_plans':        query_db("SELECT COUNT(*) as c FROM plans", one=True)['c'],
-    }
-    recent_users  = query_db("SELECT * FROM users WHERE is_admin=FALSE ORDER BY created_at DESC LIMIT 10")
-    pending_deps  = query_db("""
-        SELECT d.*,u.full_name,u.email FROM deposits d
-        JOIN users u ON u.id=d.user_id WHERE d.status='pending' ORDER BY d.created_at DESC
-    """)
-    pending_wds   = query_db("""
-        SELECT w.*,u.full_name,u.email FROM withdrawals w
-        JOIN users u ON u.id=w.user_id WHERE w.status='pending' ORDER BY w.created_at DESC
-    """)
+    try:
+        stats = {
+            'total_users':         sb_count('users',       [('is_admin','eq',False)]),
+            'total_invested':      sb_sum('investments',   'amount'),
+            'pending_deposits':    sb_count('deposits',    [('status','eq','pending')]),
+            'pending_withdrawals': sb_count('withdrawals', [('status','eq','pending')]),
+            'total_paid_out':      sb_sum('withdrawals',   'amount', [('status','eq','approved')]),
+            'active_investments':  sb_count('investments', [('status','eq','active')]),
+            'total_plans':         sb_count('plans'),
+        }
+    except Exception as e:
+        print(f'Admin stats error: {e}')
+        stats = {k: 0 for k in ['total_users','total_invested','pending_deposits',
+                                  'pending_withdrawals','total_paid_out',
+                                  'active_investments','total_plans']}
+    try:
+        recent_users = sb_all('users', filters=[('is_admin','eq',False)],
+                              order=('created_at','desc'), limit=10)
+    except Exception:
+        recent_users = []
+    try:
+        pending_deps = _join_users(
+            sb_all('deposits', filters=[('status','eq','pending')],
+                   order=('created_at','desc')))
+    except Exception:
+        pending_deps = []
+    try:
+        pending_wds = _join_users(
+            sb_all('withdrawals', filters=[('status','eq','pending')],
+                   order=('created_at','desc')))
+    except Exception:
+        pending_wds = []
     return render_template('admin/dashboard.html',
         stats=stats, recent_users=recent_users,
         pending_deps=pending_deps, pending_wds=pending_wds)
+
+
+def _join_users(rows):
+    """Enrich rows with full_name and email from users table."""
+    if not rows:
+        return []
+    # Batch: collect unique user_ids and fetch them all at once
+    user_ids = list({r.get('user_id') for r in rows if r.get('user_id')})
+    users_map = {}
+    if user_ids:
+        try:
+            q = get_sb().table('users').select('id,full_name,email')
+            q = q.in_('id', user_ids)
+            r = q.execute()
+            for u in (r.data or []):
+                users_map[u['id']] = u
+        except Exception as e:
+            print(f'_join_users fetch error: {e}')
+    result = []
+    for row in rows:
+        u = users_map.get(row.get('user_id'), {})
+        result.append({**row,
+            'full_name': u.get('full_name', 'Unknown'),
+            'email':     u.get('email', '—')})
+    return result
 
 
 # ═════════════════════════════════════════════
@@ -628,7 +662,7 @@ def admin_dashboard():
 @app.route('/admin/plans')
 @admin_required
 def admin_plans():
-    all_plans = query_db("SELECT * FROM plans ORDER BY sort_order ASC, id ASC")
+    all_plans = sb_all('plans', order=[('sort_order','asc'),('id','asc')])
     return render_template('admin/plans.html', plans=all_plans)
 
 
@@ -636,97 +670,91 @@ def admin_plans():
 @admin_required
 def admin_plan_add():
     if request.method == 'POST':
-        name         = request.form.get('name', '').strip()
-        slug         = request.form.get('slug', '').strip().lower().replace(' ', '-')
-        icon         = request.form.get('icon', '🌱').strip()
-        description  = request.form.get('description', '').strip()
-        min_amount   = request.form.get('min_amount', 0, type=float)
-        max_amount   = request.form.get('max_amount', None)
-        roi_percent  = request.form.get('roi_percent', 0, type=float)
-        duration_days= request.form.get('duration_days', 30, type=int)
-        features_raw = request.form.get('features', '').strip()
-        sort_order   = request.form.get('sort_order', 0, type=int)
-        is_active    = request.form.get('is_active') == 'on'
-
-        # Clean features — one per line → pipe-separated
-        features = '|'.join([f.strip() for f in features_raw.splitlines() if f.strip()])
-        max_amt  = float(max_amount) if max_amount and str(max_amount).strip() else None
-
-        # Check slug unique
-        if query_db("SELECT id FROM plans WHERE slug=%s", [slug], one=True):
-            flash('A plan with that slug already exists. Choose a different name/slug.', 'error')
+        data, error = _plan_from_form(request.form)
+        if error:
+            flash(error, 'error')
             return render_template('admin/plan_form.html', plan=None, action='add')
-
-        if not name or not slug or roi_percent <= 0 or min_amount <= 0:
-            flash('Name, slug, ROI % and min amount are required.', 'error')
+        if sb_one('plans', [('slug','eq', data['slug'])]):
+            flash('A plan with that slug already exists.', 'error')
             return render_template('admin/plan_form.html', plan=None, action='add')
-
-        query_db("""
-            INSERT INTO plans (name,slug,icon,description,min_amount,max_amount,roi_percent,duration_days,features,sort_order,is_active)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
-        """, [name, slug, icon, description, min_amount, max_amt, roi_percent,
-              duration_days, features, sort_order, is_active], commit=True)
-
-        flash(f'Plan "{name}" created successfully!', 'success')
+        sb_insert('plans', data)
+        flash(f'Plan "{data["name"]}" created!', 'success')
         return redirect(url_for('admin_plans'))
-
     return render_template('admin/plan_form.html', plan=None, action='add')
 
 
 @app.route('/admin/plans/<int:plan_id>/edit', methods=['GET', 'POST'])
 @admin_required
 def admin_plan_edit(plan_id):
-    plan = query_db("SELECT * FROM plans WHERE id=%s", [plan_id], one=True)
+    plan = sb_one('plans', [('id','eq',plan_id)])
     if not plan:
         flash('Plan not found.', 'error')
         return redirect(url_for('admin_plans'))
 
     if request.method == 'POST':
-        name         = request.form.get('name', '').strip()
-        slug         = request.form.get('slug', '').strip().lower().replace(' ', '-')
-        icon         = request.form.get('icon', '🌱').strip()
-        description  = request.form.get('description', '').strip()
-        min_amount   = request.form.get('min_amount', 0, type=float)
-        max_amount   = request.form.get('max_amount', None)
-        roi_percent  = request.form.get('roi_percent', 0, type=float)
-        duration_days= request.form.get('duration_days', 30, type=int)
-        features_raw = request.form.get('features', '').strip()
-        sort_order   = request.form.get('sort_order', 0, type=int)
-        is_active    = request.form.get('is_active') == 'on'
+        data, error = _plan_from_form(request.form)
+        if error:
+            flash(error, 'error')
+            plan_d = dict(plan)
+            plan_d['features_text'] = (plan_d.get('features') or '').replace('|','\n')
+            return render_template('admin/plan_form.html', plan=plan_d, action='edit')
 
-        features = '|'.join([f.strip() for f in features_raw.splitlines() if f.strip()])
-        max_amt  = float(max_amount) if max_amount and str(max_amount).strip() else None
+        # Check slug uniqueness (exclude self)
+        existing = sb_all('plans', filters=[('slug','eq',data['slug'])])
+        clash = [p for p in existing if p['id'] != plan_id]
+        if clash:
+            flash('That slug is used by another plan.', 'error')
+            return redirect(url_for('admin_plan_edit', plan_id=plan_id))
 
-        # Check slug unique (exclude self)
-        existing = query_db("SELECT id FROM plans WHERE slug=%s AND id!=%s", [slug, plan_id], one=True)
-        if existing:
-            flash('That slug is already used by another plan.', 'error')
-            return render_template('admin/plan_form.html', plan=dict(plan), action='edit')
-
-        query_db("""
-            UPDATE plans SET name=%s,slug=%s,icon=%s,description=%s,min_amount=%s,
-            max_amount=%s,roi_percent=%s,duration_days=%s,features=%s,sort_order=%s,is_active=%s
-            WHERE id=%s RETURNING id
-        """, [name, slug, icon, description, min_amount, max_amt, roi_percent,
-              duration_days, features, sort_order, is_active, plan_id], commit=True)
-
-        flash(f'Plan "{name}" updated successfully!', 'success')
+        sb_update('plans', data, [('id','eq',plan_id)])
+        flash(f'Plan "{data["name"]}" updated!', 'success')
         return redirect(url_for('admin_plans'))
 
-    plan_dict = dict(plan)
-    # Convert pipe features back to newlines for the textarea
-    plan_dict['features_text'] = '\n'.join((plan_dict.get('features') or '').split('|'))
-    return render_template('admin/plan_form.html', plan=plan_dict, action='edit')
+    plan_d = dict(plan)
+    plan_d['features_text'] = (plan_d.get('features') or '').replace('|','\n')
+    return render_template('admin/plan_form.html', plan=plan_d, action='edit')
+
+
+def _plan_from_form(form):
+    """Parse and validate plan form. Returns (data_dict, error_str)."""
+    name          = form.get('name','').strip()
+    slug          = form.get('slug','').strip().lower().replace(' ','-')
+    icon          = form.get('icon','🌱').strip() or '🌱'
+    description   = form.get('description','').strip()
+    min_amount    = form.get('min_amount', 0, type=float)
+    max_amount    = form.get('max_amount', '').strip()
+    roi_percent   = form.get('roi_percent', 0, type=float)
+    duration_days = form.get('duration_days', 30, type=int)
+    features_raw  = form.get('features','').strip()
+    sort_order    = form.get('sort_order', 0, type=int)
+    is_active     = form.get('is_active') == 'on'
+
+    if not name or not slug:
+        return None, 'Name and slug are required.'
+    if roi_percent <= 0:
+        return None, 'ROI % must be greater than 0.'
+    if min_amount <= 0:
+        return None, 'Minimum amount must be greater than 0.'
+
+    features = '|'.join([f.strip() for f in features_raw.splitlines() if f.strip()])
+    max_amt  = float(max_amount) if max_amount else None
+
+    return {
+        'name': name, 'slug': slug, 'icon': icon,
+        'description': description, 'min_amount': min_amount,
+        'max_amount': max_amt, 'roi_percent': roi_percent,
+        'duration_days': duration_days, 'features': features,
+        'sort_order': sort_order, 'is_active': is_active,
+    }, None
 
 
 @app.route('/admin/plans/<int:plan_id>/toggle', methods=['POST'])
 @admin_required
 def admin_plan_toggle(plan_id):
-    plan = query_db("SELECT * FROM plans WHERE id=%s", [plan_id], one=True)
+    plan = sb_one('plans', [('id','eq',plan_id)])
     if plan:
         new_status = not bool(plan['is_active'])
-        query_db("UPDATE plans SET is_active=%s WHERE id=%s RETURNING id",
-                 [new_status, plan_id], commit=True)
+        sb_update('plans', {'is_active': new_status}, [('id','eq',plan_id)])
         flash(f'Plan {"activated" if new_status else "deactivated"}.', 'success')
     return redirect(url_for('admin_plans'))
 
@@ -734,15 +762,12 @@ def admin_plan_toggle(plan_id):
 @app.route('/admin/plans/<int:plan_id>/delete', methods=['POST'])
 @admin_required
 def admin_plan_delete(plan_id):
-    # Check if any active investments reference this plan
-    active = query_db(
-        "SELECT COUNT(*) as c FROM investments WHERE plan_id=%s AND status='active'", [plan_id], one=True)
-    if active and active['c'] > 0:
-        flash(f'Cannot delete — {active["c"]} active investment(s) use this plan. Deactivate it instead.', 'error')
+    active = sb_count('investments', [('plan_id','eq',plan_id),('status','eq','active')])
+    if active > 0:
+        flash(f'Cannot delete — {active} active investment(s) use this plan. Deactivate it instead.', 'error')
         return redirect(url_for('admin_plans'))
-
-    plan = query_db("SELECT name FROM plans WHERE id=%s", [plan_id], one=True)
-    query_db("DELETE FROM plans WHERE id=%s RETURNING id", [plan_id], commit=True)
+    plan = sb_one('plans', [('id','eq',plan_id)])
+    sb_delete('plans', [('id','eq',plan_id)])
     flash(f'Plan "{plan["name"] if plan else plan_id}" deleted.', 'success')
     return redirect(url_for('admin_plans'))
 
@@ -753,52 +778,68 @@ def admin_plan_delete(plan_id):
 @app.route('/admin/users')
 @admin_required
 def admin_users():
-    users = query_db("""
-        SELECT u.*,
-          (SELECT COUNT(*) FROM investments  WHERE user_id=u.id) as inv_count,
-          (SELECT COUNT(*) FROM referrals    WHERE referrer_id=u.id) as ref_count
-        FROM users u WHERE u.is_admin=FALSE ORDER BY u.created_at DESC
-    """)
-    return render_template('admin/users.html', users=users)
+    try:
+        users = sb_all('users', filters=[('is_admin','eq',False)],
+                       order=('created_at','desc'))
+    except Exception:
+        users = []
+
+    # Batch-fetch all investments and referrals, count in Python
+    try:
+        all_investments = sb_all('investments')
+        all_referrals   = sb_all('referrals')
+    except Exception:
+        all_investments, all_referrals = [], []
+
+    inv_map = {}
+    for inv in all_investments:
+        uid = inv.get('user_id')
+        inv_map[uid] = inv_map.get(uid, 0) + 1
+    ref_map = {}
+    for ref in all_referrals:
+        uid = ref.get('referrer_id')
+        ref_map[uid] = ref_map.get(uid, 0) + 1
+
+    enriched = [{**u, 'inv_count': inv_map.get(u['id'], 0),
+                      'ref_count': ref_map.get(u['id'], 0)} for u in users]
+    return render_template('admin/users.html', users=enriched)
 
 
 @app.route('/admin/users/<int:user_id>/edit', methods=['GET', 'POST'])
 @admin_required
 def admin_user_edit(user_id):
-    user = query_db("SELECT * FROM users WHERE id=%s", [user_id], one=True)
+    user = sb_one('users', [('id','eq',user_id)])
     if not user:
         flash('User not found.', 'error')
         return redirect(url_for('admin_users'))
 
     if request.method == 'POST':
-        full_name  = request.form.get('full_name', '').strip()
-        email      = request.form.get('email', '').strip().lower()
-        phone      = request.form.get('phone', '').strip()
-        balance    = request.form.get('balance', 0, type=float)
-        is_active  = request.form.get('is_active') == 'on'
-        is_admin   = request.form.get('is_admin') == 'on'
-        new_password = request.form.get('new_password', '').strip()
+        full_name    = request.form.get('full_name','').strip()
+        email        = request.form.get('email','').strip().lower()
+        phone        = request.form.get('phone','').strip()
+        balance      = request.form.get('balance', 0, type=float)
+        is_active    = request.form.get('is_active') == 'on'
+        is_admin     = request.form.get('is_admin') == 'on'
+        new_password = request.form.get('new_password','').strip()
 
-        # Check email unique (exclude self)
-        if query_db("SELECT id FROM users WHERE email=%s AND id!=%s", [email, user_id], one=True):
+        # Email uniqueness check
+        existing = sb_all('users', filters=[('email','eq',email)])
+        if any(u['id'] != user_id for u in existing):
             flash('Email already used by another account.', 'error')
             return render_template('admin/user_form.html', user=dict(user))
 
+        update_data = {
+            'full_name': full_name, 'email': email, 'phone': phone,
+            'balance': balance, 'is_active': is_active, 'is_admin': is_admin,
+        }
         if new_password:
             if len(new_password) < 8:
-                flash('New password must be at least 8 characters.', 'error')
+                flash('Password must be at least 8 characters.', 'error')
                 return render_template('admin/user_form.html', user=dict(user))
-            query_db("UPDATE users SET password_hash=%s WHERE id=%s RETURNING id",
-                     [generate_password_hash(new_password), user_id], commit=True)
+            update_data['password_hash'] = generate_password_hash(new_password)
 
-        query_db("""
-            UPDATE users SET full_name=%s,email=%s,phone=%s,balance=%s,is_active=%s,is_admin=%s
-            WHERE id=%s RETURNING id
-        """, [full_name, email, phone, balance, is_active, is_admin, user_id], commit=True)
-
-        query_db("INSERT INTO notifications (user_id,message,type) VALUES (%s,%s,%s) RETURNING id",
-                 [user_id, 'Your account details have been updated by admin.', 'info'], commit=True)
-
+        sb_update('users', update_data, [('id','eq',user_id)])
+        notify(user_id, 'Your account details have been updated by admin.', 'info')
         flash(f'User "{full_name}" updated.', 'success')
         return redirect(url_for('admin_users'))
 
@@ -808,11 +849,10 @@ def admin_user_edit(user_id):
 @app.route('/admin/users/<int:user_id>/toggle', methods=['POST'])
 @admin_required
 def admin_toggle_user(user_id):
-    user = query_db("SELECT * FROM users WHERE id=%s", [user_id], one=True)
+    user = sb_one('users', [('id','eq',user_id)])
     if user:
         new_status = not bool(user['is_active'])
-        query_db("UPDATE users SET is_active=%s WHERE id=%s RETURNING id",
-                 [new_status, user_id], commit=True)
+        sb_update('users', {'is_active': new_status}, [('id','eq',user_id)])
         flash(f'User {"activated" if new_status else "suspended"}.', 'success')
     return redirect(url_for('admin_users'))
 
@@ -823,43 +863,38 @@ def admin_credit_user(user_id):
     amount = request.form.get('amount', 0, type=float)
     note   = request.form.get('note', 'Admin credit').strip()
     if amount > 0:
-        query_db("UPDATE users SET balance=balance+%s WHERE id=%s RETURNING id",
-                 [amount, user_id], commit=True)
-        query_db("INSERT INTO notifications (user_id,message,type) VALUES (%s,%s,%s) RETURNING id",
-                 [user_id, f'Your account has been credited ₦{amount:,.2f}. {note}', 'success'],
-                 commit=True)
-        flash(f'₦{amount:,.2f} credited successfully.', 'success')
+        user = sb_one('users', [('id','eq',user_id)])
+        if user:
+            sb_update('users', {'balance': float(user['balance']) + amount}, [('id','eq',user_id)])
+            notify(user_id, f'Your account was credited ₦{amount:,.2f}. {note}', 'success')
+            flash(f'₦{amount:,.2f} credited.', 'success')
     return redirect(url_for('admin_users'))
 
 
 @app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
 @admin_required
 def admin_user_delete(user_id):
-    user = query_db("SELECT * FROM users WHERE id=%s", [user_id], one=True)
+    user = sb_one('users', [('id','eq',user_id)])
     if not user:
         flash('User not found.', 'error')
         return redirect(url_for('admin_users'))
-    if user['is_admin']:
+    if user.get('is_admin'):
         flash('Cannot delete admin accounts.', 'error')
         return redirect(url_for('admin_users'))
-
-    active_inv = query_db(
-        "SELECT COUNT(*) as c FROM investments WHERE user_id=%s AND status='active'", [user_id], one=True)
-    if active_inv and active_inv['c'] > 0:
-        flash(f'Cannot delete — user has {active_inv["c"]} active investment(s). Suspend instead.', 'error')
+    active_inv = sb_count('investments', [('user_id','eq',user_id),('status','eq','active')])
+    if active_inv > 0:
+        flash(f'Cannot delete — {active_inv} active investment(s). Suspend instead.', 'error')
         return redirect(url_for('admin_users'))
 
-    # Cascade delete related records
-    for tbl in ['notifications', 'deposits', 'withdrawals', 'investments', 'referrals']:
-        col = 'referrer_id' if tbl == 'referrals' else 'user_id'
+    for tbl, col in [('notifications','user_id'),('deposits','user_id'),
+                     ('withdrawals','user_id'),('investments','user_id'),
+                     ('referrals','referrer_id'),('referrals','referred_id')]:
         try:
-            query_db(f"DELETE FROM {tbl} WHERE {col}=%s RETURNING id", [user_id], commit=True)
-            if tbl == 'referrals':
-                query_db("DELETE FROM referrals WHERE referred_id=%s RETURNING id", [user_id], commit=True)
+            sb_delete(tbl, [(col,'eq',user_id)])
         except Exception:
             pass
 
-    query_db("DELETE FROM users WHERE id=%s RETURNING id", [user_id], commit=True)
+    sb_delete('users', [('id','eq',user_id)])
     flash(f'User "{user["full_name"]}" deleted permanently.', 'success')
     return redirect(url_for('admin_users'))
 
@@ -870,25 +905,21 @@ def admin_user_delete(user_id):
 @app.route('/admin/deposits')
 @admin_required
 def admin_deposits():
-    deposits = query_db("""
-        SELECT d.*,u.full_name,u.email FROM deposits d
-        JOIN users u ON u.id=d.user_id ORDER BY d.created_at DESC
-    """)
+    deposits = _join_users(sb_all('deposits', order=('created_at','desc')))
     return render_template('admin/deposits.html', deposits=deposits)
 
 
 @app.route('/admin/deposits/<int:dep_id>/approve', methods=['POST'])
 @admin_required
 def admin_approve_deposit(dep_id):
-    dep = query_db("SELECT * FROM deposits WHERE id=%s", [dep_id], one=True)
+    dep = sb_one('deposits', [('id','eq',dep_id)])
     if dep and dep['status'] == 'pending':
-        query_db("UPDATE deposits SET status='approved', updated_at=NOW() WHERE id=%s RETURNING id",
-                 [dep_id], commit=True)
-        query_db("UPDATE users SET balance=balance+%s WHERE id=%s RETURNING id",
-                 [dep['amount'], dep['user_id']], commit=True)
-        query_db("INSERT INTO notifications (user_id,message,type) VALUES (%s,%s,%s) RETURNING id",
-                 [dep['user_id'], f'Your deposit of ₦{float(dep["amount"]):,.2f} has been approved!', 'success'],
-                 commit=True)
+        sb_update('deposits', {'status':'approved'}, [('id','eq',dep_id)])
+        user = sb_one('users', [('id','eq',dep['user_id'])])
+        if user:
+            sb_update('users', {'balance': float(user['balance']) + float(dep['amount'])},
+                      [('id','eq',dep['user_id'])])
+        notify(dep['user_id'], f'Your deposit of ₦{float(dep["amount"]):,.2f} has been approved!', 'success')
         flash('Deposit approved.', 'success')
     return redirect(url_for('admin_deposits'))
 
@@ -897,13 +928,10 @@ def admin_approve_deposit(dep_id):
 @admin_required
 def admin_reject_deposit(dep_id):
     note = request.form.get('note', 'Rejected by admin')
-    dep  = query_db("SELECT * FROM deposits WHERE id=%s", [dep_id], one=True)
+    dep  = sb_one('deposits', [('id','eq',dep_id)])
     if dep and dep['status'] == 'pending':
-        query_db("UPDATE deposits SET status='rejected',admin_note=%s,updated_at=NOW() WHERE id=%s RETURNING id",
-                 [note, dep_id], commit=True)
-        query_db("INSERT INTO notifications (user_id,message,type) VALUES (%s,%s,%s) RETURNING id",
-                 [dep['user_id'], f'Deposit of ₦{float(dep["amount"]):,.2f} rejected. Reason: {note}', 'error'],
-                 commit=True)
+        sb_update('deposits', {'status':'rejected','admin_note':note}, [('id','eq',dep_id)])
+        notify(dep['user_id'], f'Deposit of ₦{float(dep["amount"]):,.2f} rejected. Reason: {note}', 'error')
         flash('Deposit rejected.', 'warning')
     return redirect(url_for('admin_deposits'))
 
@@ -914,25 +942,21 @@ def admin_reject_deposit(dep_id):
 @app.route('/admin/withdrawals')
 @admin_required
 def admin_withdrawals():
-    withdrawals = query_db("""
-        SELECT w.*,u.full_name,u.email FROM withdrawals w
-        JOIN users u ON u.id=w.user_id ORDER BY w.created_at DESC
-    """)
+    withdrawals = _join_users(sb_all('withdrawals', order=('created_at','desc')))
     return render_template('admin/withdrawals.html', withdrawals=withdrawals)
 
 
 @app.route('/admin/withdrawals/<int:wd_id>/approve', methods=['POST'])
 @admin_required
 def admin_approve_withdrawal(wd_id):
-    wd = query_db("SELECT * FROM withdrawals WHERE id=%s", [wd_id], one=True)
+    wd = sb_one('withdrawals', [('id','eq',wd_id)])
     if wd and wd['status'] == 'pending':
-        query_db("UPDATE withdrawals SET status='approved',updated_at=NOW() WHERE id=%s RETURNING id",
-                 [wd_id], commit=True)
-        query_db("UPDATE users SET total_earnings=total_earnings+%s WHERE id=%s RETURNING id",
-                 [wd['amount'], wd['user_id']], commit=True)
-        query_db("INSERT INTO notifications (user_id,message,type) VALUES (%s,%s,%s) RETURNING id",
-                 [wd['user_id'], f'Withdrawal of ₦{float(wd["amount"]):,.2f} approved and sent!', 'success'],
-                 commit=True)
+        sb_update('withdrawals', {'status':'approved'}, [('id','eq',wd_id)])
+        user = sb_one('users', [('id','eq',wd['user_id'])])
+        if user:
+            sb_update('users', {'total_earnings': float(user['total_earnings']) + float(wd['amount'])},
+                      [('id','eq',wd['user_id'])])
+        notify(wd['user_id'], f'Withdrawal of ₦{float(wd["amount"]):,.2f} approved and sent!', 'success')
         flash('Withdrawal approved.', 'success')
     return redirect(url_for('admin_withdrawals'))
 
@@ -940,16 +964,15 @@ def admin_approve_withdrawal(wd_id):
 @app.route('/admin/withdrawals/<int:wd_id>/reject', methods=['POST'])
 @admin_required
 def admin_reject_withdrawal(wd_id):
-    note = request.form.get('note', 'Rejected by admin')
-    wd   = query_db("SELECT * FROM withdrawals WHERE id=%s", [wd_id], one=True)
+    note = request.form.get('note', 'Rejected')
+    wd   = sb_one('withdrawals', [('id','eq',wd_id)])
     if wd and wd['status'] == 'pending':
-        query_db("UPDATE users SET balance=balance+%s WHERE id=%s RETURNING id",
-                 [wd['amount'], wd['user_id']], commit=True)
-        query_db("UPDATE withdrawals SET status='rejected',admin_note=%s,updated_at=NOW() WHERE id=%s RETURNING id",
-                 [note, wd_id], commit=True)
-        query_db("INSERT INTO notifications (user_id,message,type) VALUES (%s,%s,%s) RETURNING id",
-                 [wd['user_id'], f'Withdrawal of ₦{float(wd["amount"]):,.2f} rejected. Refunded. Reason: {note}', 'warning'],
-                 commit=True)
+        user = sb_one('users', [('id','eq',wd['user_id'])])
+        if user:
+            sb_update('users', {'balance': float(user['balance']) + float(wd['amount'])},
+                      [('id','eq',wd['user_id'])])
+        sb_update('withdrawals', {'status':'rejected','admin_note':note}, [('id','eq',wd_id)])
+        notify(wd['user_id'], f'Withdrawal of ₦{float(wd["amount"]):,.2f} rejected. Refunded. Reason: {note}', 'warning')
         flash('Withdrawal rejected and balance refunded.', 'warning')
     return redirect(url_for('admin_withdrawals'))
 
@@ -960,30 +983,51 @@ def admin_reject_withdrawal(wd_id):
 @app.route('/admin/investments')
 @admin_required
 def admin_investments():
-    investments = query_db("""
-        SELECT i.*,u.full_name,u.email FROM investments i
-        JOIN users u ON u.id=i.user_id ORDER BY i.created_at DESC
-    """)
+    investments = _join_users(sb_all('investments', order=('created_at','desc')))
     return render_template('admin/investments.html', investments=investments)
 
 
 @app.route('/admin/investments/<int:inv_id>/complete', methods=['POST'])
 @admin_required
 def admin_complete_investment(inv_id):
-    inv = query_db("SELECT * FROM investments WHERE id=%s", [inv_id], one=True)
+    inv = sb_one('investments', [('id','eq',inv_id)])
     if inv and inv['status'] == 'active':
-        query_db("UPDATE investments SET status='completed' WHERE id=%s RETURNING id",
-                 [inv_id], commit=True)
+        sb_update('investments', {'status':'completed'}, [('id','eq',inv_id)])
+        user   = sb_one('users', [('id','eq',inv['user_id'])])
         profit = float(inv['expected_return']) - float(inv['amount'])
-        query_db("UPDATE users SET balance=balance+%s, total_earnings=total_earnings+%s WHERE id=%s RETURNING id",
-                 [inv['expected_return'], profit, inv['user_id']], commit=True)
-        query_db("INSERT INTO notifications (user_id,message,type) VALUES (%s,%s,%s) RETURNING id",
-                 [inv['user_id'],
-                  f'{inv["plan_name"]} matured! ₦{float(inv["expected_return"]):,.2f} credited to your balance.',
-                  'success'], commit=True)
+        if user:
+            sb_update('users', {
+                'balance':        float(user['balance']) + float(inv['expected_return']),
+                'total_earnings': float(user['total_earnings']) + profit,
+            }, [('id','eq',inv['user_id'])])
+        notify(inv['user_id'],
+               f'{inv["plan_name"]} matured! ₦{float(inv["expected_return"]):,.2f} credited.',
+               'success')
         flash('Investment completed and balance credited.', 'success')
     return redirect(url_for('admin_investments'))
 
+
+# ═════════════════════════════════════════════
+# Debug Route (admin only — check Render logs)
+# ═════════════════════════════════════════════
+@app.route('/admin/debug')
+@admin_required
+def admin_debug():
+    """Shows live connection status and any errors. Check Render logs for detail."""
+    results = {}
+    try:
+        results['supabase_url'] = SUPABASE_URL[:40] + '...' if SUPABASE_URL else 'NOT SET'
+        results['supabase_key_set'] = bool(SUPABASE_KEY)
+        results['users_count']   = sb_count('users')
+        results['plans_count']   = sb_count('plans')
+        results['deposits_count']= sb_count('deposits')
+        results['status'] = 'OK - Database connection working'
+    except Exception as e:
+        import traceback
+        results['error'] = str(e)
+        results['traceback'] = traceback.format_exc()
+        results['status'] = 'ERROR'
+    return jsonify(results)
 
 # ═════════════════════════════════════════════
 # Error Handlers
@@ -1017,7 +1061,7 @@ def date_fmt(value, fmt='%d %b %Y'):
         return '—'
     if isinstance(value, str):
         try:
-            value = datetime.fromisoformat(value)
+            value = datetime.fromisoformat(value.replace('Z','+00:00'))
         except Exception:
             return value
     try:
@@ -1027,25 +1071,23 @@ def date_fmt(value, fmt='%d %b %Y'):
 
 @app.template_filter('status_badge')
 def status_badge(status):
-    badges = {
+    return {
         'pending':   'badge-warning',
         'approved':  'badge-success',
         'rejected':  'badge-error',
         'active':    'badge-info',
         'completed': 'badge-success',
-    }
-    return badges.get(str(status or '').lower(), 'badge-neutral')
+    }.get(str(status or '').lower(), 'badge-neutral')
 
 
 # ═════════════════════════════════════════════
-# Initialize DB on startup (gunicorn safe)
+# Startup
 # ═════════════════════════════════════════════
 with app.app_context():
     try:
         init_db()
-        print("✓ Database initialized successfully")
     except Exception as _e:
-        print(f"⚠ DB init skipped (no DATABASE_URL yet?): {_e}")
+        print(f"⚠ Startup DB init skipped: {_e}")
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)

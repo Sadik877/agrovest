@@ -7,7 +7,9 @@ services:
     envVars:
       - key: SECRET_KEY
         generateValue: true
+      - key: DATABASE_URL
+        sync: false          # You paste this from Supabase manually
       - key: RENDER_TMP
         value: "true"
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: "3.11.0"
