@@ -6,13 +6,16 @@
   <!-- ── Sidebar ── -->
   <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-forest-950 flex flex-col transition-transform duration-300 -translate-x-full lg:translate-x-0 lg:static lg:z-auto">
     <!-- Logo -->
-    <div class="px-6 py-5 border-b border-white/10">
+    <div class="px-6 py-5 border-b border-white/10 flex items-center justify-between">
       <a href="{{ url_for('index') }}" class="flex items-center gap-2.5">
         <div class="w-8 h-8 rounded-lg bg-gold-500 flex items-center justify-center flex-shrink-0">
           <span class="text-forest-950 font-display font-bold">A</span>
         </div>
         <span class="font-display font-bold text-lg text-white">Agro<span class="text-gold-500">Vest</span></span>
       </a>
+      <button onclick="closeSidebar()" class="lg:hidden text-white/40 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
     </div>
 
     <!-- User Info -->
@@ -129,12 +132,14 @@
 
 <script>
   function openSidebar() {
-    document.getElementById('sidebar').style.transform = 'translateX(0)';
+    document.getElementById('sidebar').classList.remove('-translate-x-full');
     document.getElementById('sidebar-overlay').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
   }
   function closeSidebar() {
-    document.getElementById('sidebar').style.transform = '';
+    document.getElementById('sidebar').classList.add('-translate-x-full');
     document.getElementById('sidebar-overlay').classList.add('hidden');
+    document.body.style.overflow = '';
   }
   function toggleNotifications() {
     document.getElementById('notif-panel').classList.toggle('hidden');
@@ -152,6 +157,18 @@
     if (!panel.contains(e.target) && !btn.contains(e.target)) {
       panel.classList.add('hidden');
     }
+  });
+
+  // Close sidebar on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSidebar();
+  });
+
+  // Close sidebar when a nav link is clicked on mobile
+  document.querySelectorAll('#sidebar .sidebar-link').forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth < 1024) closeSidebar();
+    });
   });
 </script>
 {% endblock %}
