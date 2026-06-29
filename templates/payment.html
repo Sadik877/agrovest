@@ -1,0 +1,343 @@
+{% extends "dashboard_base.html" %}
+{% block page_title %}Complete Payment{% endblock %}
+{% block page_subtitle %}Transfer to any of the accounts below{% endblock %}
+
+{% block dashboard_content %}
+<div class="max-w-lg mx-auto">
+
+  <!-- Step indicator -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-5">
+    <div class="flex">
+      <div class="flex-1 py-4 px-6 flex items-center gap-3">
+        <span class="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+          <svg class="w-4 h-4 text-forest-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+        </span>
+        <span class="text-sm font-medium text-gray-400 line-through">Enter Amount</span>
+      </div>
+      <div class="flex-1 py-4 px-6 flex items-center gap-3 border-l border-gray-100">
+        <span class="w-7 h-7 rounded-full bg-forest-950 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
+        <span class="text-sm font-semibold text-gray-900">Make Payment</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Amount display -->
+  <div class="bg-gradient-to-br from-forest-950 to-forest-800 rounded-2xl p-6 mb-5 text-white relative overflow-hidden">
+    <div class="absolute inset-0 opacity-5" style="background-image: radial-gradient(circle at 20% 80%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px); background-size: 40px 40px;"></div>
+    <div class="relative">
+      <p class="text-forest-300 text-xs font-semibold uppercase tracking-widest mb-1">Amount to Pay</p>
+      <p class="text-4xl font-black tracking-tight" id="display-amount">₦0</p>
+      <div class="mt-4 pt-4 border-t border-forest-700/50 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-xs text-forest-300">Session active</span>
+        </div>
+        <div id="session-timer" class="text-xs text-forest-300 font-mono">30:00</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bank account card -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-5">
+    <div class="px-6 pt-5 pb-3 border-b border-gray-50 flex items-center justify-between">
+      <div>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Pay to this Account</p>
+        <p class="text-sm text-gray-500 mt-0.5">Transfer the exact amount shown above</p>
+      </div>
+      <!-- Account position dots -->
+      <div class="flex items-center gap-1.5" id="account-dots"></div>
+    </div>
+
+    <!-- Account card body -->
+    <div class="p-6">
+      <div id="account-display" class="transition-all duration-500">
+        <!-- Injected by JS -->
+      </div>
+
+      <!-- Copy button -->
+      <button
+        onclick="copyAccountNumber()"
+        id="copy-btn"
+        class="mt-5 w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl border-2 border-forest-200 text-forest-800 font-bold text-sm hover:bg-forest-50 hover:border-forest-400 transition-all active:scale-95"
+      >
+        <svg id="copy-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+        <span id="copy-label">Copy Account Number</span>
+      </button>
+
+      <!-- Switch account -->
+      <button
+        onclick="nextAccount()"
+        class="mt-2 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-gray-500 text-sm font-medium hover:text-gray-700 hover:bg-gray-50 transition-all"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+        Use a different account
+      </button>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-5">
+    <p class="text-xs font-bold text-amber-800 uppercase tracking-widest mb-3">Payment Instructions</p>
+    <ol class="space-y-2.5">
+      <li class="flex items-start gap-3 text-sm text-amber-900">
+        <span class="w-5 h-5 rounded-full bg-amber-200 text-amber-800 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+        Copy the account number above and open your banking app.
+      </li>
+      <li class="flex items-start gap-3 text-sm text-amber-900">
+        <span class="w-5 h-5 rounded-full bg-amber-200 text-amber-800 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+        Transfer the <strong>exact amount</strong> shown — ₦1 difference may delay confirmation.
+      </li>
+      <li class="flex items-start gap-3 text-sm text-amber-900">
+        <span class="w-5 h-5 rounded-full bg-amber-200 text-amber-800 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+        Take a screenshot or download your receipt immediately after payment.
+      </li>
+      <li class="flex items-start gap-3 text-sm text-amber-900">
+        <span class="w-5 h-5 rounded-full bg-amber-200 text-amber-800 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
+        Upload the receipt below and click <strong>Submit</strong>. Your balance updates within 30 minutes.
+      </li>
+    </ol>
+  </div>
+
+  <!-- Proof upload form (submits to existing deposit route) -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+    <p class="font-semibold text-gray-900 mb-1">I've made the transfer</p>
+    <p class="text-sm text-gray-500 mb-5">Upload your payment receipt to confirm your deposit.</p>
+
+    <form method="POST" action="{{ url_for('deposit') }}" enctype="multipart/form-data" class="space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="amount" id="form-amount">
+      <input type="hidden" name="payment_method" id="form-method">
+
+      <!-- Drop zone -->
+      <div
+        id="drop-zone"
+        onclick="document.getElementById('proof-file').click()"
+        class="border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center cursor-pointer hover:border-forest-400 hover:bg-forest-50/30 transition-all"
+      >
+        <div id="upload-idle">
+          <div class="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+            <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+          </div>
+          <p class="text-sm font-semibold text-gray-600">Upload payment receipt</p>
+          <p class="text-xs text-gray-400 mt-1">PNG, JPG, or PDF — Max 5MB</p>
+        </div>
+        <div id="upload-selected" class="hidden">
+          <div class="w-14 h-14 rounded-2xl bg-forest-50 flex items-center justify-center mx-auto mb-3">
+            <svg class="w-7 h-7 text-forest-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <p id="file-name" class="text-sm font-bold text-forest-700"></p>
+          <p class="text-xs text-gray-400 mt-1">Click to change file</p>
+        </div>
+      </div>
+      <input
+        type="file"
+        name="proof"
+        id="proof-file"
+        accept=".png,.jpg,.jpeg,.pdf"
+        class="hidden"
+        onchange="handleFileSelect(this)"
+      />
+
+      <button
+        type="submit"
+        id="submit-btn"
+        class="w-full bg-forest-950 hover:bg-forest-800 text-white font-bold py-4 rounded-2xl transition-colors text-base shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Submit Deposit Request
+      </button>
+
+      <p class="text-center text-xs text-gray-400">
+        Having trouble?
+        <a href="{{ url_for('deposit') }}" class="text-forest-700 font-semibold hover:underline">Start over</a>
+      </p>
+    </form>
+  </div>
+</div>
+
+<style>
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .account-animate { animation: fadeSlideIn 0.35s ease forwards; }
+</style>
+
+<script>
+  // ─── Bank accounts pool ───────────────────────────────────────────
+  const ACCOUNTS = [
+    { bank: 'Zenith Bank',    number: '2089234567', name: 'AgroVest Nigeria Ltd',  logo: '🟦' },
+    { bank: 'GTBank',         number: '0123456789', name: 'AgroVest Nigeria Ltd',  logo: '🟧' },
+    { bank: 'Access Bank',    number: '0987654321', name: 'AgroVest Nigeria Ltd',  logo: '🟥' },
+    { bank: 'First Bank',     number: '3012345678', name: 'AgroVest Nigeria Ltd',  logo: '🟩' },
+    { bank: 'UBA',            number: '1023456789', name: 'AgroVest Nigeria Ltd',  logo: '🟨' },
+  ];
+
+  let currentIndex = 0;
+  let rotationTimer  = null;
+  let sessionSeconds = 30 * 60; // 30 min
+
+  // ─── Read URL params ──────────────────────────────────────────────
+  function getParam(key) {
+    return new URLSearchParams(window.location.search).get(key) || '';
+  }
+
+  const rawAmount = parseFloat(getParam('amount')) || 0;
+  const method    = getParam('method') || 'bank_transfer';
+
+  // ─── Format helpers ───────────────────────────────────────────────
+  function formatNaira(n) {
+    return '₦' + Number(n).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function formatAccNum(num) {
+    return num.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3');
+  }
+
+  // ─── Populate hidden fields ───────────────────────────────────────
+  document.getElementById('form-amount').value = rawAmount;
+  document.getElementById('form-method').value = method;
+  document.getElementById('display-amount').textContent = formatNaira(rawAmount);
+
+  // ─── Render dots ─────────────────────────────────────────────────
+  function renderDots() {
+    const container = document.getElementById('account-dots');
+    container.innerHTML = '';
+    ACCOUNTS.forEach((_, i) => {
+      const dot = document.createElement('button');
+      dot.className = `w-2 h-2 rounded-full transition-all ${i === currentIndex ? 'bg-forest-800 w-4' : 'bg-gray-200 hover:bg-gray-300'}`;
+      dot.onclick = () => goToAccount(i);
+      container.appendChild(dot);
+    });
+  }
+
+  // ─── Render active account ────────────────────────────────────────
+  function renderAccount(animate = true) {
+    const acc = ACCOUNTS[currentIndex];
+    const display = document.getElementById('account-display');
+
+    display.style.opacity = '0';
+    display.style.transform = 'translateY(6px)';
+
+    setTimeout(() => {
+      display.innerHTML = `
+        <div class="flex items-start gap-4">
+          <div class="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center text-2xl flex-shrink-0">${acc.logo}</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-0.5">${acc.bank}</p>
+            <p class="text-2xl font-black text-gray-900 tracking-widest font-mono leading-tight">${formatAccNum(acc.number)}</p>
+            <p class="text-sm text-gray-500 mt-1">${acc.name}</p>
+          </div>
+        </div>
+        <div class="mt-5 grid grid-cols-2 gap-3">
+          <div class="bg-gray-50 rounded-xl p-3">
+            <p class="text-xs text-gray-400 mb-0.5">Amount</p>
+            <p class="text-sm font-bold text-gray-900">${formatNaira(rawAmount)}</p>
+          </div>
+          <div class="bg-gray-50 rounded-xl p-3">
+            <p class="text-xs text-gray-400 mb-0.5">Account</p>
+            <p class="text-sm font-bold text-gray-900 font-mono">${acc.number}</p>
+          </div>
+        </div>
+      `;
+      display.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+      display.style.opacity = '1';
+      display.style.transform = 'translateY(0)';
+    }, animate ? 180 : 0);
+
+    renderDots();
+    resetRotationTimer();
+  }
+
+  function goToAccount(idx) {
+    currentIndex = idx;
+    renderAccount();
+  }
+
+  function nextAccount() {
+    currentIndex = (currentIndex + 1) % ACCOUNTS.length;
+    renderAccount();
+  }
+
+  function resetRotationTimer() {
+    if (rotationTimer) clearInterval(rotationTimer);
+    rotationTimer = setInterval(() => {
+      currentIndex = (currentIndex + 1) % ACCOUNTS.length;
+      renderAccount();
+    }, 8000);
+  }
+
+  // ─── Copy to clipboard ────────────────────────────────────────────
+  function copyAccountNumber() {
+    const acc = ACCOUNTS[currentIndex];
+    navigator.clipboard.writeText(acc.number).then(() => {
+      const btn   = document.getElementById('copy-btn');
+      const label = document.getElementById('copy-label');
+      const icon  = document.getElementById('copy-icon');
+      label.textContent = 'Copied!';
+      btn.classList.add('bg-forest-50', 'border-forest-500');
+      icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>';
+      setTimeout(() => {
+        label.textContent = 'Copy Account Number';
+        btn.classList.remove('bg-forest-50', 'border-forest-500');
+        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>';
+      }, 2500);
+    }).catch(() => {
+      // Fallback
+      const el = document.createElement('textarea');
+      el.value = acc.number;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    });
+  }
+
+  // ─── File upload ──────────────────────────────────────────────────
+  function handleFileSelect(input) {
+    const file = input.files[0];
+    if (!file) return;
+    document.getElementById('upload-idle').classList.add('hidden');
+    document.getElementById('upload-selected').classList.remove('hidden');
+    document.getElementById('file-name').textContent = file.name;
+  }
+
+  // Drag and drop
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('border-forest-400','bg-forest-50/50'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('border-forest-400','bg-forest-50/50'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('border-forest-400','bg-forest-50/50');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      const input = document.getElementById('proof-file');
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      handleFileSelect(input);
+    }
+  });
+
+  // ─── Session countdown ────────────────────────────────────────────
+  function updateTimer() {
+    const m = Math.floor(sessionSeconds / 60).toString().padStart(2,'0');
+    const s = (sessionSeconds % 60).toString().padStart(2,'0');
+    document.getElementById('session-timer').textContent = `${m}:${s}`;
+    if (sessionSeconds <= 0) {
+      clearInterval(sessionInterval);
+      document.getElementById('session-timer').textContent = 'Expired';
+    }
+    sessionSeconds--;
+  }
+  const sessionInterval = setInterval(updateTimer, 1000);
+
+  // ─── Init ─────────────────────────────────────────────────────────
+  renderAccount(false);
+
+  // Redirect if no amount
+  if (!rawAmount || rawAmount < 1000) {
+    window.location.href = "{{ url_for('deposit') }}";
+  }
+</script>
+{% endblock %}
