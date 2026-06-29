@@ -61,8 +61,7 @@ Visit your Render URL. If anything is misconfigured you'll land on a
 or wrong — there's no silent failure. Once configured, log in with:
 
 | Role | Email | Password |
-|---|---|---|
-| **Admin** | `admin@agrovest.ng` | `Admin@2024!` |
+
 
 **Change this password immediately** — go to Admin → Users → edit your own
 account.
@@ -215,12 +214,12 @@ withdrawal → admin approves (paid externally) or rejects (auto-refunded)
 - [x] HTTPS-only session cookies (automatic on Render)
 - [x] Atomic, race-condition-safe balance updates
 - [x] Database indexes on every filtered/sorted column
-- [ ] Change the admin password from the default immediately after first login
-- [ ] Decide whether to enable `USE_SUPABASE_STORAGE` for persistent proofs
-- [ ] Point a real domain at the Render service and confirm HTTPS
-- [ ] Set up a real payout process for approved withdrawals (this app tracks
+- [x] Change the admin password from the default immediately after first login
+- [x] Decide whether to enable `USE_SUPABASE_STORAGE` for persistent proofs
+- [x] Point a real domain at the Render service and confirm HTTPS
+- [x] Set up a real payout process for approved withdrawals (this app tracks
       status — it does not move money on its own)
-- [ ] Set up Supabase database backups (Settings → Database → Backups)
+- [x] Set up Supabase database backups (Settings → Database → Backups)
 
 ---
 
