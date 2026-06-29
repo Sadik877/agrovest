@@ -85,12 +85,12 @@ _sb = None
 def _connect_sb():
     """Build a fresh Supabase client. Raises a clear, actionable error on bad config."""
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_KEY', '').strip()
+    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
 
     if not url or not key:
         missing = []
         if not url: missing.append('SUPABASE_URL')
-        if not key: missing.append('SUPABASE_KEY')
+        if not key: missing.append('SUPABASE_SECRET_KEY')
         raise RuntimeError(
             f"Missing environment variables: {', '.join(missing)}. "
             "Go to Render → your service → Environment → Add Environment Variable."
