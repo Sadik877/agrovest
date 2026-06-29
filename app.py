@@ -1540,9 +1540,9 @@ def admin_debug():
     """Shows live connection status and any errors. Check Render logs for detail."""
     results = {}
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_KEY', '').strip()
+    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
     results['supabase_url'] = (url[:40] + '...') if url else 'NOT SET'
-    results['supabase_key_set'] = bool(key)
+    results['supabase_secret_key_set'] = bool(key)
     results['is_render'] = IS_RENDER
     results['use_supabase_storage'] = USE_SUPABASE_STORAGE
     try:
