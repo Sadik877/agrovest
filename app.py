@@ -1444,6 +1444,34 @@ def admin_reject_deposit(dep_id):
         else:
             flash('This deposit was already processed.', 'warning')
     return redirect(url_for('admin_deposits'))
+# ─── ADD THIS ROUTE TO YOUR EXISTING FLASK APP ──────────────────────────────
+# Place alongside your existing @app.route('/deposit') route.
+# No database changes. No existing route modifications. Navigation only.
+
+@app.route('/payment')
+@login_required   # keep whatever auth decorator you already use
+def payment():
+    """
+    Step 2 of the deposit flow.
+    Amount and method are passed as query-string params from deposit.html.
+    The actual deposit submission still POSTs to the existing /deposit route.
+    """
+    return render_template('payment.html')
+
+# ─── THAT'S IT. Nothing else changes. ────────────────────────────────────────
+#
+# Your existing deposit route stays completely unchanged:
+#
+#   @app.route('/deposit', methods=['GET', 'POST'])
+#   @login_required
+#   def deposit():
+#       ...  # untouched
+#
+# The payment.html form POSTs directly to url_for('deposit'), so all your
+# existing backend logic (file upload, CSRF, DB write, reference generation)
+# is preserved exactly as-is.
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 
 # ═════════════════════════════════════════════
