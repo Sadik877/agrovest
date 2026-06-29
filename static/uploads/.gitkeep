@@ -1,0 +1,4 @@
+Local deposit-proof uploads land here when USE_SUPABASE_STORAGE is not
+enabled. This folder is empty by design — the app creates it automatically
+on startup if it's missing. See the README for why this is ephemeral on
+Render and how to make it persistent.
