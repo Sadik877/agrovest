@@ -87,12 +87,12 @@ _sb = None
 def _connect_sb():
     """Build a fresh Supabase client. Raises a clear, actionable error on bad config."""
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
+    key = os.environ.get('SUPABASE_KEY', '').strip()
 
     if not url or not key:
         missing = []
         if not url: missing.append('SUPABASE_URL')
-        if not key: missing.append('SUPABASE_SECRET_KEY')
+        if not key: missing.append('SUPABASE_KEY')
         raise RuntimeError(
             f"Missing environment variables: {', '.join(missing)}. "
             "Go to Render → your service → Environment → Add Environment Variable."
@@ -567,14 +567,14 @@ def uploaded_file(filename):
 def check_env():
     """Return (ok, missing_list, errors_list)."""
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
+    key = os.environ.get('SUPABASE_KEY', '').strip()
     missing, errors = [], []
     if not url:
         missing.append('SUPABASE_URL')
     elif not url.startswith('https://'):
         errors.append(f'SUPABASE_URL must start with https:// — got: {url[:60]}')
     if not key:
-        missing.append('SUPABASE_SECRET_KEY')
+        missing.append('SUPABASE_KEY')
     return (len(missing) == 0 and len(errors) == 0), missing, errors
 
 @app.before_request
@@ -944,6 +944,17 @@ def deposit():
     deposits = sb_all('deposits', filters=[('user_id','eq',user['id'])],
                       order=('created_at','desc'))
     return render_template('deposit.html', user=user, deposits=deposits)
+
+
+@app.route('/dashboard/payment')
+@login_required
+def payment():
+    """Step 2 of the deposit flow — shows bank accounts to pay into.
+    Amount/method are passed via query string from deposit.html and are
+    purely for display; the actual deposit record is still created by the
+    existing /dashboard/deposit POST handler above, untouched."""
+    user = get_current_user()
+    return render_template('payment.html', user=user)
 
 
 @app.route('/dashboard/withdraw', methods=['GET', 'POST'])
@@ -1444,34 +1455,6 @@ def admin_reject_deposit(dep_id):
         else:
             flash('This deposit was already processed.', 'warning')
     return redirect(url_for('admin_deposits'))
-# ─── ADD THIS ROUTE TO YOUR EXISTING FLASK APP ──────────────────────────────
-# Place alongside your existing @app.route('/deposit') route.
-# No database changes. No existing route modifications. Navigation only.
-
-@app.route('/payment')
-@login_required   # keep whatever auth decorator you already use
-def payment():
-    """
-    Step 2 of the deposit flow.
-    Amount and method are passed as query-string params from deposit.html.
-    The actual deposit submission still POSTs to the existing /deposit route.
-    """
-    return render_template('payment.html')
-
-# ─── THAT'S IT. Nothing else changes. ────────────────────────────────────────
-#
-# Your existing deposit route stays completely unchanged:
-#
-#   @app.route('/deposit', methods=['GET', 'POST'])
-#   @login_required
-#   def deposit():
-#       ...  # untouched
-#
-# The payment.html form POSTs directly to url_for('deposit'), so all your
-# existing backend logic (file upload, CSRF, DB write, reference generation)
-# is preserved exactly as-is.
-# ─────────────────────────────────────────────────────────────────────────────
-
 
 
 # ═════════════════════════════════════════════
@@ -1568,9 +1551,9 @@ def admin_debug():
     """Shows live connection status and any errors. Check Render logs for detail."""
     results = {}
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
+    key = os.environ.get('SUPABASE_KEY', '').strip()
     results['supabase_url'] = (url[:40] + '...') if url else 'NOT SET'
-    results['supabase_secret_key_set'] = bool(key)
+    results['supabase_key_set'] = bool(key)
     results['is_render'] = IS_RENDER
     results['use_supabase_storage'] = USE_SUPABASE_STORAGE
     try:
@@ -1641,7 +1624,7 @@ def status_badge(status):
 # ═════════════════════════════════════════════
 with app.app_context():
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
+    key = os.environ.get('SUPABASE_KEY', '').strip()
     if url and key and url.startswith('https://'):
         try:
             init_db()
@@ -1649,7 +1632,7 @@ with app.app_context():
         except Exception as _e:
             print(f"⚠ DB seed skipped (tables may not exist yet — run supabase_setup.sql): {_e}")
     else:
-        print("⚠ SUPABASE_URL / SUPABASE_SECRET_KEY not set — visit /setup for instructions")
+        print("⚠ SUPABASE_URL / SUPABASE_KEY not set — visit /setup for instructions")
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
