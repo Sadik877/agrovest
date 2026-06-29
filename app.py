@@ -506,14 +506,14 @@ def uploaded_file(filename):
 def check_env():
     """Return (ok, missing_list, errors_list)."""
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_KEY', '').strip()
+    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
     missing, errors = [], []
     if not url:
         missing.append('SUPABASE_URL')
     elif not url.startswith('https://'):
         errors.append(f'SUPABASE_URL must start with https:// — got: {url[:60]}')
     if not key:
-        missing.append('SUPABASE_KEY')
+        missing.append('SUPABASE_SECRET_KEY')
     return (len(missing) == 0 and len(errors) == 0), missing, errors
 
 @app.before_request
@@ -1506,7 +1506,7 @@ def status_badge(status):
 # ═════════════════════════════════════════════
 with app.app_context():
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_KEY', '').strip()
+    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
     if url and key and url.startswith('https://'):
         try:
             init_db()
