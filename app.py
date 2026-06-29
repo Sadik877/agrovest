@@ -567,7 +567,7 @@ def uploaded_file(filename):
 def check_env():
     """Return (ok, missing_list, errors_list)."""
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_KEY', '').strip()
+    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
     missing, errors = [], []
     if not url:
         missing.append('SUPABASE_URL')
