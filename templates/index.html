@@ -198,14 +198,20 @@
         <div class="absolute top-0 left-0 right-0 bg-gold-500 text-forest-950 text-xs font-bold text-center py-1.5 uppercase tracking-widest">Most Popular</div>
         {% endif %}
         <div class="p-6 {{ 'pt-10' if loop.index == 3 else '' }}">
+          {% if plan.image_url %}
+          <img src="{{ plan.image_url }}" alt="{{ plan.name }}" loading="lazy"
+               class="w-full h-32 object-cover rounded-xl mb-4" />
+          {% else %}
           <div class="text-4xl mb-4">{{ plan.icon }}</div>
+          {% endif %}
           <h3 class="font-display font-bold text-lg text-gray-900 mb-1">{{ plan.name }}</h3>
           <p class="text-gray-400 text-xs mb-5">{{ plan.description }}</p>
 
-          <div class="flex items-baseline gap-1 mb-2">
+          <div class="flex items-baseline gap-1 mb-1">
             <span class="text-4xl font-display font-bold text-forest-800">{{ plan.roi_percent }}%</span>
             <span class="text-gray-400 text-sm">ROI</span>
           </div>
+          <p class="text-xs text-gray-400 mb-2">Total Return: <span class="font-semibold text-forest-700">{{ plan.total_return }}%</span></p>
           <p class="text-sm text-gray-500 mb-5">in {{ plan.duration_days }} days</p>
 
           <div class="text-xs text-gray-400 mb-5">
