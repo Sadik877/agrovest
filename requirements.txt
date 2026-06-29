@@ -14,4 +14,3 @@ python-dotenv==1.0.1
 
 # Supabase client (PostgreSQL backend + optional Storage for deposit proofs)
 supabase==2.31.0
-httpx==0.28.1

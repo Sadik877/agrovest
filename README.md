@@ -26,9 +26,12 @@ A production Flask web app for a Nigerian agricultural investment platform, back
 ### 1. Create your Supabase project
 Go to [supabase.com](https://supabase.com) → New project. Once it's ready:
 
-- **Settings → API** — copy the **Project URL** and the **`service_role` secret key**
-  (NOT the `anon`/`public` key — this app needs full read/write access and does
-  its own admin checks in Python, bypassing Postgres row-level security).
+- **Settings → API Keys** — copy the **Project URL**, and the **`Secret key`**
+  (starts with `sb_secret_...` — on older projects this is instead called the
+  **`service_role`** key, under a "Legacy API Keys" tab). Either works.
+  Do **NOT** use the `Publishable key` / `anon` key — this app needs full
+  read/write access and does its own admin checks in Python, bypassing
+  Postgres row-level security.
 - **SQL Editor → New query** — paste the entire contents of `supabase_setup.sql`
   and run it once. This creates all tables, indexes, timestamp triggers, and
   the atomic balance-adjustment function the app relies on.
@@ -42,7 +45,7 @@ generate for you:
 | Variable | Where to get it |
 |---|---|
 | `SUPABASE_URL` | Supabase → Settings → API → Project URL |
-| `SUPABASE_KEY` | Supabase → Settings → API → `service_role` key |
+| `SUPABASE_KEY` | Supabase → Settings → API Keys → `Secret key` (or `service_role` on legacy projects) |
 
 `SECRET_KEY` is generated for you automatically. You do **not** need to set
 `RENDER=true` yourself — Render sets that automatically on every service.
@@ -116,10 +119,22 @@ agrovest/
 |---|---|---|
 | `SECRET_KEY` | Yes | Signs session cookies. `render.yaml` generates one automatically. |
 | `SUPABASE_URL` | Yes | Your Supabase project's REST API URL. |
-| `SUPABASE_KEY` | Yes | The Supabase **service_role** key. |
+| `SUPABASE_KEY` | Yes | The Supabase **Secret key** (`sb_secret_...`) — called **service_role** on older/legacy projects. |
 | `USE_SUPABASE_STORAGE` | No (default `false`) | Persist deposit proofs in Supabase Storage instead of local disk — see below. |
 | `SUPABASE_STORAGE_BUCKET` | No (default `deposit-proofs`) | Bucket name if the above is enabled. |
+| `MAINTENANCE_MODE` | No (default `false`) | Set to `true` to show a "down for maintenance" page to everyone except logged-in admins. |
+| `MAINTENANCE_MESSAGE` | No | Optional custom text shown on the maintenance page (e.g. an ETA). |
 | `RENDER` | Set automatically by Render | Used to detect HTTPS-only cookies and the `/tmp` upload path. Don't set this yourself. |
+
+### Taking the site down for maintenance
+
+Set `MAINTENANCE_MODE=true` on Render (Dashboard → Environment) and redeploy
+applies automatically — takes ~30-60s, same as any env var change. Everyone
+except logged-in admins sees a friendly "we'll be right back" page (HTTP 503).
+Admins can still log in and use the dashboard/admin panel as normal while
+it's up, so you're never locked out of your own site. Set it back to `false`
+(and let it redeploy) when you're done. `MAINTENANCE_MESSAGE` lets you show a
+custom note, e.g. `Back online by 3pm WAT`.
 
 ---
 
@@ -160,6 +175,16 @@ app automatically falls back to local disk so a deposit is never blocked.
 ---
 
 ## 💰 Investment Plans
+
+Each plan can optionally have an uploaded image (shown instead of the emoji
+icon wherever plans are displayed) and a **Total Return %** figure — set it
+explicitly per plan, or leave it blank to default to `100 + ROI%`. Both are
+editable from **Admin → Plans → Add/Edit**.
+
+> **Already running this app with an existing Supabase database?** Re-run
+> `supabase_setup.sql` once — it's safe to run again, it only adds the two
+> new columns (`image_filename`, `total_return`) if they're not already
+> there and won't touch your existing data.
 
 Seeded on first run, fully editable afterwards from **Admin → Plans**:
 

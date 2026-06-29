@@ -64,8 +64,10 @@ os.makedirs(_UPLOAD_DIR, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = _UPLOAD_DIR
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
+PLAN_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 USE_SUPABASE_STORAGE = os.environ.get('USE_SUPABASE_STORAGE', '').strip().lower() == 'true'
 SUPABASE_STORAGE_BUCKET = os.environ.get('SUPABASE_STORAGE_BUCKET', 'deposit-proofs').strip()
+PLAN_IMAGES_BUCKET = os.environ.get('PLAN_IMAGES_BUCKET', 'plan-images').strip()
 REFERRAL_COMMISSION = 5  # percent
 
 
@@ -85,12 +87,12 @@ _sb = None
 def _connect_sb():
     """Build a fresh Supabase client. Raises a clear, actionable error on bad config."""
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
+    key = os.environ.get('SUPABASE_KEY', '').strip()
 
     if not url or not key:
         missing = []
         if not url: missing.append('SUPABASE_URL')
-        if not key: missing.append('SUPABASE_SECRET_KEY')
+        if not key: missing.append('SUPABASE_KEY')
         raise RuntimeError(
             f"Missing environment variables: {', '.join(missing)}. "
             "Go to Render → your service → Environment → Add Environment Variable."
@@ -330,6 +332,56 @@ def resolve_proof_url(proof_filename):
             return None
     return url_for('uploaded_file', filename=proof_filename)
 
+
+def is_allowed_plan_image(filename):
+    return '.' in filename and filename.rsplit('.', 1)[-1].lower() in PLAN_IMAGE_EXTENSIONS
+
+
+def upload_plan_image(file_storage):
+    """Save an uploaded plan image. Same fallback behavior as upload_proof():
+    tries Supabase Storage (public bucket — these are marketing images, not
+    sensitive) if USE_SUPABASE_STORAGE is on, otherwise/falls back to local
+    disk. Returns the value to store in plans.image_filename, or None."""
+    ext = file_storage.filename.rsplit('.', 1)[-1].lower()
+    stored_name = f"plan_{uuid.uuid4().hex}.{ext}"
+
+    if USE_SUPABASE_STORAGE:
+        try:
+            content_type = {
+                'png': 'image/png', 'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg', 'webp': 'image/webp',
+            }.get(ext, 'application/octet-stream')
+            file_bytes = file_storage.read()
+            get_sb().storage.from_(PLAN_IMAGES_BUCKET).upload(
+                stored_name, file_bytes, file_options={'content-type': content_type})
+            return f"sb:{stored_name}"
+        except Exception as e:
+            print(f"⚠ Supabase Storage plan-image upload failed, falling back to local disk: {e}")
+            try:
+                file_storage.stream.seek(0)
+            except Exception:
+                pass
+
+    file_storage.save(os.path.join(app.config['UPLOAD_FOLDER'], stored_name))
+    return stored_name
+
+
+def resolve_plan_image_url(image_filename):
+    """Turn a stored plans.image_filename value into a viewable URL (or None).
+    Unlike deposit proofs, plan images are public — a plain public URL is
+    used instead of a short-lived signed one."""
+    if not image_filename:
+        return None
+    if image_filename.startswith('sb:'):
+        path = image_filename[3:]
+        try:
+            res = get_sb().storage.from_(PLAN_IMAGES_BUCKET).get_public_url(path)
+            return res if isinstance(res, str) else (res.get('publicUrl') or res.get('publicURL'))
+        except Exception as e:
+            print(f'resolve_plan_image_url error: {e}')
+            return None
+    return url_for('uploaded_file', filename=image_filename)
+
 # ─────────────────────────────────────────────
 # Database Initializer — runs SQL via Supabase RPC
 # We create tables using Supabase Dashboard SQL editor instead.
@@ -420,16 +472,25 @@ def init_db():
 # ─────────────────────────────────────────────
 # Plan Helper
 # ─────────────────────────────────────────────
+def _enrich_plan(p):
+    """Add computed display fields to a raw plan row: a resolved image URL
+    and a total_return percentage (falls back to 100 + ROI for older rows
+    created before this field existed, or left blank by an admin)."""
+    p = dict(p)
+    p['roi_percent'] = float(p.get('roi_percent') or 0)
+    p['image_url'] = resolve_plan_image_url(p.get('image_filename'))
+    p['total_return'] = float(p['total_return']) if p.get('total_return') else r2(100 + p['roi_percent'])
+    return p
+
 def get_plans(active_only=True):
     filters = [('is_active', 'eq', True)] if active_only else []
     rows = sb_all('plans', filters=filters, order=[('sort_order', 'asc'), ('id', 'asc')])
     plans = []
     for r in rows:
-        p = dict(r)
+        p = _enrich_plan(r)
         p['features'] = [f.strip() for f in (p.get('features') or '').split('|') if f.strip()]
         p['min_amount'] = float(p.get('min_amount') or 0)
         p['max_amount'] = float(p['max_amount']) if p.get('max_amount') else None
-        p['roi_percent'] = float(p.get('roi_percent') or 0)
         plans.append(p)
     return plans
 
@@ -506,15 +567,33 @@ def uploaded_file(filename):
 def check_env():
     """Return (ok, missing_list, errors_list)."""
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
+    key = os.environ.get('SUPABASE_KEY', '').strip()
     missing, errors = [], []
     if not url:
         missing.append('SUPABASE_URL')
     elif not url.startswith('https://'):
         errors.append(f'SUPABASE_URL must start with https:// — got: {url[:60]}')
     if not key:
-        missing.append('SUPABASE_SECRET_KEY')
+        missing.append('SUPABASE_KEY')
     return (len(missing) == 0 and len(errors) == 0), missing, errors
+
+@app.before_request
+def check_maintenance():
+    """Show a maintenance page to everyone except logged-in admins.
+
+    Toggle with the MAINTENANCE_MODE env var on Render (true/false) — changing
+    an env var triggers a redeploy, so it takes ~30-60s to apply, same as any
+    other env var change. Optionally set MAINTENANCE_MESSAGE to customize the
+    text shown (e.g. an ETA).
+    """
+    if os.environ.get('MAINTENANCE_MODE', '').strip().lower() != 'true':
+        return
+    if request.endpoint in ('static', 'uploaded_file', 'login', 'logout'):
+        return
+    if session.get('is_admin'):
+        return  # admins can still use the site to fix things / lift maintenance
+    return render_template('maintenance.html',
+                           maintenance_message=os.environ.get('MAINTENANCE_MESSAGE', '').strip() or None), 503
 
 @app.before_request
 def guard_env():
@@ -1019,7 +1098,7 @@ def _join_users(rows):
 @app.route('/admin/plans')
 @admin_required
 def admin_plans():
-    all_plans = sb_all('plans', order=[('sort_order','asc'),('id','asc')])
+    all_plans = [_enrich_plan(p) for p in sb_all('plans', order=[('sort_order','asc'),('id','asc')])]
     return render_template('admin/plans.html', plans=all_plans)
 
 
@@ -1027,7 +1106,7 @@ def admin_plans():
 @admin_required
 def admin_plan_add():
     if request.method == 'POST':
-        data, error = _plan_from_form(request.form)
+        data, error = _plan_from_form(request.form, request.files)
         if error:
             flash(error, 'error')
             return render_template('admin/plan_form.html', plan=None, action='add')
@@ -1049,10 +1128,10 @@ def admin_plan_edit(plan_id):
         return redirect(url_for('admin_plans'))
 
     if request.method == 'POST':
-        data, error = _plan_from_form(request.form)
+        data, error = _plan_from_form(request.form, request.files, existing=plan)
         if error:
             flash(error, 'error')
-            plan_d = dict(plan)
+            plan_d = _enrich_plan(plan)
             plan_d['features_text'] = (plan_d.get('features') or '').replace('|','\n')
             return render_template('admin/plan_form.html', plan=plan_d, action='edit')
 
@@ -1067,13 +1146,18 @@ def admin_plan_edit(plan_id):
         flash(f'Plan "{data["name"]}" updated!', 'success')
         return redirect(url_for('admin_plans'))
 
-    plan_d = dict(plan)
+    plan_d = _enrich_plan(plan)
     plan_d['features_text'] = (plan_d.get('features') or '').replace('|','\n')
     return render_template('admin/plan_form.html', plan=plan_d, action='edit')
 
 
-def _plan_from_form(form):
-    """Parse and validate plan form. Returns (data_dict, error_str)."""
+def _plan_from_form(form, files=None, existing=None):
+    """Parse and validate plan form. Returns (data_dict, error_str).
+
+    `existing` is the current plan row (when editing) — used to keep the
+    current image if no new one was uploaded, and to default total_return
+    sensibly. `files` is request.files, used for the optional image upload.
+    """
     name          = form.get('name','').strip()
     slug          = form.get('slug','').strip().lower().replace(' ','-')
     icon          = form.get('icon','🌱').strip() or '🌱'
@@ -1081,10 +1165,12 @@ def _plan_from_form(form):
     min_amount    = r2(form.get('min_amount', 0, type=float))
     max_amount    = form.get('max_amount', '').strip()
     roi_percent   = r2(form.get('roi_percent', 0, type=float))
+    total_return_raw = form.get('total_return', '').strip()
     duration_days = form.get('duration_days', 30, type=int)
     features_raw  = form.get('features','').strip()
     sort_order    = form.get('sort_order', 0, type=int)
     is_active     = form.get('is_active') == 'on'
+    remove_image  = form.get('remove_image') == 'on'
 
     if not name or not slug:
         return None, 'Name and slug are required.'
@@ -1106,12 +1192,33 @@ def _plan_from_form(form):
         if max_amt <= min_amount:
             return None, 'Maximum amount must be greater than the minimum amount.'
 
+    total_return = r2(100 + roi_percent)  # sensible default: principal + ROI
+    if total_return_raw:
+        try:
+            total_return = r2(float(total_return_raw))
+        except ValueError:
+            return None, 'Total return must be a valid number.'
+        if total_return <= 0:
+            return None, 'Total return must be greater than 0.'
+
+    # Image: keep the current one by default, replace it if a new file was
+    # uploaded, or clear it if "remove image" was checked with no replacement.
+    image_filename = existing.get('image_filename') if existing else None
+    image_file = files.get('image') if files else None
+    if image_file and image_file.filename:
+        if not is_allowed_plan_image(image_file.filename):
+            return None, 'Plan image must be a PNG, JPG, JPEG or WEBP file.'
+        image_filename = upload_plan_image(image_file)
+    elif remove_image:
+        image_filename = None
+
     features = '|'.join([f.strip() for f in features_raw.splitlines() if f.strip()])
 
     return {
         'name': name, 'slug': slug, 'icon': icon,
         'description': description, 'min_amount': min_amount,
         'max_amount': max_amt, 'roi_percent': roi_percent,
+        'total_return': total_return, 'image_filename': image_filename,
         'duration_days': duration_days, 'features': features,
         'sort_order': sort_order, 'is_active': is_active,
     }, None
@@ -1506,7 +1613,7 @@ def status_badge(status):
 # ═════════════════════════════════════════════
 with app.app_context():
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
+    key = os.environ.get('SUPABASE_KEY', '').strip()
     if url and key and url.startswith('https://'):
         try:
             init_db()

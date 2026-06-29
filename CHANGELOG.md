@@ -1,5 +1,22 @@
 # Changelog — Production Audit & Rebuild
 
+## ✨ New: Plan images & Total Return
+
+- Admins can now upload an image per plan (Admin → Plans → Add/Edit) — shown
+  on the landing page, the plans page, and the dashboard invest screen,
+  replacing the emoji icon wherever one is set. Falls back to the emoji if
+  no image is uploaded, so existing plans are unaffected.
+- Added a `total_return` field admins can set explicitly (defaults to
+  `100 + ROI%` if left blank) — shown alongside ROI everywhere plans are
+  displayed. This is a separate marketing/display figure; actual investment
+  payouts still use `roi_percent` as the source of truth.
+- Plan images go through the same Supabase Storage (public bucket this
+  time, since they're not sensitive) + local-disk-fallback pattern already
+  used for deposit proofs — see `USE_SUPABASE_STORAGE` in the README.
+- `supabase_setup.sql` is safe to re-run on an existing database — it now
+  includes `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` for the two new
+  columns instead of only creating them on a fresh install.
+
 This pass focused on real bugs found by reading every file, not a cosmetic
 pass. Each item below was an actual defect in the uploaded project, verified
 against the code and (where money is involved) against a scripted end-to-end

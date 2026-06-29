@@ -27,16 +27,24 @@ CREATE TABLE IF NOT EXISTS public.plans (
     name          TEXT NOT NULL,
     slug          TEXT UNIQUE NOT NULL,
     icon          TEXT DEFAULT '🌱',
+    image_filename TEXT,
     description   TEXT,
     min_amount    NUMERIC(15,2) NOT NULL DEFAULT 10000,
     max_amount    NUMERIC(15,2),
     roi_percent   NUMERIC(5,2) NOT NULL DEFAULT 10,
+    total_return  NUMERIC(6,2),
     duration_days INTEGER NOT NULL DEFAULT 30,
     features      TEXT DEFAULT '',
     is_active     BOOLEAN DEFAULT TRUE,
     sort_order    INTEGER DEFAULT 0,
     created_at    TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration for existing databases that already had a plans table before
+-- image/total_return were added — safe to re-run, does nothing if these
+-- columns already exist.
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS image_filename TEXT;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS total_return NUMERIC(6,2);
 
 -- 3. INVESTMENTS
 CREATE TABLE IF NOT EXISTS public.investments (
@@ -226,4 +234,18 @@ SELECT 'AgroVest tables created successfully!' AS status;
 -- ════════════════════════════════════════════
 -- INSERT INTO storage.buckets (id, name, public)
 -- VALUES ('deposit-proofs', 'deposit-proofs', false)
+-- ON CONFLICT (id) DO NOTHING;
+
+-- ════════════════════════════════════════════
+-- OPTIONAL — persistent plan images
+--
+-- Same ephemeral-disk situation as above, but plan images (uploaded from
+-- Admin → Plans) are public marketing content, not private documents, so
+-- this bucket is created PUBLIC — anyone with the URL can view the image
+-- (nobody can list/browse the bucket or see anything else). Uncomment to
+-- create it, then set USE_SUPABASE_STORAGE=true (same flag as above covers
+-- both buckets).
+-- ════════════════════════════════════════════
+-- INSERT INTO storage.buckets (id, name, public)
+-- VALUES ('plan-images', 'plan-images', true)
 -- ON CONFLICT (id) DO NOTHING;

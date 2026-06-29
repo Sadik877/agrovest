@@ -10,13 +10,15 @@ services:
 
       # ── Required: from Supabase Dashboard → Project Settings → API ──
       # SUPABASE_URL  = "Project URL"      e.g. https://abcxyzproject.supabase.co
-      # SUPABASE_KEY  = "service_role" key  (NOT the "anon" / "public" key —
-      #                  the service_role key is required because the app
-      #                  manages its own auth/admin checks and needs to read
-      #                  and write every table regardless of row-level policy)
+      # SUPABASE_KEY  = "Secret key" (sb_secret_...) — on older projects this
+      #                  is called the "service_role" key instead (under a
+      #                  "Legacy API Keys" tab). Either works. Do NOT use the
+      #                  "Publishable key" / "anon" key — the app manages its
+      #                  own auth/admin checks and needs to read and write
+      #                  every table regardless of row-level policy
       - key: SUPABASE_URL
         sync: false
-      - key: SUPABASE_SECRET_KEY
+      - key: SUPABASE_KEY
         sync: false
 
       # ── Optional: persist deposit-proof uploads in Supabase Storage instead
@@ -26,6 +28,14 @@ services:
       #     uploads still work, they just won't survive a redeploy.
       - key: USE_SUPABASE_STORAGE
         value: "false"
+
+      # ── Optional: show a "down for maintenance" page to everyone except
+      #     logged-in admins. Flip to "true" + redeploy when you need to take
+      #     the site down briefly; admins can still log in and use it normally.
+      - key: MAINTENANCE_MODE
+        value: "false"
+      - key: MAINTENANCE_MESSAGE
+        value: ""
 
       # NOTE: RENDER=true is set automatically by Render itself — you do not
       # need to add it. The app uses it to detect HTTPS-only cookies and the
