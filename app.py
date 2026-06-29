@@ -87,12 +87,12 @@ _sb = None
 def _connect_sb():
     """Build a fresh Supabase client. Raises a clear, actionable error on bad config."""
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_KEY', '').strip()
+    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
 
     if not url or not key:
         missing = []
         if not url: missing.append('SUPABASE_URL')
-        if not key: missing.append('SUPABASE_KEY')
+        if not key: missing.append('SUPABASE_SECRET_KEY')
         raise RuntimeError(
             f"Missing environment variables: {', '.join(missing)}. "
             "Go to Render → your service → Environment → Add Environment Variable."
@@ -574,7 +574,7 @@ def check_env():
     elif not url.startswith('https://'):
         errors.append(f'SUPABASE_URL must start with https:// — got: {url[:60]}')
     if not key:
-        missing.append('SUPABASE_KEY')
+        missing.append('SUPABASE_SECRET_KEY')
     return (len(missing) == 0 and len(errors) == 0), missing, errors
 
 @app.before_request
@@ -1613,7 +1613,7 @@ def status_badge(status):
 # ═════════════════════════════════════════════
 with app.app_context():
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_KEY', '').strip()
+    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
     if url and key and url.startswith('https://'):
         try:
             init_db()
@@ -1621,7 +1621,7 @@ with app.app_context():
         except Exception as _e:
             print(f"⚠ DB seed skipped (tables may not exist yet — run supabase_setup.sql): {_e}")
     else:
-        print("⚠ SUPABASE_URL / SUPABASE_KEY not set — visit /setup for instructions")
+        print("⚠ SUPABASE_URL / SUPABASE_SECRET_KEY not set — visit /setup for instructions")
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
