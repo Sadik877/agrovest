@@ -19,7 +19,7 @@
       </p>
     </div>
 
-    <form method="POST"
+    <form method="POST" enctype="multipart/form-data"
           action="{{ url_for('admin_plan_edit', plan_id=plan.id) if action == 'edit' else url_for('admin_plan_add') }}"
           class="p-6 space-y-6">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -45,7 +45,7 @@
         </div>
       </div>
 
-      <!-- Row 2: Icon + Description -->
+      <!-- Row 2: Icon + Image + Description -->
       <div class="grid sm:grid-cols-3 gap-5">
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">Icon (Emoji)</label>
@@ -63,8 +63,22 @@
               class="text-lg hover:scale-125 transition-transform">{{ e }}</button>
             {% endfor %}
           </div>
+          <p class="text-xs text-gray-400 mt-2">Shown when no image is uploaded.</p>
         </div>
-        <div class="sm:col-span-2">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Plan Image <span class="text-gray-400 font-normal text-xs">(optional)</span></label>
+          {% if plan and plan.image_url %}
+          <img src="{{ plan.image_url }}" alt="Current plan image" class="w-full h-20 object-cover rounded-lg mb-2 border border-gray-200" />
+          <label class="flex items-center gap-2 text-xs text-gray-500 mb-2">
+            <input type="checkbox" name="remove_image" class="rounded border-gray-300">
+            Remove current image
+          </label>
+          {% endif %}
+          <input type="file" name="image" accept=".png,.jpg,.jpeg,.webp"
+                 class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-gray-600 focus:outline-none focus:border-forest-500" />
+          <p class="text-xs text-gray-400 mt-1">PNG, JPG or WEBP. Replaces the icon on plan cards when set.</p>
+        </div>
+        <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>
           <textarea name="description" rows="3"
                     placeholder="Brief description shown on the plan card..."
@@ -73,7 +87,7 @@
       </div>
 
       <!-- Row 3: Financial -->
-      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-5">
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">Min Amount (₦) <span class="text-red-500">*</span></label>
           <div class="relative">
@@ -99,9 +113,22 @@
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">ROI % <span class="text-red-500">*</span></label>
           <div class="relative">
-            <input type="number" name="roi_percent" required min="0.1" step="0.1"
+            <input type="number" name="roi_percent" id="roi-input" required min="0.1" step="0.1"
                    value="{{ plan.roi_percent if plan else '' }}"
                    placeholder="15"
+                   oninput="suggestTotalReturn(this.value)"
+                   class="w-full border border-gray-200 rounded-xl pl-4 pr-8 py-3 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Total Return %
+            <span class="text-gray-400 font-normal text-xs">(blank = 100+ROI)</span>
+          </label>
+          <div class="relative">
+            <input type="number" name="total_return" id="total-return-input" min="0.1" step="0.1"
+                   value="{{ plan.total_return if plan else '' }}"
+                   placeholder="{{ (100 + plan.roi_percent)|round(1) if plan else '115' }}"
                    class="w-full border border-gray-200 rounded-xl pl-4 pr-8 py-3 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
             <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
           </div>
@@ -151,13 +178,16 @@
       <div class="bg-gray-50 rounded-xl p-5 border border-gray-200">
         <p class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">Live Preview</p>
         <div class="bg-white rounded-xl border border-gray-200 p-5 max-w-sm shadow-sm">
-          <div class="text-4xl mb-2" id="prev-icon">{{ plan.icon if plan else '🌱' }}</div>
+          <img id="prev-image" src="{{ plan.image_url if plan and plan.image_url else '' }}"
+               class="w-full h-28 object-cover rounded-lg mb-2 {{ '' if plan and plan.image_url else 'hidden' }}" />
+          <div class="text-4xl mb-2 {{ 'hidden' if plan and plan.image_url else '' }}" id="prev-icon">{{ plan.icon if plan else '🌱' }}</div>
           <h3 class="font-bold text-gray-900 mb-1" id="prev-name">{{ plan.name if plan else 'Plan Name' }}</h3>
           <p class="text-gray-400 text-xs mb-3" id="prev-desc">{{ plan.description if plan else 'Description...' }}</p>
           <div class="flex items-baseline gap-1 mb-1">
             <span class="text-3xl font-bold text-forest-700" id="prev-roi">{{ plan.roi_percent if plan else '0' }}%</span>
             <span class="text-gray-400 text-sm">ROI</span>
           </div>
+          <p class="text-xs text-gray-500 mb-1">Total Return: <span id="prev-total-return" class="font-semibold text-gray-700">{{ plan.total_return if plan else '100' }}%</span></p>
           <p class="text-xs text-gray-500 mb-3">in <span id="prev-days">{{ plan.duration_days if plan else '30' }}</span> days</p>
           <p class="text-xs text-gray-400">Min: <span id="prev-min" class="font-semibold text-gray-700">₦{{ '{:,.0f}'.format(plan.min_amount) if plan else '0' }}</span></p>
         </div>
@@ -199,10 +229,24 @@
     document.getElementById('prev-icon').textContent = emoji;
   }
 
+  // Suggest Total Return = 100 + ROI, unless the admin has typed their own value
+  const totalReturnInput = document.getElementById('total-return-input');
+  function suggestTotalReturn(roiValue) {
+    document.getElementById('prev-roi').textContent = (roiValue || 0) + '%';
+    if (!totalReturnInput.dataset.manual) {
+      const suggested = (100 + parseFloat(roiValue || 0)).toFixed(1).replace(/\.0$/, '');
+      totalReturnInput.placeholder = suggested;
+      document.getElementById('prev-total-return').textContent = suggested + '%';
+    }
+  }
+  totalReturnInput.addEventListener('input', function() {
+    this.dataset.manual = '1';
+    document.getElementById('prev-total-return').textContent = (this.value || this.placeholder) + '%';
+  });
+
   // Live preview sync
   const syncFields = [
     ['[name=description]', 'prev-desc'],
-    ['[name=roi_percent]', 'prev-roi', v => v + '%'],
     ['[name=duration_days]', 'prev-days'],
     ['[name=min_amount]', 'prev-min', v => '₦' + parseFloat(v||0).toLocaleString()],
   ];
@@ -216,5 +260,28 @@
   document.getElementById('icon-input').addEventListener('input', function() {
     document.getElementById('prev-icon').textContent = this.value || '🌱';
   });
+
+  // Preview the chosen image file before upload, and swap the icon out
+  // while an image is selected (matches how the saved plan will display).
+  const imageInput = document.querySelector('input[name=image]');
+  if (imageInput) {
+    imageInput.addEventListener('change', function() {
+      const file = this.files[0];
+      const prevImage = document.getElementById('prev-image');
+      const prevIcon = document.getElementById('prev-icon');
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          prevImage.src = e.target.result;
+          prevImage.classList.remove('hidden');
+          prevIcon.classList.add('hidden');
+        };
+        reader.readAsDataURL(file);
+      } else {
+        prevImage.classList.add('hidden');
+        prevIcon.classList.remove('hidden');
+      }
+    });
+  }
 </script>
 {% endblock %}

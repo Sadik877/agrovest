@@ -20,7 +20,11 @@
     <div class="bg-gradient-to-r from-forest-950 to-forest-800 p-5">
       <div class="flex items-start justify-between">
         <div class="flex items-center gap-3">
+          {% if plan.image_url %}
+          <img src="{{ plan.image_url }}" alt="{{ plan.name }}" class="w-10 h-10 object-cover rounded-lg" />
+          {% else %}
           <span class="text-3xl">{{ plan.icon }}</span>
+          {% endif %}
           <div>
             <h3 class="font-bold text-white">{{ plan.name }}</h3>
             <p class="text-gray-300 text-xs font-mono">/plans#{{ plan.slug }}</p>
@@ -33,10 +37,14 @@
     </div>
 
     <!-- Stats -->
-    <div class="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
+    <div class="grid grid-cols-2 divide-x divide-y divide-gray-100 border-b border-gray-100">
       <div class="p-3 text-center">
         <p class="text-lg font-bold text-forest-700">{{ plan.roi_percent }}%</p>
         <p class="text-xs text-gray-400">ROI</p>
+      </div>
+      <div class="p-3 text-center">
+        <p class="text-lg font-bold text-gold-600">{{ plan.total_return }}%</p>
+        <p class="text-xs text-gray-400">Total Return</p>
       </div>
       <div class="p-3 text-center">
         <p class="text-lg font-bold text-gray-800">{{ plan.duration_days }}d</p>
