@@ -16,7 +16,7 @@ services:
       #                  and write every table regardless of row-level policy)
       - key: SUPABASE_URL
         sync: false
-      - key: SUPABASE_KEY
+      - key: SUPABASE_SECRET_KEY
         sync: false
 
       # ── Optional: persist deposit-proof uploads in Supabase Storage instead
