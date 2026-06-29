@@ -14,14 +14,14 @@
     ('check-circle', 'Total Paid Out', stats.total_paid_out | naira, 'text-emerald-600', 'bg-emerald-50'),
   ] %}
   {% for icon, label, value, text_col, bg_col in admin_stats %}
-  <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100/80 hover:-translate-y-0.5 transition-all duration-200 group overflow-hidden relative">
+  <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100/80 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden relative">
     <div class="absolute -right-3 -bottom-3 w-16 h-16 rounded-full {{ bg_col }} opacity-60"></div>
     <div class="relative">
-      <div class="w-9 h-9 rounded-xl {{ bg_col }} flex items-center justify-center mb-3">
+      <div class="w-9 h-9 rounded-xl {{ bg_col }} flex items-center justify-center mb-3 flex-shrink-0">
         <i data-lucide="{{ icon }}" class="w-4 h-4 {{ text_col }}"></i>
       </div>
-      <p class="font-black text-xl text-gray-900 tracking-tight leading-none mb-1">{{ value }}</p>
-      <p class="text-[11px] text-gray-400 font-medium">{{ label }}</p>
+      <p class="font-black text-xl text-gray-900 tracking-tight leading-none mb-1 truncate">{{ value }}</p>
+      <p class="text-[11px] text-gray-400 font-medium leading-tight">{{ label }}</p>
     </div>
   </div>
   {% endfor %}
