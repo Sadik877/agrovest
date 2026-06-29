@@ -1,118 +1,756 @@
 {% extends "admin/base.html" %}
-{% block admin_title %}Admin Dashboard{% endblock %}
+{% block admin_title %}Dashboard Overview{% endblock %}
 
 {% block admin_content %}
-<!-- Stats -->
-<div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+
+<style>
+  /* ── Custom tokens ── */
+  :root {
+    --gold: #C9A84C;
+    --gold-light: #F5E6C0;
+    --forest: #1A4731;
+    --forest-mid: #2D6A4F;
+    --forest-light: #D8F3DC;
+    --ink: #0F172A;
+    --ink-soft: #334155;
+    --muted: #64748B;
+    --border: #E2E8F0;
+    --surface: #FFFFFF;
+    --bg: #F8FAFC;
+  }
+
+  /* ── Page fade-in ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: .6; transform: scale(1.3); }
+  }
+  @keyframes countUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .anim-fade-up { animation: fadeUp .5s ease both; }
+  .anim-fade    { animation: fadeIn .4s ease both; }
+
+  /* Stagger children */
+  .stagger > *:nth-child(1)  { animation-delay: .05s; }
+  .stagger > *:nth-child(2)  { animation-delay: .10s; }
+  .stagger > *:nth-child(3)  { animation-delay: .15s; }
+  .stagger > *:nth-child(4)  { animation-delay: .20s; }
+  .stagger > *:nth-child(5)  { animation-delay: .25s; }
+  .stagger > *:nth-child(6)  { animation-delay: .30s; }
+
+  /* ── Stat card glass gradient ── */
+  .stat-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+    padding: 20px;
+    color: #fff;
+    cursor: default;
+    transition: transform .25s ease, box-shadow .25s ease;
+    box-shadow: 0 4px 20px rgba(0,0,0,.12);
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,0) 60%);
+    pointer-events: none;
+  }
+  .stat-card::after {
+    content: '';
+    position: absolute;
+    top: -30px; right: -30px;
+    width: 110px; height: 110px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.10);
+    pointer-events: none;
+  }
+  .stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(0,0,0,.18);
+  }
+  .stat-card .stat-value {
+    animation: countUp .6s ease both;
+  }
+
+  /* gradient cards */
+  .sc-blue    { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); }
+  .sc-indigo  { background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%); }
+  .sc-forest  { background: linear-gradient(135deg, #1A4731 0%, #2D6A4F 100%); }
+  .sc-amber   { background: linear-gradient(135deg, #D97706 0%, #B45309 100%); }
+  .sc-red     { background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%); }
+  .sc-emerald { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
+
+  /* ── Premium card ── */
+  .premium-card {
+    background: #fff;
+    border-radius: 18px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 4px rgba(0,0,0,.04), 0 4px 20px rgba(0,0,0,.05);
+    overflow: hidden;
+    transition: box-shadow .2s ease;
+  }
+  .premium-card:hover {
+    box-shadow: 0 4px 24px rgba(0,0,0,.10);
+  }
+
+  /* ── Pending item rows ── */
+  .pending-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    transition: background .18s ease, border-color .18s ease;
+  }
+  .pending-row:hover { border-color: #E2E8F0; }
+  .dep-row  { background: #FFFBEB; }
+  .dep-row:hover  { background: #FEF3C7; }
+  .wd-row   { background: #FFF5F5; }
+  .wd-row:hover   { background: #FEE2E2; }
+
+  /* Avatar initials */
+  .avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px; flex-shrink: 0;
+    letter-spacing: .5px;
+  }
+
+  /* ── Approve button ── */
+  .btn-approve {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: linear-gradient(135deg, #059669, #047857);
+    color: #fff;
+    font-size: 11px; font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: none; cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+    box-shadow: 0 2px 8px rgba(5,150,105,.35);
+    white-space: nowrap;
+  }
+  .btn-approve:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(5,150,105,.45);
+    filter: brightness(1.08);
+  }
+  .btn-approve:active { transform: translateY(0); }
+
+  /* ── Status badges ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    letter-spacing: .3px;
+  }
+  .badge-success { background: var(--forest-light); color: var(--forest); }
+  .badge-error   { background: #FEE2E2; color: #991B1B; }
+  .badge-pending { background: #FEF3C7; color: #92400E; }
+
+  /* ── Table ── */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table thead th {
+    position: sticky; top: 0; z-index: 1;
+    background: #F8FAFC;
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .7px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table tbody tr {
+    border-bottom: 1px solid #F1F5F9;
+    transition: background .15s ease;
+  }
+  .data-table tbody tr:last-child { border-bottom: none; }
+  .data-table tbody tr:hover { background: #F8FAFC; }
+  .data-table td { padding: 12px 14px; vertical-align: middle; }
+
+  /* ── User avatar in table ── */
+  .user-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* ── View-all link ── */
+  .view-all {
+    font-size: 12px; font-weight: 600;
+    color: var(--forest-mid);
+    display: inline-flex; align-items: center; gap: 3px;
+    text-decoration: none;
+    transition: color .15s;
+  }
+  .view-all:hover { color: var(--forest); text-decoration: underline; }
+
+  /* ── Section label ── */
+  .section-label {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: .8px; text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* ── Quick actions ── */
+  .qa-card {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px;
+    padding: 18px 10px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: #fff;
+    text-decoration: none;
+    color: var(--ink-soft);
+    font-size: 12px; font-weight: 600;
+    transition: background .18s, border-color .18s, transform .18s, box-shadow .18s;
+    cursor: pointer;
+    text-align: center;
+  }
+  .qa-card:hover {
+    background: var(--forest-light);
+    border-color: var(--forest-mid);
+    color: var(--forest);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(26,71,49,.12);
+  }
+  .qa-card .qa-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    background: #F1F5F9;
+    transition: background .18s;
+  }
+  .qa-card:hover .qa-icon { background: rgba(26,71,49,.12); }
+  .qa-card.qa-danger { color: #DC2626; }
+  .qa-card.qa-danger:hover {
+    background: #FEE2E2; border-color: #DC2626;
+    box-shadow: 0 6px 18px rgba(220,38,38,.12);
+  }
+  .qa-card.qa-danger:hover .qa-icon { background: rgba(220,38,38,.12); }
+
+  /* ── Hero banner ── */
+  .hero-banner {
+    background: linear-gradient(135deg, var(--forest) 0%, #1E5C3A 50%, #2D6A4F 100%);
+    border-radius: 20px;
+    padding: 28px 32px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(26,71,49,.30);
+  }
+  .hero-banner::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 220px; height: 220px;
+    border-radius: 50%;
+    background: rgba(201,168,76,.15);
+    pointer-events: none;
+  }
+  .hero-banner::after {
+    content: '';
+    position: absolute;
+    bottom: -40px; right: 120px;
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.06);
+    pointer-events: none;
+  }
+
+  /* ── Notification banner ── */
+  .notif-banner {
+    border-radius: 14px;
+    padding: 12px 18px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; font-weight: 500;
+  }
+  .notif-healthy {
+    background: var(--forest-light);
+    border: 1px solid #B7E4C7;
+    color: var(--forest);
+  }
+  .notif-warning {
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    color: #92400E;
+  }
+
+  /* live dot */
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #4ADE80;
+    animation: pulse-dot 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+
+  /* scrollable list */
+  .scrollable-list { max-height: 320px; overflow-y: auto; }
+  .scrollable-list::-webkit-scrollbar { width: 4px; }
+  .scrollable-list::-webkit-scrollbar-track { background: transparent; }
+  .scrollable-list::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+
+  /* ── Empty state ── */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px; padding: 32px 16px;
+    color: var(--muted);
+  }
+  .empty-state .empty-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    background: #F1F5F9;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 4px;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .hero-banner { padding: 20px 20px; }
+    .stat-card   { padding: 16px; }
+    .hero-banner::before, .hero-banner::after { display: none; }
+  }
+
+  /* Gold accent text */
+  .text-gold { color: var(--gold); }
+
+  /* amount text */
+  .amount-text {
+    font-size: 13px; font-weight: 700;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* Trend badge */
+  .trend-badge {
+    display: inline-flex; align-items: center; gap: 2px;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 6px; border-radius: 6px;
+    background: rgba(255,255,255,.20);
+    color: rgba(255,255,255,.95);
+  }
+</style>
+
+<!-- ════════════════════════════════════════════
+     HERO HEADER
+════════════════════════════════════════════ -->
+<div class="hero-banner anim-fade-up mb-6" style="animation-delay:.02s">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+    <!-- Left: Greeting -->
+    <div>
+      <p class="text-xs font-semibold tracking-widest text-gold uppercase mb-1">AgroVest Admin</p>
+      <h2 class="text-2xl sm:text-3xl font-bold text-white leading-tight" id="hero-greeting">Good Morning, Admin 👋</h2>
+      <p class="text-sm text-white/60 mt-1" id="hero-date">Loading date…</p>
+    </div>
+
+    <!-- Right: Status + Clock -->
+    <div class="flex flex-col sm:items-end gap-2 flex-shrink-0">
+      <div class="flex items-center gap-2 bg-white/10 backdrop-blur rounded-xl px-4 py-2.5 border border-white/15">
+        <div class="live-dot"></div>
+        <span class="text-white text-xs font-semibold">System Online</span>
+      </div>
+      <p class="text-white/80 font-mono text-lg font-semibold tracking-wider" id="hero-clock">--:--:--</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     NOTIFICATION BANNER
+════════════════════════════════════════════ -->
+<div class="anim-fade-up mb-6" style="animation-delay:.08s">
+  {% set total_pending = (pending_deps | length) + (pending_wds | length) %}
+  {% if total_pending > 0 %}
+  <div class="notif-banner notif-warning">
+    <i data-lucide="alert-triangle" class="w-4 h-4 flex-shrink-0 text-amber-600"></i>
+    <span>
+      You have <strong>{{ total_pending }} pending request{{ 's' if total_pending != 1 }}</strong> — 
+      {{ pending_deps | length }} deposit{{ 's' if (pending_deps|length) != 1 }} and 
+      {{ pending_wds | length }} withdrawal{{ 's' if (pending_wds|length) != 1 }} awaiting approval.
+    </span>
+  </div>
+  {% else %}
+  <div class="notif-banner notif-healthy">
+    <i data-lucide="check-circle-2" class="w-4 h-4 flex-shrink-0"></i>
+    <span>All clear — no pending deposits or withdrawals. Platform is healthy.</span>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ════════════════════════════════════════════
+     STATISTICS CARDS
+════════════════════════════════════════════ -->
+<div class="section-label anim-fade-up" style="animation-delay:.10s">Platform Overview</div>
+<div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8 stagger">
+
   {% set admin_stats = [
-    ('users', 'Total Users', stats.total_users, 'bg-blue-600'),
-    ('package', 'Active Plans', stats.total_plans, 'bg-indigo-600'),
-    ('trending-up', 'Active Investments', stats.active_investments, 'bg-forest-700'),
-    ('wallet', 'Pending Deposits', stats.pending_deposits, 'bg-amber-600'),
-    ('banknote', 'Pending Withdrawals', stats.pending_withdrawals, 'bg-red-600'),
-    ('check-circle', 'Total Paid Out', stats.total_paid_out | naira, 'bg-emerald-600'),
+    ('users',         'Total Users',          stats.total_users,          'sc-blue',    'users',        '↑'),
+    ('package',       'Active Plans',          stats.total_plans,          'sc-indigo',  'package',      '↑'),
+    ('trending-up',   'Active Investments',    stats.active_investments,   'sc-forest',  'trending-up',  '→'),
+    ('wallet',        'Pending Deposits',      stats.pending_deposits,     'sc-amber',   'wallet',       '!'),
+    ('banknote',      'Pending Withdrawals',   stats.pending_withdrawals,  'sc-red',     'banknote',     '!'),
+    ('check-circle',  'Total Paid Out',        stats.total_paid_out | naira, 'sc-emerald','check-circle','↑'),
   ] %}
-  {% for icon, label, value, bg in admin_stats %}
-  <div class="{{ bg }} rounded-xl p-4 text-white">
-    <i data-lucide="{{ icon }}" class="w-5 h-5 mb-2 opacity-70"></i>
-    <p class="font-bold text-lg">{{ value }}</p>
-    <p class="text-xs opacity-70">{{ label }}</p>
+
+  {% for icon, label, value, cls, lucide, trend in admin_stats %}
+  <div class="stat-card {{ cls }} anim-fade-up">
+    <div class="flex items-start justify-between mb-3">
+      <i data-lucide="{{ lucide }}" class="w-5 h-5 opacity-80"></i>
+      <span class="trend-badge">{{ trend }}</span>
+    </div>
+    <p class="stat-value text-xl font-extrabold leading-tight mb-1">{{ value }}</p>
+    <p class="text-xs font-medium opacity-70 leading-snug">{{ label }}</p>
   </div>
   {% endfor %}
+
 </div>
 
-<!-- Pending Actions -->
+<!-- ════════════════════════════════════════════
+     QUICK ACTIONS
+════════════════════════════════════════════ -->
+<div class="section-label anim-fade-up" style="animation-delay:.18s">Quick Actions</div>
+<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3 mb-8 anim-fade-up stagger" style="animation-delay:.20s">
+
+  <a href="{{ url_for('admin_users') }}" class="qa-card">
+    <div class="qa-icon"><i data-lucide="users" class="w-5 h-5"></i></div>
+    Users
+  </a>
+  <a href="{{ url_for('admin_plans') }}" class="qa-card">
+    <div class="qa-icon"><i data-lucide="package" class="w-5 h-5"></i></div>
+    Plans
+  </a>
+  <a href="{{ url_for('admin_deposits') }}" class="qa-card">
+    <div class="qa-icon"><i data-lucide="wallet" class="w-5 h-5"></i></div>
+    Deposits
+  </a>
+  <a href="{{ url_for('admin_withdrawals') }}" class="qa-card">
+    <div class="qa-icon"><i data-lucide="banknote" class="w-5 h-5"></i></div>
+    Withdrawals
+  </a>
+  <a href="{{ url_for('admin_investments') }}" class="qa-card">
+    <div class="qa-icon"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
+    Investments
+  </a>
+  <a href="{{ url_for('index') }}" class="qa-card" target="_blank" rel="noopener">
+    <div class="qa-icon"><i data-lucide="external-link" class="w-5 h-5"></i></div>
+    Website
+  </a>
+  <a href="{{ url_for('logout') }}" class="qa-card qa-danger">
+    <div class="qa-icon"><i data-lucide="log-out" class="w-5 h-5"></i></div>
+    Logout
+  </a>
+
+</div>
+
+<!-- ════════════════════════════════════════════
+     PENDING ACTIONS GRID
+════════════════════════════════════════════ -->
 <div class="grid lg:grid-cols-2 gap-6 mb-6">
-  <!-- Pending Deposits -->
-  <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="font-semibold text-gray-900">Pending Deposits</h2>
-      <a href="{{ url_for('admin_deposits') }}" class="text-xs text-blue-600 hover:underline">View All</a>
-    </div>
-    {% if pending_deps %}
-    <div class="space-y-3">
-      {% for dep in pending_deps[:5] %}
-      <div class="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100">
-        <div>
-          <p class="text-sm font-semibold text-gray-900">{{ dep.full_name }}</p>
-          <p class="text-xs text-gray-400">{{ dep.created_at | date_fmt }}</p>
+
+  <!-- ── Pending Deposits ── -->
+  <div class="premium-card anim-fade-up" style="animation-delay:.24s">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+          <i data-lucide="wallet" class="w-4 h-4 text-amber-600"></i>
         </div>
-        <div class="flex items-center gap-2">
-          <span class="font-bold text-gray-900 text-sm">{{ dep.amount | naira }}</span>
-          <form method="POST" action="{{ url_for('admin_approve_deposit', dep_id=dep.id) }}" class="inline">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="bg-green-600 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg hover:bg-green-700">✓</button>
-          </form>
+        <div>
+          <h2 class="font-bold text-gray-900 text-sm leading-tight">Pending Deposits</h2>
+          <p class="text-xs text-gray-400">Awaiting approval</p>
         </div>
       </div>
-      {% endfor %}
+      <a href="{{ url_for('admin_deposits') }}" class="view-all">
+        View all <i data-lucide="arrow-right" class="w-3 h-3"></i>
+      </a>
     </div>
-    {% else %}
-    <p class="text-gray-400 text-sm text-center py-6">No pending deposits</p>
-    {% endif %}
+
+    <div class="p-4">
+      {% if pending_deps %}
+      <div class="space-y-2 scrollable-list">
+        {% for dep in pending_deps[:5] %}
+        <div class="pending-row dep-row">
+
+          <!-- Avatar + Info -->
+          <div class="flex items-center gap-3 min-w-0">
+            {% set colors = ['bg-blue-100 text-blue-700','bg-purple-100 text-purple-700','bg-teal-100 text-teal-700','bg-rose-100 text-rose-700','bg-orange-100 text-orange-700'] %}
+            {% set ci = loop.index0 % 5 %}
+            <div class="avatar {{ colors[ci] }}">
+              {{ dep.full_name[0].upper() if dep.full_name else '?' }}
+            </div>
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-gray-900 truncate">{{ dep.full_name }}</p>
+              <p class="text-xs text-gray-400">{{ dep.created_at | date_fmt }}</p>
+            </div>
+          </div>
+
+          <!-- Amount + Approve -->
+          <div class="flex items-center gap-2.5 flex-shrink-0 ml-2">
+            <div class="text-right">
+              <span class="amount-text">{{ dep.amount | naira }}</span>
+              <span class="block text-xs text-amber-600 font-semibold">Pending</span>
+            </div>
+            <form method="POST" action="{{ url_for('admin_approve_deposit', dep_id=dep.id) }}" class="inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn-approve">
+                <i data-lucide="check" class="w-3 h-3"></i> Approve
+              </button>
+            </form>
+          </div>
+
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">
+          <i data-lucide="inbox" class="w-5 h-5 text-gray-400"></i>
+        </div>
+        <p class="font-semibold text-gray-600 text-sm">All clear</p>
+        <p class="text-xs text-gray-400">No pending deposits to review</p>
+      </div>
+      {% endif %}
+    </div>
   </div>
 
-  <!-- Pending Withdrawals -->
-  <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="font-semibold text-gray-900">Pending Withdrawals</h2>
-      <a href="{{ url_for('admin_withdrawals') }}" class="text-xs text-blue-600 hover:underline">View All</a>
-    </div>
-    {% if pending_wds %}
-    <div class="space-y-3">
-      {% for wd in pending_wds[:5] %}
-      <div class="flex items-center justify-between p-3 bg-red-50 rounded-xl border border-red-100">
-        <div>
-          <p class="text-sm font-semibold text-gray-900">{{ wd.full_name }}</p>
-          <p class="text-xs text-gray-400">{{ wd.bank_name }} · {{ wd.account_number }}</p>
+  <!-- ── Pending Withdrawals ── -->
+  <div class="premium-card anim-fade-up" style="animation-delay:.28s">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+          <i data-lucide="banknote" class="w-4 h-4 text-red-500"></i>
         </div>
-        <div class="flex items-center gap-2">
-          <span class="font-bold text-gray-900 text-sm">{{ wd.amount | naira }}</span>
-          <form method="POST" action="{{ url_for('admin_approve_withdrawal', wd_id=wd.id) }}" class="inline">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="bg-green-600 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg hover:bg-green-700">✓</button>
-          </form>
+        <div>
+          <h2 class="font-bold text-gray-900 text-sm leading-tight">Pending Withdrawals</h2>
+          <p class="text-xs text-gray-400">Bank transfer requests</p>
         </div>
       </div>
-      {% endfor %}
+      <a href="{{ url_for('admin_withdrawals') }}" class="view-all">
+        View all <i data-lucide="arrow-right" class="w-3 h-3"></i>
+      </a>
     </div>
-    {% else %}
-    <p class="text-gray-400 text-sm text-center py-6">No pending withdrawals</p>
-    {% endif %}
+
+    <div class="p-4">
+      {% if pending_wds %}
+      <div class="space-y-2 scrollable-list">
+        {% for wd in pending_wds[:5] %}
+        <div class="pending-row wd-row">
+
+          <!-- Avatar + Info -->
+          <div class="flex items-center gap-3 min-w-0">
+            {% set colors2 = ['bg-red-100 text-red-700','bg-pink-100 text-pink-700','bg-fuchsia-100 text-fuchsia-700','bg-violet-100 text-violet-700','bg-indigo-100 text-indigo-700'] %}
+            {% set ci2 = loop.index0 % 5 %}
+            <div class="avatar {{ colors2[ci2] }}">
+              {{ wd.full_name[0].upper() if wd.full_name else '?' }}
+            </div>
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-gray-900 truncate">{{ wd.full_name }}</p>
+              <p class="text-xs text-gray-400 truncate">
+                <i data-lucide="landmark" class="w-3 h-3 inline-block mr-0.5 align-middle"></i>
+                {{ wd.bank_name }} · {{ wd.account_number }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Amount + Approve -->
+          <div class="flex items-center gap-2.5 flex-shrink-0 ml-2">
+            <div class="text-right">
+              <span class="amount-text">{{ wd.amount | naira }}</span>
+              <span class="block text-xs text-red-500 font-semibold">Pending</span>
+            </div>
+            <form method="POST" action="{{ url_for('admin_approve_withdrawal', wd_id=wd.id) }}" class="inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn-approve">
+                <i data-lucide="check" class="w-3 h-3"></i> Approve
+              </button>
+            </form>
+          </div>
+
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">
+          <i data-lucide="inbox" class="w-5 h-5 text-gray-400"></i>
+        </div>
+        <p class="font-semibold text-gray-600 text-sm">All clear</p>
+        <p class="text-xs text-gray-400">No pending withdrawals to process</p>
+      </div>
+      {% endif %}
+    </div>
   </div>
+
 </div>
 
-<!-- Recent Users -->
-<div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-  <div class="flex items-center justify-between mb-4">
-    <h2 class="font-semibold text-gray-900">Recent Users</h2>
-    <a href="{{ url_for('admin_users') }}" class="text-xs text-blue-600 hover:underline">View All</a>
+<!-- ════════════════════════════════════════════
+     RECENT USERS TABLE
+════════════════════════════════════════════ -->
+<div class="premium-card anim-fade-up" style="animation-delay:.32s">
+  <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+        <i data-lucide="users" class="w-4 h-4 text-blue-600"></i>
+      </div>
+      <div>
+        <h2 class="font-bold text-gray-900 text-sm leading-tight">Recent Members</h2>
+        <p class="text-xs text-gray-400">Newly registered users</p>
+      </div>
+    </div>
+    <a href="{{ url_for('admin_users') }}" class="view-all">
+      View all <i data-lucide="arrow-right" class="w-3 h-3"></i>
+    </a>
   </div>
+
   <div class="overflow-x-auto">
-    <table class="w-full text-sm">
+    <table class="data-table">
       <thead>
-        <tr class="text-left text-xs text-gray-400 uppercase tracking-wider border-b border-gray-100">
-          <th class="pb-3 font-medium">Name</th>
-          <th class="pb-3 font-medium">Email</th>
-          <th class="pb-3 font-medium">Balance</th>
-          <th class="pb-3 font-medium">Joined</th>
-          <th class="pb-3 font-medium">Status</th>
+        <tr>
+          <th>Member</th>
+          <th>Email</th>
+          <th>Balance</th>
+          <th>Joined</th>
+          <th>Status</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-50">
+      <tbody>
         {% for u in recent_users %}
-        <tr class="hover:bg-gray-50">
-          <td class="py-3 font-medium text-gray-900">{{ u.full_name }}</td>
-          <td class="py-3 text-gray-500">{{ u.email }}</td>
-          <td class="py-3 font-semibold text-forest-700">{{ u.balance | naira }}</td>
-          <td class="py-3 text-gray-400">{{ u.created_at | date_fmt }}</td>
-          <td class="py-3">
-            <span class="{{ 'badge-success' if u.is_active else 'badge-error' }} badge">{{ 'Active' if u.is_active else 'Suspended' }}</span>
+        <tr>
+          <!-- Name + Avatar -->
+          <td>
+            <div class="flex items-center gap-2.5">
+              {% set avatar_colors = [
+                'bg-blue-100 text-blue-700',
+                'bg-emerald-100 text-emerald-700',
+                'bg-violet-100 text-violet-700',
+                'bg-amber-100 text-amber-700',
+                'bg-rose-100 text-rose-700',
+                'bg-teal-100 text-teal-700',
+                'bg-indigo-100 text-indigo-700',
+                'bg-orange-100 text-orange-700'
+              ] %}
+              {% set ac = loop.index0 % 8 %}
+              <div class="user-avatar {{ avatar_colors[ac] }}">
+                {{ u.full_name[0].upper() if u.full_name else '?' }}
+              </div>
+              <span class="font-semibold text-gray-900 text-sm whitespace-nowrap">{{ u.full_name }}</span>
+            </div>
+          </td>
+
+          <!-- Email -->
+          <td>
+            <div class="flex items-center gap-1.5 text-gray-500 text-xs">
+              <i data-lucide="mail" class="w-3 h-3 flex-shrink-0 text-gray-400"></i>
+              <span class="truncate max-w-[160px]">{{ u.email }}</span>
+            </div>
+          </td>
+
+          <!-- Balance -->
+          <td>
+            <span class="font-bold text-sm" style="color: var(--forest-mid);">{{ u.balance | naira }}</span>
+          </td>
+
+          <!-- Joined -->
+          <td>
+            <span class="text-xs text-gray-400">{{ u.created_at | date_fmt }}</span>
+          </td>
+
+          <!-- Status -->
+          <td>
+            <span class="badge {{ 'badge-success' if u.is_active else 'badge-error' }}">
+              {% if u.is_active %}
+              <i data-lucide="check-circle" class="w-3 h-3"></i> Active
+              {% else %}
+              <i data-lucide="x-circle" class="w-3 h-3"></i> Suspended
+              {% endif %}
+            </span>
           </td>
         </tr>
         {% endfor %}
+
+        {% if not recent_users %}
+        <tr>
+          <td colspan="5">
+            <div class="empty-state">
+              <div class="empty-icon">
+                <i data-lucide="user-x" class="w-5 h-5 text-gray-400"></i>
+              </div>
+              <p class="font-semibold text-gray-600 text-sm">No users yet</p>
+              <p class="text-xs text-gray-400">New registrations will appear here</p>
+            </div>
+          </td>
+        </tr>
+        {% endif %}
       </tbody>
     </table>
   </div>
 </div>
+<!-- /Recent Users -->
+
+
+<!-- ════════════════════════════════════════════
+     SCRIPTS
+════════════════════════════════════════════ -->
+<script>
+(function () {
+  /* ── Hero greeting, date & clock ── */
+  function updateHero() {
+    const now = new Date();
+
+    /* Greeting based on hour */
+    const h = now.getHours();
+    const greeting = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
+    const greetEl = document.getElementById('hero-greeting');
+    if (greetEl) greetEl.textContent = greeting + ', Admin 👋';
+
+    /* Date */
+    const dateEl = document.getElementById('hero-date');
+    if (dateEl) {
+      dateEl.textContent = now.toLocaleDateString('en-NG', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
+    }
+
+    /* Clock */
+    const clockEl = document.getElementById('hero-clock');
+    if (clockEl) {
+      clockEl.textContent = now.toLocaleTimeString('en-NG', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+      });
+    }
+  }
+
+  updateHero();
+  setInterval(updateHero, 1000);
+
+  /* ── Init Lucide icons ── */
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  /* ── Re-run Lucide after DOM settle (for dynamic icons) ── */
+  setTimeout(function () {
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }, 200);
+})();
+</script>
+
 {% endblock %}
