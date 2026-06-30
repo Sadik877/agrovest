@@ -710,14 +710,14 @@ def uploaded_file(filename):
 def check_env():
     """Return (ok, missing_list, errors_list)."""
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_KEY', '').strip()
+    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
     missing, errors = [], []
     if not url:
         missing.append('SUPABASE_URL')
     elif not url.startswith('https://'):
         errors.append(f'SUPABASE_URL must start with https:// — got: {url[:60]}')
     if not key:
-        missing.append('SUPABASE_KEY')
+        missing.append('SUPABASE_SECER_KEY')
     return (len(missing) == 0 and len(errors) == 0), missing, errors
 
 @app.before_request
@@ -1743,7 +1743,7 @@ def admin_debug():
     """Shows live connection status and any errors. Check Render logs for detail."""
     results = {}
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_KEY', '').strip()
+    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
     results['supabase_url'] = (url[:40] + '...') if url else 'NOT SET'
     results['supabase_key_set'] = bool(key)
     results['is_render'] = IS_RENDER
