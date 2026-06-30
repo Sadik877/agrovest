@@ -279,6 +279,149 @@ def sb_adjust_balance(user_id, balance_delta=0, total_invested_delta=0,
     return result if ok else False
 
 
+# ─────────────────────────────────────────────
+# Automatic Daily Profit Distribution
+# ─────────────────────────────────────────────
+def _parse_dt(value):
+    """Parse a Supabase timestamp string (or datetime) into a naive UTC datetime."""
+    if isinstance(value, datetime):
+        return value
+    if not value:
+        return None
+    return datetime.fromisoformat(str(value).replace('Z', '+00:00')).replace(tzinfo=None)
+
+
+def get_daily_profit_amount(investment):
+    """The fixed daily profit for one investment. Uses the stored daily_profit
+    if present (set at investment time from the plan), otherwise falls back to
+    spreading the plan's total ROI evenly across its duration — this keeps old
+    investment rows (created before this feature existed) working correctly."""
+    stored = investment.get('daily_profit')
+    if stored not in (None, ''):
+        return r2(stored)
+    amount   = float(investment.get('amount') or 0)
+    roi_pct  = float(investment.get('roi_percent') or 0)
+    duration = int(investment.get('duration_days') or 1) or 1
+    return r2((amount * roi_pct / 100) / duration)
+
+
+def sb_credit_daily_profit(investment_id, user_id, credit_amount, new_last_profit_date,
+                            mark_completed=False, principal_return=0):
+    """Atomically credit accumulated daily profit (and, if the investment has
+    matured, the principal) via a Postgres RPC function. The function takes a
+    row lock on the investment and only applies the update if the investment
+    is still 'active', which makes this safe to call repeatedly/concurrently
+    (e.g. from a cron job and a dashboard page-load at the same moment)
+    without ever double-crediting a user.
+
+    Returns True if a credit was applied, False otherwise (already processed,
+    investment not active, or the RPC call failed).
+    """
+    def _run():
+        r = get_sb().rpc('agrovest_credit_daily_profit', {
+            'p_investment_id': investment_id,
+            'p_user_id': user_id,
+            'p_credit_amount': r2(credit_amount),
+            'p_new_last_profit_date': new_last_profit_date,
+            'p_mark_completed': bool(mark_completed),
+            'p_principal_return': r2(principal_return),
+        }).execute()
+        data = r.data
+        if isinstance(data, list):
+            data = data[0] if data else False
+        return bool(data)
+    ok, result = _with_retry(_run, 'sb_credit_daily_profit', retries=0)
+    return result if ok else False
+
+
+def process_investment_daily_profit(inv):
+    """Credit any owed daily profit for a single active investment, covering
+    every missed day since it was last credited (e.g. if the user/cron hasn't
+    visited in 4 days, all 4 days are credited in one shot). Never credits
+    past the investment's end_date. Marks the investment 'completed' and
+    returns the principal once end_date is reached, and never credits profit
+    again afterwards."""
+    if inv.get('status') != 'active':
+        return False
+
+    end_date = _parse_dt(inv.get('end_date'))
+    if not end_date:
+        return False
+
+    last_profit_date = _parse_dt(inv.get('last_profit_date')) or \
+                        _parse_dt(inv.get('start_date')) or \
+                        _parse_dt(inv.get('created_at')) or datetime.utcnow()
+
+    now = datetime.utcnow()
+    effective_now = min(now, end_date)
+    elapsed_days = (effective_now - last_profit_date).days
+
+    matured = now >= end_date
+    if elapsed_days <= 0 and not matured:
+        return False  # not even 1 full day has passed yet — nothing owed
+
+    daily_profit  = get_daily_profit_amount(inv)
+    credit_amount = r2(daily_profit * elapsed_days)
+    new_last_date = (last_profit_date + timedelta(days=elapsed_days)).isoformat()
+
+    if credit_amount <= 0 and not matured:
+        return False
+
+    principal_return = r2(inv['amount']) if matured else 0
+    credited = sb_credit_daily_profit(
+        investment_id=inv['id'], user_id=inv['user_id'],
+        credit_amount=credit_amount, new_last_profit_date=new_last_date,
+        mark_completed=matured, principal_return=principal_return,
+    )
+    if credited:
+        if credit_amount > 0:
+            notify(inv['user_id'],
+                   f'₦{credit_amount:,.2f} daily profit credited for {inv.get("plan_name","your investment")}.',
+                   'success')
+        if matured:
+            notify(inv['user_id'],
+                   f'{inv.get("plan_name","Your investment")} has matured — principal of '
+                   f'₦{principal_return:,.2f} returned to your wallet.', 'success')
+    return credited
+
+
+def run_daily_profit_distribution(user_id=None):
+    """Process daily profit for all active investments (optionally scoped to
+    one user). Safe to call as often as needed — already-credited investments
+    are simply skipped. Call sites: lazily on dashboard load (per-user) and
+    from the /cron/daily-profits endpoint (global, for an external scheduler)."""
+    filters = [('status', 'eq', 'active')]
+    if user_id is not None:
+        filters.append(('user_id', 'eq', user_id))
+    investments = sb_all('investments', filters=filters)
+    processed = 0
+    for inv in investments:
+        try:
+            if process_investment_daily_profit(inv):
+                processed += 1
+        except Exception as e:
+            print(f'⚠ daily profit error for investment {inv.get("id")}: {e}')
+    return processed
+
+
+def _enrich_investment_progress(inv):
+    """Add remaining_days / progress_percent to an investment dict for display."""
+    inv = dict(inv)
+    try:
+        start = _parse_dt(inv.get('start_date') or inv.get('created_at'))
+        end   = _parse_dt(inv.get('end_date'))
+        now   = datetime.utcnow()
+        total_days = max((end - start).days, 1)
+        elapsed    = max((min(now, end) - start).days, 0)
+        inv['remaining_days']   = max((end - now).days, 0)
+        inv['progress_percent'] = round(min(elapsed / total_days * 100, 100), 1)
+        inv['daily_profit']     = get_daily_profit_amount(inv)
+        inv['total_profit']     = r2(inv.get('total_profit'))
+    except Exception:
+        inv['remaining_days'], inv['progress_percent'] = 0, 0
+    return inv
+
+
 def is_allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[-1].lower() in ALLOWED_EXTENSIONS
 
@@ -567,14 +710,14 @@ def uploaded_file(filename):
 def check_env():
     """Return (ok, missing_list, errors_list)."""
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
+    key = os.environ.get('SUPABASE_KEY', '').strip()
     missing, errors = [], []
     if not url:
         missing.append('SUPABASE_URL')
     elif not url.startswith('https://'):
         errors.append(f'SUPABASE_URL must start with https:// — got: {url[:60]}')
     if not key:
-        missing.append('SUPABASE_SECRET_KEY')
+        missing.append('SUPABASE_KEY')
     return (len(missing) == 0 and len(errors) == 0), missing, errors
 
 @app.before_request
@@ -588,7 +731,7 @@ def check_maintenance():
     """
     if os.environ.get('MAINTENANCE_MODE', '').strip().lower() != 'true':
         return
-    if request.endpoint in ('static', 'uploaded_file', 'login', 'logout'):
+    if request.endpoint in ('static', 'uploaded_file', 'login', 'logout', 'cron_daily_profits'):
         return
     if session.get('is_admin'):
         return  # admins can still use the site to fix things / lift maintenance
@@ -798,15 +941,33 @@ def logout():
 def dashboard():
     user = get_current_user()
     uid  = user['id']
+
+    # Lazily catch this user up on any daily profit owed since their last
+    # visit (covers missed days automatically) before reading their data.
+    run_daily_profit_distribution(user_id=uid)
+    user = get_current_user()  # re-fetch — profit_wallet/balance may have changed above
+
     active_investments = sb_all('investments',
         filters=[('user_id','eq',uid),('status','eq','active')],
         order=('created_at','desc'))
+    active_investments = [_enrich_investment_progress(i) for i in active_investments]
+    completed_count = sb_count('investments',
+        filters=[('user_id','eq',uid),('status','eq','completed')])
+
+    todays_profit       = r2(sum(i['daily_profit'] for i in active_investments))
+    total_profit_earned = r2(sum(float(i.get('total_profit') or 0) for i in active_investments)
+                              + sb_sum('investments', 'total_profit',
+                                       [('user_id','eq',uid),('status','eq','completed')]))
+
     recent_deposits = sb_all('deposits',
         filters=[('user_id','eq',uid)], order=('created_at','desc'), limit=5)
     recent_withdrawals = sb_all('withdrawals',
         filters=[('user_id','eq',uid)], order=('created_at','desc'), limit=5)
     notifications = sb_all('notifications',
         filters=[('user_id','eq',uid)], order=('created_at','desc'), limit=10)
+    recent_profit_transactions = sb_all('transactions',
+        filters=[('user_id','eq',uid),('type','eq','Daily Profit')],
+        order=('created_at','desc'), limit=10)
 
     # Referrals with referred user names
     raw_refs = sb_all('referrals', filters=[('referrer_id','eq',uid)],
@@ -816,10 +977,19 @@ def dashboard():
         referred_user = sb_one('users', [('id','eq',r['referred_id'])])
         referrals.append({**r, 'full_name': referred_user['full_name'] if referred_user else 'Unknown'})
 
+    profit_stats = {
+        'profit_wallet':         r2(user.get('profit_wallet')),
+        'todays_profit':         todays_profit,
+        'total_profit_earned':   total_profit_earned,
+        'active_investments':    len(active_investments),
+        'completed_investments': completed_count,
+    }
+
     return render_template('dashboard.html',
         user=user, active_investments=active_investments,
         recent_deposits=recent_deposits, recent_withdrawals=recent_withdrawals,
-        referrals=referrals, notifications=notifications)
+        referrals=referrals, notifications=notifications,
+        profit_stats=profit_stats, recent_profit_transactions=recent_profit_transactions)
 
 
 @app.route('/dashboard/invest', methods=['GET', 'POST'])
@@ -857,15 +1027,24 @@ def invest():
             return redirect(url_for('deposit'))
 
         roi_pct         = float(plan['roi_percent'])
+        duration_days   = int(plan['duration_days'])
         expected_return = r2(amount + (amount * roi_pct / 100))
-        end_date        = (datetime.utcnow() + timedelta(days=int(plan['duration_days']))).isoformat()
+        start_date      = datetime.utcnow()
+        end_date        = start_date + timedelta(days=duration_days)
+        # Fixed daily profit for THIS investment — the plan's total ROI spread
+        # evenly across its duration (e.g. ₦3,000 at 30% over 1 day = ₦900/day).
+        daily_profit    = r2((amount * roi_pct / 100) / duration_days)
 
         new_investment = sb_insert('investments', {
             'user_id': user['id'], 'plan_id': plan_id,
             'plan_name': plan['name'], 'amount': amount,
             'roi_percent': roi_pct, 'expected_return': expected_return,
-            'duration_days': int(plan['duration_days']),
-            'end_date': end_date, 'status': 'active',
+            'duration_days': duration_days,
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            'last_profit_date': start_date.isoformat(),
+            'daily_profit': daily_profit, 'total_profit': 0,
+            'status': 'active',
         })
         if not new_investment:
             rolled_back = sb_adjust_balance(user['id'], balance_delta=amount,
@@ -944,17 +1123,6 @@ def deposit():
     deposits = sb_all('deposits', filters=[('user_id','eq',user['id'])],
                       order=('created_at','desc'))
     return render_template('deposit.html', user=user, deposits=deposits)
-
-
-@app.route('/dashboard/payment')
-@login_required
-def payment():
-    """Step 2 of the deposit flow — shows bank accounts to pay into.
-    Amount/method are passed via query string from deposit.html and are
-    purely for display; the actual deposit record is still created by the
-    existing /dashboard/deposit POST handler above, untouched."""
-    user = get_current_user()
-    return render_template('payment.html', user=user)
 
 
 @app.route('/dashboard/withdraw', methods=['GET', 'POST'])
@@ -1523,15 +1691,20 @@ def admin_investments():
 def admin_complete_investment(inv_id):
     inv = sb_one('investments', [('id','eq',inv_id)])
     if inv and inv['status'] == 'active':
-        expected_return = r2(inv['expected_return'])
-        profit = r2(expected_return - float(inv['amount']))
+        expected_return     = r2(inv['expected_return'])
+        already_paid_profit = r2(inv.get('total_profit'))
+        # Only pay out what the daily-profit engine hasn't already credited,
+        # so early/manual completion never double-pays profit on top of the
+        # automatic daily credits.
+        remaining_payout = r2(expected_return - already_paid_profit)
+        profit = r2(remaining_payout - float(inv['amount']))
         updated = sb_update('investments', {'status':'completed'},
                              [('id','eq',inv_id), ('status','eq','active')])
         if updated:
-            if sb_adjust_balance(inv['user_id'], balance_delta=expected_return,
+            if sb_adjust_balance(inv['user_id'], balance_delta=remaining_payout,
                                   total_earnings_delta=profit):
                 notify(inv['user_id'],
-                       f'{inv["plan_name"]} matured! ₦{expected_return:,.2f} credited.',
+                       f'{inv["plan_name"]} matured! ₦{remaining_payout:,.2f} credited.',
                        'success')
                 flash('Investment completed and balance credited.', 'success')
             else:
@@ -1543,15 +1716,34 @@ def admin_complete_investment(inv_id):
 
 
 # ═════════════════════════════════════════════
-# Debug Route (admin only — check Render logs)
+# Daily Profit Cron Endpoint
+# Trigger this every 24h (or more often — it's
+# idempotent) from Render Cron Jobs, GitHub
+# Actions, or an external pinger like cron-job.org,
+# passing ?key=<CRON_SECRET>. Profit is also caught
+# up lazily whenever a user opens their dashboard,
+# so this is a belt-and-suspenders job to cover
+# users who don't log in for a while.
 # ═════════════════════════════════════════════
+@app.route('/cron/daily-profits', methods=['GET', 'POST'])
+@csrf.exempt
+def cron_daily_profits():
+    secret = os.environ.get('CRON_SECRET', '').strip()
+    provided = request.args.get('key', '') or request.headers.get('X-Cron-Secret', '')
+    if not secret or provided != secret:
+        abort(403)
+    processed = run_daily_profit_distribution()
+    return jsonify({'status': 'ok', 'investments_processed': processed})
+
+
+
 @app.route('/admin/debug')
 @admin_required
 def admin_debug():
     """Shows live connection status and any errors. Check Render logs for detail."""
     results = {}
     url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
+    key = os.environ.get('SUPABASE_KEY', '').strip()
     results['supabase_url'] = (url[:40] + '...') if url else 'NOT SET'
     results['supabase_key_set'] = bool(key)
     results['is_render'] = IS_RENDER
