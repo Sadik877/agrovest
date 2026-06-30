@@ -941,33 +941,15 @@ def logout():
 def dashboard():
     user = get_current_user()
     uid  = user['id']
-
-    # Lazily catch this user up on any daily profit owed since their last
-    # visit (covers missed days automatically) before reading their data.
-    run_daily_profit_distribution(user_id=uid)
-    user = get_current_user()  # re-fetch — profit_wallet/balance may have changed above
-
     active_investments = sb_all('investments',
         filters=[('user_id','eq',uid),('status','eq','active')],
         order=('created_at','desc'))
-    active_investments = [_enrich_investment_progress(i) for i in active_investments]
-    completed_count = sb_count('investments',
-        filters=[('user_id','eq',uid),('status','eq','completed')])
-
-    todays_profit       = r2(sum(i['daily_profit'] for i in active_investments))
-    total_profit_earned = r2(sum(float(i.get('total_profit') or 0) for i in active_investments)
-                              + sb_sum('investments', 'total_profit',
-                                       [('user_id','eq',uid),('status','eq','completed')]))
-
     recent_deposits = sb_all('deposits',
         filters=[('user_id','eq',uid)], order=('created_at','desc'), limit=5)
     recent_withdrawals = sb_all('withdrawals',
         filters=[('user_id','eq',uid)], order=('created_at','desc'), limit=5)
     notifications = sb_all('notifications',
         filters=[('user_id','eq',uid)], order=('created_at','desc'), limit=10)
-    recent_profit_transactions = sb_all('transactions',
-        filters=[('user_id','eq',uid),('type','eq','Daily Profit')],
-        order=('created_at','desc'), limit=10)
 
     # Referrals with referred user names
     raw_refs = sb_all('referrals', filters=[('referrer_id','eq',uid)],
@@ -977,19 +959,10 @@ def dashboard():
         referred_user = sb_one('users', [('id','eq',r['referred_id'])])
         referrals.append({**r, 'full_name': referred_user['full_name'] if referred_user else 'Unknown'})
 
-    profit_stats = {
-        'profit_wallet':         r2(user.get('profit_wallet')),
-        'todays_profit':         todays_profit,
-        'total_profit_earned':   total_profit_earned,
-        'active_investments':    len(active_investments),
-        'completed_investments': completed_count,
-    }
-
     return render_template('dashboard.html',
         user=user, active_investments=active_investments,
         recent_deposits=recent_deposits, recent_withdrawals=recent_withdrawals,
-        referrals=referrals, notifications=notifications,
-        profit_stats=profit_stats, recent_profit_transactions=recent_profit_transactions)
+        referrals=referrals, notifications=notifications)
 
 
 @app.route('/dashboard/invest', methods=['GET', 'POST'])
@@ -1027,24 +1000,15 @@ def invest():
             return redirect(url_for('deposit'))
 
         roi_pct         = float(plan['roi_percent'])
-        duration_days   = int(plan['duration_days'])
         expected_return = r2(amount + (amount * roi_pct / 100))
-        start_date      = datetime.utcnow()
-        end_date        = start_date + timedelta(days=duration_days)
-        # Fixed daily profit for THIS investment — the plan's total ROI spread
-        # evenly across its duration (e.g. ₦3,000 at 30% over 1 day = ₦900/day).
-        daily_profit    = r2((amount * roi_pct / 100) / duration_days)
+        end_date        = (datetime.utcnow() + timedelta(days=int(plan['duration_days']))).isoformat()
 
         new_investment = sb_insert('investments', {
             'user_id': user['id'], 'plan_id': plan_id,
             'plan_name': plan['name'], 'amount': amount,
             'roi_percent': roi_pct, 'expected_return': expected_return,
-            'duration_days': duration_days,
-            'start_date': start_date.isoformat(),
-            'end_date': end_date.isoformat(),
-            'last_profit_date': start_date.isoformat(),
-            'daily_profit': daily_profit, 'total_profit': 0,
-            'status': 'active',
+            'duration_days': int(plan['duration_days']),
+            'end_date': end_date, 'status': 'active',
         })
         if not new_investment:
             rolled_back = sb_adjust_balance(user['id'], balance_delta=amount,
@@ -1125,6 +1089,17 @@ def deposit():
     return render_template('deposit.html', user=user, deposits=deposits)
 
 
+@app.route('/dashboard/payment')
+@login_required
+def payment():
+    """Step 2 of the deposit flow — shows bank accounts to pay into.
+    Amount/method are passed via query string from deposit.html and are
+    purely for display; the actual deposit record is still created by the
+    existing /dashboard/deposit POST handler above, untouched."""
+    user = get_current_user()
+    return render_template('payment.html', user=user)
+
+
 @app.route('/dashboard/withdraw', methods=['GET', 'POST'])
 @login_required
 def withdraw():
@@ -1201,7 +1176,6 @@ def mark_notifications_read():
     user = get_current_user()
     sb_update('notifications', {'is_read': True}, [('user_id','eq',user['id'])])
     return jsonify({'status': 'ok'})
-
 
 # ═════════════════════════════════════════════
 # ADMIN — Dashboard
