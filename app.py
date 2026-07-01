@@ -939,11 +939,32 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    user = get_current_user()
-    uid  = user['id']
-    active_investments = sb_all('investments',
-        filters=[('user_id','eq',uid),('status','eq','active')],
-        order=('created_at','desc'))
+    uid = session['user_id']
+
+    # Lazily catch up any daily profit owed on this user's active investments.
+    # This is what makes the profit engine self-healing even if the external
+    # /cron/daily-profits job hasn't fired recently — every dashboard visit
+    # re-checks and credits anything owed. Safe to call as often as needed:
+    # process_investment_daily_profit() is idempotent per elapsed day and the
+    # underlying agrovest_credit_daily_profit RPC takes a row lock, so this
+    # can never double-credit even under concurrent requests.
+    run_daily_profit_distribution(user_id=uid)
+
+    # Re-fetch the user fresh (bypassing the per-request g cache set by
+    # get_current_user() earlier in login_required) so balance/total_earnings
+    # reflect any profit that was just credited above.
+    user = sb_one('users', [('id', 'eq', uid)])
+    if not user:
+        session.clear()
+        flash('Your account could not be found. Please log in again.', 'error')
+        return redirect(url_for('login'))
+    g._current_user_cache = user
+
+    active_investments = [
+        _enrich_investment_progress(inv) for inv in sb_all('investments',
+            filters=[('user_id','eq',uid),('status','eq','active')],
+            order=('created_at','desc'))
+    ]
     recent_deposits = sb_all('deposits',
         filters=[('user_id','eq',uid)], order=('created_at','desc'), limit=5)
     recent_withdrawals = sb_all('withdrawals',
@@ -959,10 +980,22 @@ def dashboard():
         referred_user = sb_one('users', [('id','eq',r['referred_id'])])
         referrals.append({**r, 'full_name': referred_user['full_name'] if referred_user else 'Unknown'})
 
+    # Real "Today's Profit": the sum of each active investment's actual
+    # per-day profit rate (the same daily_profit figure the automatic engine
+    # credits — stored on the investment at creation time, or derived from
+    # amount/roi_percent/duration_days for legacy rows via
+    # get_daily_profit_amount()). This is a live figure from the database,
+    # not a placeholder.
+    today_profit = r2(sum(inv['daily_profit'] for inv in active_investments))
+    total_invested = float(user.get('total_invested') or 0)
+    profit_change_pct = r2((today_profit / total_invested * 100) if total_invested > 0 else 0)
+
     return render_template('dashboard.html',
         user=user, active_investments=active_investments,
         recent_deposits=recent_deposits, recent_withdrawals=recent_withdrawals,
-        referrals=referrals, notifications=notifications)
+        referrals=referrals, notifications=notifications,
+        today_profit=today_profit, profit_change_pct=profit_change_pct,
+        now_utc=datetime.utcnow())
 
 
 @app.route('/dashboard/invest', methods=['GET', 'POST'])
@@ -1000,15 +1033,25 @@ def invest():
             return redirect(url_for('deposit'))
 
         roi_pct         = float(plan['roi_percent'])
+        duration_days   = int(plan['duration_days'])
         expected_return = r2(amount + (amount * roi_pct / 100))
-        end_date        = (datetime.utcnow() + timedelta(days=int(plan['duration_days']))).isoformat()
+        start_dt        = datetime.utcnow()
+        end_date        = (start_dt + timedelta(days=duration_days)).isoformat()
+        # Fixed daily payout for this investment, locked in at creation time
+        # so it never has to be recomputed/guessed later — this is the exact
+        # amount the automatic daily-profit engine will credit every 24h.
+        daily_profit    = r2((amount * roi_pct / 100) / duration_days)
 
         new_investment = sb_insert('investments', {
             'user_id': user['id'], 'plan_id': plan_id,
             'plan_name': plan['name'], 'amount': amount,
             'roi_percent': roi_pct, 'expected_return': expected_return,
-            'duration_days': int(plan['duration_days']),
+            'duration_days': duration_days,
+            'start_date': start_dt.isoformat(),
             'end_date': end_date, 'status': 'active',
+            'daily_profit': daily_profit,
+            'last_profit_date': start_dt.isoformat(),
+            'total_profit': 0,
         })
         if not new_investment:
             rolled_back = sb_adjust_balance(user['id'], balance_delta=amount,
