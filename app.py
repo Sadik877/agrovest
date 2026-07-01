@@ -293,15 +293,28 @@ def _parse_dt(value):
 
 def get_daily_profit_amount(investment):
     """The fixed daily profit for one investment. Uses the stored daily_profit
-    if present (set at investment time from the plan), otherwise falls back to
-    spreading the plan's total ROI evenly across its duration — this keeps old
-    investment rows (created before this feature existed) working correctly."""
+    if present (set at investment time from the plan), otherwise derives it
+    from the investment's stored profit (or expected_return - amount) spread
+    evenly across its duration. Falls back to the legacy ROI%-based formula
+    only for very old rows created before the total_return-based plan model
+    existed — this keeps historic investments working correctly."""
     stored = investment.get('daily_profit')
     if stored not in (None, ''):
         return r2(stored)
-    amount   = float(investment.get('amount') or 0)
-    roi_pct  = float(investment.get('roi_percent') or 0)
+
     duration = int(investment.get('duration_days') or 1) or 1
+    amount   = float(investment.get('amount') or 0)
+
+    profit = investment.get('profit')
+    if profit not in (None, ''):
+        return r2(float(profit) / duration)
+
+    expected_return = investment.get('expected_return')
+    if expected_return not in (None, ''):
+        return r2((float(expected_return) - amount) / duration)
+
+    # Legacy fallback for rows predating the total_return-based plan model.
+    roi_pct = float(investment.get('roi_percent') or 0)
     return r2((amount * roi_pct / 100) / duration)
 
 
@@ -417,6 +430,9 @@ def _enrich_investment_progress(inv):
         inv['progress_percent'] = round(min(elapsed / total_days * 100, 100), 1)
         inv['daily_profit']     = get_daily_profit_amount(inv)
         inv['total_profit']     = r2(inv.get('total_profit'))
+        stored_profit = inv.get('profit')
+        inv['profit'] = r2(stored_profit) if stored_profit not in (None, '') else \
+            r2(float(inv.get('expected_return') or 0) - float(inv.get('amount') or 0))
     except Exception:
         inv['remaining_days'], inv['progress_percent'] = 0, 0
     return inv
@@ -532,25 +548,25 @@ def resolve_plan_image_url(image_filename):
 # ─────────────────────────────────────────────
 def init_db():
     default_plans = [
-        {'name': 'Starter Farm',  'slug': 'starter',      'icon': '🌱',
+        {'name': 'Starter Farm',
          'description': 'Perfect entry point for new agricultural investors.',
-         'min_amount': 10000, 'max_amount': 49999,  'roi_percent': 15, 'duration_days': 30,
-         'features': 'Daily ROI updates|Email notifications|Basic support',
+         'price': 10000, 'total_return': 11500, 'duration_days': 30,
+         'features': 'Daily profit updates|Email notifications|Basic support',
          'sort_order': 1, 'is_active': True},
-        {'name': 'Green Harvest', 'slug': 'green-harvest','icon': '🌿',
+        {'name': 'Green Harvest',
          'description': 'Mid-range plan with diversified crop investments.',
-         'min_amount': 50000, 'max_amount': 199999, 'roi_percent': 25, 'duration_days': 45,
-         'features': 'Daily ROI updates|Priority support|Monthly reports|Referral bonus',
+         'price': 50000, 'total_return': 62500, 'duration_days': 45,
+         'features': 'Daily profit updates|Priority support|Monthly reports|Referral bonus',
          'sort_order': 2, 'is_active': True},
-        {'name': 'Premium Agro',  'slug': 'premium-agro', 'icon': '🌾',
+        {'name': 'Premium Agro',
          'description': 'Premium returns from large-scale farming operations.',
-         'min_amount': 200000, 'max_amount': 999999, 'roi_percent': 40, 'duration_days': 60,
-         'features': 'Daily ROI updates|24/7 VIP support|Weekly reports|Higher referral bonus|Early withdrawal option',
+         'price': 200000, 'total_return': 280000, 'duration_days': 60,
+         'features': 'Daily profit updates|24/7 VIP support|Weekly reports|Higher referral bonus|Early withdrawal option',
          'sort_order': 3, 'is_active': True},
-        {'name': 'Elite Farm',    'slug': 'elite',        'icon': '👑',
+        {'name': 'Elite Farm',
          'description': 'Elite tier for serious investors seeking maximum returns.',
-         'min_amount': 1000000, 'max_amount': None, 'roi_percent': 60, 'duration_days': 90,
-         'features': 'Daily ROI updates|Dedicated account manager|Daily reports|Maximum referral bonus|Flexible withdrawal|Farm visit opportunity',
+         'price': 1000000, 'total_return': 1600000, 'duration_days': 90,
+         'features': 'Daily profit updates|Dedicated account manager|Daily reports|Maximum referral bonus|Flexible withdrawal|Farm visit opportunity',
          'sort_order': 4, 'is_active': True},
     ]
 
@@ -596,7 +612,7 @@ def init_db():
         # a plan or two.
         seeded, failed = 0, 0
         for p in default_plans:
-            if not sb_one('plans', [('slug', 'eq', p['slug'])]):
+            if not sb_one('plans', [('name', 'eq', p['name'])]):
                 if sb_insert('plans', p):
                     seeded += 1
                 else:
@@ -617,12 +633,12 @@ def init_db():
 # ─────────────────────────────────────────────
 def _enrich_plan(p):
     """Add computed display fields to a raw plan row: a resolved image URL
-    and a total_return percentage (falls back to 100 + ROI for older rows
-    created before this field existed, or left blank by an admin)."""
+    and the flat profit this plan pays out (total_return - price)."""
     p = dict(p)
-    p['roi_percent'] = float(p.get('roi_percent') or 0)
+    p['price'] = float(p.get('price') or 0)
+    p['total_return'] = float(p.get('total_return') or 0)
+    p['profit'] = r2(p['total_return'] - p['price'])
     p['image_url'] = resolve_plan_image_url(p.get('image_filename'))
-    p['total_return'] = float(p['total_return']) if p.get('total_return') else r2(100 + p['roi_percent'])
     return p
 
 def get_plans(active_only=True):
@@ -632,8 +648,6 @@ def get_plans(active_only=True):
     for r in rows:
         p = _enrich_plan(r)
         p['features'] = [f.strip() for f in (p.get('features') or '').split('|') if f.strip()]
-        p['min_amount'] = float(p.get('min_amount') or 0)
-        p['max_amount'] = float(p['max_amount']) if p.get('max_amount') else None
         plans.append(p)
     return plans
 
@@ -983,7 +997,7 @@ def dashboard():
     # Real "Today's Profit": the sum of each active investment's actual
     # per-day profit rate (the same daily_profit figure the automatic engine
     # credits — stored on the investment at creation time, or derived from
-    # amount/roi_percent/duration_days for legacy rows via
+    # profit/expected_return-amount/duration_days for legacy rows via
     # get_daily_profit_amount()). This is a live figure from the database,
     # not a placeholder.
     today_profit = r2(sum(inv['daily_profit'] for inv in active_investments))
@@ -1006,22 +1020,19 @@ def invest():
 
     if request.method == 'POST':
         plan_id = request.form.get('plan_id', 0, type=int)
-        amount  = r2(request.form.get('amount', 0, type=float))
 
         plan = sb_one('plans', [('id','eq',plan_id),('is_active','eq',True)])
         if not plan:
             flash('Invalid plan selected.', 'error')
             return redirect(url_for('invest'))
 
-        min_a = float(plan['min_amount'])
-        max_a = float(plan['max_amount']) if plan.get('max_amount') else None
-
-        if amount <= 0 or amount < min_a:
-            flash(f'Minimum investment for {plan["name"]} is ₦{min_a:,.0f}', 'error')
-            return redirect(url_for('invest'))
-        if max_a and amount > max_a:
-            flash(f'Maximum investment for {plan["name"]} is ₦{max_a:,.0f}', 'error')
-            return redirect(url_for('invest'))
+        # The investment amount is always the plan's fixed price — users
+        # never enter or choose a custom amount.
+        amount          = r2(float(plan['price']))
+        total_return    = r2(float(plan['total_return']))
+        duration_days   = int(plan['duration_days'])
+        profit          = r2(total_return - amount)
+        expected_return = total_return
 
         # Atomic debit — fails cleanly if balance is insufficient, even under
         # concurrent requests (e.g. a double-clicked submit button).
@@ -1032,20 +1043,17 @@ def invest():
             flash('Insufficient balance. Please deposit funds first.', 'error')
             return redirect(url_for('deposit'))
 
-        roi_pct         = float(plan['roi_percent'])
-        duration_days   = int(plan['duration_days'])
-        expected_return = r2(amount + (amount * roi_pct / 100))
-        start_dt        = datetime.utcnow()
-        end_date        = (start_dt + timedelta(days=duration_days)).isoformat()
+        start_dt = datetime.utcnow()
+        end_date = (start_dt + timedelta(days=duration_days)).isoformat()
         # Fixed daily payout for this investment, locked in at creation time
         # so it never has to be recomputed/guessed later — this is the exact
         # amount the automatic daily-profit engine will credit every 24h.
-        daily_profit    = r2((amount * roi_pct / 100) / duration_days)
+        daily_profit = r2(profit / duration_days)
 
         new_investment = sb_insert('investments', {
             'user_id': user['id'], 'plan_id': plan_id,
             'plan_name': plan['name'], 'amount': amount,
-            'roi_percent': roi_pct, 'expected_return': expected_return,
+            'expected_return': expected_return, 'profit': profit,
             'duration_days': duration_days,
             'start_date': start_dt.isoformat(),
             'end_date': end_date, 'status': 'active',
@@ -1306,9 +1314,6 @@ def admin_plan_add():
         if error:
             flash(error, 'error')
             return render_template('admin/plan_form.html', plan=None, action='add')
-        if sb_one('plans', [('slug','eq', data['slug'])]):
-            flash('A plan with that slug already exists.', 'error')
-            return render_template('admin/plan_form.html', plan=None, action='add')
         sb_insert('plans', data)
         flash(f'Plan "{data["name"]}" created!', 'success')
         return redirect(url_for('admin_plans'))
@@ -1331,13 +1336,6 @@ def admin_plan_edit(plan_id):
             plan_d['features_text'] = (plan_d.get('features') or '').replace('|','\n')
             return render_template('admin/plan_form.html', plan=plan_d, action='edit')
 
-        # Check slug uniqueness (exclude self)
-        existing = sb_all('plans', filters=[('slug','eq',data['slug'])])
-        clash = [p for p in existing if p['id'] != plan_id]
-        if clash:
-            flash('That slug is used by another plan.', 'error')
-            return redirect(url_for('admin_plan_edit', plan_id=plan_id))
-
         sb_update('plans', data, [('id','eq',plan_id)])
         flash(f'Plan "{data["name"]}" updated!', 'success')
         return redirect(url_for('admin_plans'))
@@ -1351,51 +1349,27 @@ def _plan_from_form(form, files=None, existing=None):
     """Parse and validate plan form. Returns (data_dict, error_str).
 
     `existing` is the current plan row (when editing) — used to keep the
-    current image if no new one was uploaded, and to default total_return
-    sensibly. `files` is request.files, used for the optional image upload.
+    current image if no new one was uploaded, and to clear it if requested.
+    `files` is request.files, used for the optional image upload.
     """
     name          = form.get('name','').strip()
-    slug          = form.get('slug','').strip().lower().replace(' ','-')
-    icon          = form.get('icon','🌱').strip() or '🌱'
     description   = form.get('description','').strip()
-    min_amount    = r2(form.get('min_amount', 0, type=float))
-    max_amount    = form.get('max_amount', '').strip()
-    roi_percent   = r2(form.get('roi_percent', 0, type=float))
-    total_return_raw = form.get('total_return', '').strip()
-    duration_days = form.get('duration_days', 30, type=int)
+    price         = r2(form.get('price', 0, type=float))
+    total_return  = r2(form.get('total_return', 0, type=float))
+    duration_days = form.get('duration_days', 0, type=int)
     features_raw  = form.get('features','').strip()
     sort_order    = form.get('sort_order', 0, type=int)
     is_active     = form.get('is_active') == 'on'
     remove_image  = form.get('remove_image') == 'on'
 
-    if not name or not slug:
-        return None, 'Name and slug are required.'
-    if not re.match(r'^[a-z0-9-]+$', slug):
-        return None, 'Slug may only contain lowercase letters, numbers and hyphens.'
-    if roi_percent <= 0:
-        return None, 'ROI % must be greater than 0.'
-    if min_amount <= 0:
-        return None, 'Minimum amount must be greater than 0.'
+    if not name:
+        return None, 'Plan name is required.'
+    if price <= 0:
+        return None, 'Price must be greater than 0.'
+    if total_return <= 0:
+        return None, 'Total return must be greater than 0.'
     if duration_days <= 0:
         return None, 'Duration must be at least 1 day.'
-
-    max_amt = None
-    if max_amount:
-        try:
-            max_amt = r2(float(max_amount))
-        except ValueError:
-            return None, 'Maximum amount must be a valid number.'
-        if max_amt <= min_amount:
-            return None, 'Maximum amount must be greater than the minimum amount.'
-
-    total_return = r2(100 + roi_percent)  # sensible default: principal + ROI
-    if total_return_raw:
-        try:
-            total_return = r2(float(total_return_raw))
-        except ValueError:
-            return None, 'Total return must be a valid number.'
-        if total_return <= 0:
-            return None, 'Total return must be greater than 0.'
 
     # Image: keep the current one by default, replace it if a new file was
     # uploaded, or clear it if "remove image" was checked with no replacement.
@@ -1411,10 +1385,9 @@ def _plan_from_form(form, files=None, existing=None):
     features = '|'.join([f.strip() for f in features_raw.splitlines() if f.strip()])
 
     return {
-        'name': name, 'slug': slug, 'icon': icon,
-        'description': description, 'min_amount': min_amount,
-        'max_amount': max_amt, 'roi_percent': roi_percent,
-        'total_return': total_return, 'image_filename': image_filename,
+        'name': name, 'description': description,
+        'price': price, 'total_return': total_return,
+        'image_filename': image_filename,
         'duration_days': duration_days, 'features': features,
         'sort_order': sort_order, 'is_active': is_active,
     }, None
