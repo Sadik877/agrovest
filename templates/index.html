@@ -182,77 +182,197 @@
 <!-- ══════════════════════════════════════════
      INVESTMENT PLANS
 ══════════════════════════════════════════ -->
-<section class="py-20 bg-gray-50 dark:bg-gray-950">
+<section class="py-20 bg-gray-50">
   <div class="max-w-7xl mx-auto px-4 sm:px-6">
-    <div class="text-center mb-14" data-aos="fade-up">
-      <span class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest mb-4 px-4 py-2 rounded-full"
-            style="background:rgba(5,150,105,.08); color:#059669; border:1px solid rgba(5,150,105,.2);">
-        <i data-lucide="package" class="w-3.5 h-3.5"></i> Investment Plans
-      </span>
-      <h2 class="font-display font-bold text-3xl sm:text-4xl text-gray-900 dark:text-white mt-3">Choose Your Growth Path</h2>
-      <p class="text-gray-500 dark:text-gray-400 mt-3 max-w-xl mx-auto">Every plan is backed by real farming operations across Nigeria's agricultural belt.</p>
+    <div class="text-center mb-14 animate-on-scroll">
+      <span class="inline-block text-xs font-bold text-gold-600 uppercase tracking-widest mb-3">Investment Plans</span>
+      <h2 class="font-display text-3xl sm:text-4xl font-bold text-gray-900">Choose Your Growth Path</h2>
+      <p class="text-gray-500 mt-3 max-w-xl mx-auto">Every plan is backed by real farming operations across Nigeria's agricultural belt.</p>
     </div>
 
-    <!-- Plan cards grid — same style as the invest page -->
-    <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-5">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
       {% for plan in plans %}
-      <div class="rounded-2xl overflow-hidden shadow-md hover:shadow-xl hover:-translate-y-2 transition-all duration-300 border border-white dark:border-white/5"
-           data-aos="fade-up" data-aos-delay="{{ loop.index0 * 80 }}">
-
-        <!-- Dark header -->
-        <div class="relative px-5 py-6 text-center"
-             style="background:linear-gradient(145deg,#0d1b2a 0%,#0a1628 60%,#0f2040 100%);">
-          <div class="absolute inset-x-0 top-0 h-px" style="background:linear-gradient(90deg,transparent,rgba(212,175,55,.6),transparent);"></div>
-          {% if loop.index == 3 %}
-          <div class="absolute top-2 right-2 text-xs font-bold px-2 py-0.5 rounded-full"
-               style="background:rgba(212,175,55,.2);color:#d4af37;border:1px solid rgba(212,175,55,.4);">⭐</div>
+      <div class="relative bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-on-scroll {% if loop.index == 3 %}ring-2 ring-gold-500{% endif %}"
+           style="animation-delay: {{ loop.index0 * 0.1 }}s">
+        {% if loop.index == 3 %}
+        <div class="absolute top-0 left-0 right-0 bg-gold-500 text-forest-950 text-xs font-bold text-center py-1.5 uppercase tracking-widest">Most Popular</div>
+        {% endif %}
+        <div class="p-6 {{ 'pt-10' if loop.index == 3 else '' }}">
+          {% if plan.image_url %}
+          <img src="{{ plan.image_url }}" alt="{{ plan.name }}" loading="lazy"
+               class="w-full h-32 object-cover rounded-xl mb-4" />
+          {% else %}
+          <div class="text-4xl mb-4">{{ plan.icon }}</div>
           {% endif %}
-          <div class="text-3xl mb-3">
-            {% if plan.image_url %}
-            <img src="{{ plan.image_url }}" alt="{{ plan.name }}" loading="lazy" class="w-12 h-12 object-cover rounded-xl mx-auto border-2" style="border-color:rgba(212,175,55,.3);" />
+          <h3 class="font-display font-bold text-lg text-gray-900 mb-1">{{ plan.name }}</h3>
+          <p class="text-gray-400 text-xs mb-5">{{ plan.description }}</p>
+
+          <div class="flex items-baseline gap-1 mb-1">
+            <span class="text-4xl font-display font-bold text-forest-800">{{ plan.roi_percent }}%</span>
+            <span class="text-gray-400 text-sm">ROI</span>
+          </div>
+          <p class="text-xs text-gray-400 mb-2">Total Return: <span class="font-semibold text-forest-700">{{ plan.total_return }}%</span></p>
+          <p class="text-sm text-gray-500 mb-5">in {{ plan.duration_days }} days</p>
+
+          <div class="text-xs text-gray-400 mb-5">
+            Min: <span class="font-semibold text-gray-700">₦{{ '{:,.0f}'.format(plan.min_amount) }}</span>
+            {% if plan.max_amount %}
+            · Max: <span class="font-semibold text-gray-700">₦{{ '{:,.0f}'.format(plan.max_amount) }}</span>
             {% else %}
-            {{ plan.icon }}
+            · No maximum
             {% endif %}
           </div>
-          <h3 class="font-display font-bold text-white text-base">{{ plan.name }}</h3>
-          <div class="inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold"
-               style="background:rgba(212,175,55,.15);color:#d4af37;border:1px solid rgba(212,175,55,.3);">
-            {{ plan.roi_percent }}% ROI
-          </div>
-        </div>
 
-        <!-- Info rows -->
-        <div class="bg-white dark:bg-gray-900">
-          <div class="flex justify-between items-center px-4 py-3 border-b border-gray-100 dark:border-white/5 text-sm">
-            <span class="text-gray-500 dark:text-gray-400">Period</span>
-            <span class="font-bold text-gray-900 dark:text-white">{{ plan.duration_days }} Days</span>
-          </div>
-          <div class="flex justify-between items-center px-4 py-3 border-b border-gray-100 dark:border-white/5 text-sm">
-            <span class="text-gray-500 dark:text-gray-400">Total Return</span>
-            <span class="font-bold" style="color:#059669;">₦{{ '{:,.0f}'.format(plan.min_amount * plan.total_return / 100) }}</span>
-          </div>
-          <div class="flex justify-between items-center px-4 py-3 text-sm">
-            <span class="text-gray-500 dark:text-gray-400">Price</span>
-            <span class="font-bold" style="color:#d97706;">₦{{ '{:,.0f}'.format(plan.min_amount) }}</span>
-          </div>
-          <div class="px-4 pb-4 pt-1">
-            <a href="{{ url_for('register') }}"
-               class="block text-center w-full py-3 rounded-xl font-bold text-white text-sm transition-all active:scale-95"
-               style="background:linear-gradient(135deg,#d97706,#b45309); box-shadow:0 4px 14px -4px rgba(217,119,6,.4);">
-              Get Started
-            </a>
-          </div>
+          <ul class="space-y-2 mb-6">
+            {% for feature in plan.features %}
+            <li class="flex items-center gap-2 text-xs text-gray-600">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5 text-forest-600 flex-shrink-0"></i>
+              {{ feature }}
+            </li>
+            {% endfor %}
+          </ul>
+
+          <a href="{{ url_for('register') }}" class="block text-center py-3 rounded-xl font-semibold text-sm transition-all
+            {% if loop.index == 3 %}bg-gold-500 hover:bg-gold-600 text-forest-950 shadow-lg{% else %}bg-forest-950 hover:bg-forest-800 text-white{% endif %}">
+            Invest Now
+          </a>
         </div>
       </div>
       {% endfor %}
     </div>
 
-    <div class="text-center mt-10" data-aos="fade-up">
-      <a href="{{ url_for('plans') }}"
-         class="inline-flex items-center gap-2 font-semibold text-sm px-6 py-3 rounded-xl border transition-all hover:-translate-y-0.5"
-         style="border-color:rgba(5,150,105,.3); color:#059669;">
-        View all plan details <i data-lucide="arrow-right" class="w-4 h-4"></i>
+    <div class="text-center mt-10">
+      <a href="{{ url_for('plans') }}" class="inline-flex items-center gap-2 text-forest-700 font-semibold hover:text-forest-900 transition-colors">
+        View full plan details <i data-lucide="arrow-right" class="w-4 h-4"></i>
       </a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     INVESTMENT CALCULATOR  (new — frontend only)
+     Reads the existing `plans` Jinja variable via |tojson.
+     No Flask route, DB call, or backend logic is touched;
+     every number below is computed client-side in JS.
+══════════════════════════════════════════ -->
+<section id="calculator" class="relative py-20 overflow-hidden" style="background:linear-gradient(150deg,#040d09 0%,#06281c 55%,#0a3d26 100%);">
+  <div class="noise-overlay"></div>
+  <div class="blob w-[28rem] h-[28rem] -top-24 -right-24" style="background:#C9A84C;"></div>
+  <div class="blob w-72 h-72 bottom-[-15%] left-[-8%]" style="background:#16a34a;"></div>
+
+  <div class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-12 animate-on-scroll">
+      <span class="inline-block text-xs font-bold text-gold-400 uppercase tracking-widest mb-3">Investment Calculator</span>
+      <h2 class="font-display text-3xl sm:text-4xl font-bold text-white">See What Your Money Could Earn</h2>
+      <p class="text-gray-300 mt-3 max-w-xl mx-auto">Enter an amount and pick a plan — your projected returns update instantly.</p>
+    </div>
+
+    <div class="grid lg:grid-cols-5 gap-6 items-stretch">
+      <!-- Inputs -->
+      <div class="lg:col-span-2 glass rounded-3xl p-7 flex flex-col justify-center">
+        <label for="calc-amount" class="text-xs font-semibold text-white/60 uppercase tracking-widest mb-2 block">Investment Amount</label>
+        <div class="relative mb-6">
+          <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gold-400 font-bold">₦</span>
+          <input id="calc-amount" type="number" inputmode="numeric" step="1000" value="100000"
+                 class="w-full bg-white/5 border border-white/10 focus:border-gold-500 rounded-xl pl-9 pr-4 py-3.5 text-white font-display font-bold text-xl outline-none transition-colors" />
+        </div>
+        <input id="calc-range" type="range" min="1000" max="5000000" step="1000" value="100000"
+               class="w-full accent-gold-500 mb-1" />
+        <p id="calc-amount-hint" class="text-xs text-white/40 mb-6">Min ₦1,000 · Max ₦5,000,000</p>
+
+        <label for="calc-plan" class="text-xs font-semibold text-white/60 uppercase tracking-widest mb-2 block">Select Plan</label>
+        <select id="calc-plan" class="w-full bg-white/5 border border-white/10 focus:border-gold-500 rounded-xl px-4 py-3.5 text-white font-semibold outline-none transition-colors">
+          {% for plan in plans %}
+          <option value="{{ loop.index0 }}">{{ plan.icon }} {{ plan.name }} — {{ plan.roi_percent }}% / {{ plan.duration_days }} days</option>
+          {% endfor %}
+        </select>
+
+        <p id="calc-limit-warning" class="hidden text-xs text-amber-300 mt-3 flex items-center gap-1.5">
+          <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> <span></span>
+        </p>
+      </div>
+
+      <!-- Results -->
+      <div class="lg:col-span-3 glass rounded-3xl p-7">
+        <div class="grid sm:grid-cols-2 gap-4 mb-4">
+          <div class="bg-white/5 rounded-2xl p-5 border border-white/5">
+            <p class="text-xs text-white/50 uppercase tracking-widest mb-2">Expected ROI</p>
+            <p class="font-display font-bold text-3xl text-gold-400"><span id="calc-roi" data-final="0">0</span>%</p>
+          </div>
+          <div class="bg-white/5 rounded-2xl p-5 border border-white/5">
+            <p class="text-xs text-white/50 uppercase tracking-widest mb-2">Maturity Date</p>
+            <p class="font-display font-bold text-xl text-white" id="calc-maturity">—</p>
+          </div>
+          <div class="bg-white/5 rounded-2xl p-5 border border-white/5">
+            <p class="text-xs text-white/50 uppercase tracking-widest mb-2">Daily Profit</p>
+            <p class="font-display font-bold text-2xl text-green-400">₦<span id="calc-daily" data-final="0">0</span></p>
+          </div>
+          <div class="bg-white/5 rounded-2xl p-5 border border-white/5">
+            <p class="text-xs text-white/50 uppercase tracking-widest mb-2">Total Profit</p>
+            <p class="font-display font-bold text-2xl text-green-400">₦<span id="calc-profit" data-final="0">0</span></p>
+          </div>
+        </div>
+
+        <div class="rounded-2xl p-5 flex items-center justify-between" style="background:linear-gradient(135deg,rgba(201,168,76,.18),rgba(201,168,76,.06)); border:1px solid rgba(201,168,76,.3);">
+          <div>
+            <p class="text-xs text-gold-300 uppercase tracking-widest mb-1">Total Return at Maturity</p>
+            <p class="text-white/50 text-xs">Principal + profit, paid to your wallet</p>
+          </div>
+          <p class="font-display font-bold text-3xl text-white">₦<span id="calc-total" data-final="0">0</span></p>
+        </div>
+
+        <a href="{{ url_for('register') }}" class="mt-6 flex items-center justify-center gap-2 w-full bg-gold-500 hover:bg-gold-600 text-forest-950 font-bold py-4 rounded-xl transition-all shadow-xl hover:-translate-y-0.5">
+          Start This Plan <i data-lucide="arrow-right" class="w-5 h-5"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     OUR FARMS  (new — premium gallery, static content)
+══════════════════════════════════════════ -->
+<section class="py-20 bg-white relative overflow-hidden">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-14 animate-on-scroll">
+      <span class="inline-block text-xs font-bold text-gold-600 uppercase tracking-widest mb-3">Verified Operations</span>
+      <h2 class="font-display text-3xl sm:text-4xl font-bold text-gray-900">Our Farms</h2>
+      <p class="text-gray-500 mt-3 max-w-xl mx-auto">Every plan is funded by a real, inspected farm — not a promise. Here's where your money actually works.</p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {% set farms = [
+        ('Rice Farm', '🌾', 'loremflickr.com/800/900/rice,paddy,farm', 'Irrigated paddy fields across Kebbi and Niger states, harvested twice yearly.'),
+        ('Maize Farm', '🌽', 'loremflickr.com/800/900/maize,cornfield,farm', 'High-yield hybrid maize grown on mechanized farmland in Kaduna.'),
+        ('Poultry Farm', '🐔', 'loremflickr.com/800/900/poultry,chicken,farm', 'Broiler and layer houses supplying eggs and meat to regional markets.'),
+        ('Fish Farm', '🐟', 'loremflickr.com/800/900/fish,aquaculture,farm', 'Catfish and tilapia ponds with controlled water quality and feeding cycles.'),
+        ('Greenhouse', '🥬', 'loremflickr.com/800/900/greenhouse,vegetables,farm', 'Climate-controlled greenhouses producing vegetables year-round.'),
+        ('Cattle Ranch', '🐄', 'loremflickr.com/800/900/cattle,ranch,farm', 'Grazing ranches with veterinary oversight across the Middle Belt.'),
+      ] %}
+      {% for name, icon, img, desc in farms %}
+      <div class="group relative rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 animate-on-scroll" style="animation-delay: {{ loop.index0 * 0.1 }}s">
+        <div class="aspect-[4/5] w-full overflow-hidden bg-forest-950">
+          <img src="https://{{ img }}" alt="{{ name }}" loading="lazy"
+               class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" />
+        </div>
+
+        <!-- Glassmorphism overlay -->
+        <div class="absolute inset-0 bg-gradient-to-t from-forest-950 via-forest-950/40 to-transparent"></div>
+
+        <!-- Verified badge -->
+        <div class="absolute top-4 right-4 flex items-center gap-1.5 glass rounded-full pl-2 pr-3 py-1.5">
+          <i data-lucide="badge-check" class="w-3.5 h-3.5 text-gold-400"></i>
+          <span class="text-[11px] font-bold text-white uppercase tracking-wide">Verified Farm</span>
+        </div>
+
+        <!-- Content -->
+        <div class="absolute inset-x-0 bottom-0 p-6">
+          <div class="w-11 h-11 rounded-xl glass flex items-center justify-center text-xl mb-3">{{ icon }}</div>
+          <h3 class="font-display font-bold text-white text-xl mb-1.5">{{ name }}</h3>
+          <p class="text-gray-300 text-sm leading-relaxed opacity-90 group-hover:opacity-100 transition-opacity">{{ desc }}</p>
+        </div>
+      </div>
+      {% endfor %}
     </div>
   </div>
 </section>
@@ -353,6 +473,34 @@
 
 {% include "partials/footer.html" %}
 
+<!-- ══════════════════════════════════════════
+     FLOATING WHATSAPP BUTTON  (new)
+     Number is a Jinja variable with a default fallback, so it can be
+     overridden from the backend later without any template change.
+══════════════════════════════════════════ -->
+{% set whatsapp_number = whatsapp_number|default('2349113469866') %}
+<a href="https://wa.me/{{ whatsapp_number }}?text={{ 'Hi AgroVest, I have a question about investing.'|urlencode }}"
+   target="_blank" rel="noopener"
+   id="whatsapp-fab"
+   class="fixed bottom-6 right-6 z-[998] group flex items-center"
+   aria-label="Chat with AgroVest Support on WhatsApp">
+
+  <!-- Tooltip -->
+  <span class="pointer-events-none mr-3 whitespace-nowrap glass-light text-forest-950 text-xs font-semibold px-3 py-2 rounded-lg shadow-lg opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 hidden sm:block">
+    Chat with AgroVest Support
+  </span>
+
+  <!-- Button -->
+  <span class="relative flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full shadow-2xl transition-transform duration-200 group-hover:scale-110 group-active:scale-95"
+        style="background:#25D366;">
+    <span class="absolute inset-0 rounded-full animate-ping" style="background:#25D366; opacity:0.55; animation-duration:2.2s;"></span>
+    <span class="absolute inset-0 rounded-full" style="box-shadow:0 8px 24px -4px rgba(37,211,102,.6);"></span>
+    <svg viewBox="0 0 32 32" class="relative w-7 h-7 sm:w-8 sm:h-8" fill="white" aria-hidden="true">
+      <path d="M16.001 3C9.096 3 3.5 8.596 3.5 15.5c0 2.393.671 4.63 1.836 6.537L3 29l7.163-2.302A12.44 12.44 0 0 0 16 28.999C22.905 29 28.5 23.404 28.5 16.5S22.905 3 16.001 3Zm.002 22.75a10.2 10.2 0 0 1-5.196-1.42l-.373-.222-4.253 1.366 1.39-4.145-.243-.386a10.19 10.19 0 0 1-1.578-5.443c0-5.646 4.596-10.24 10.253-10.24 5.657 0 10.25 4.594 10.25 10.24 0 5.646-4.593 10.25-10.25 10.25Zm5.612-7.66c-.307-.154-1.816-.897-2.098-1-.281-.103-.486-.154-.69.154-.205.307-.792 1-.972 1.205-.179.205-.358.23-.665.077-.307-.154-1.296-.478-2.469-1.523-.913-.814-1.529-1.818-1.708-2.126-.179-.307-.019-.474.135-.627.138-.138.307-.359.46-.538.154-.18.205-.308.307-.513.103-.205.051-.384-.026-.538-.077-.154-.69-1.663-.945-2.278-.249-.598-.502-.517-.69-.527-.179-.008-.384-.01-.588-.01-.205 0-.538.077-.82.384-.281.307-1.075 1.05-1.075 2.56 0 1.51 1.1 2.97 1.254 3.175.153.205 2.166 3.308 5.25 4.638.734.317 1.306.506 1.753.647.736.234 1.406.201 1.936.122.59-.088 1.816-.742 2.072-1.46.256-.717.256-1.332.179-1.46-.077-.128-.281-.205-.588-.36Z"/>
+    </svg>
+  </span>
+</a>
+
 <script>
   // Counter animation
   function animateCounter(el) {
@@ -391,5 +539,104 @@
     body.classList.toggle('hidden');
     icon.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
   }
+</script>
+
+<!-- ══════════════════════════════════════════
+     INVESTMENT CALCULATOR LOGIC  (new, isolated —
+     does not touch animateCounter/toggleFaq above)
+══════════════════════════════════════════ -->
+<script>
+(function () {
+  const plansData = {{ plans | tojson }};
+  const amountInput = document.getElementById('calc-amount');
+  const rangeInput = document.getElementById('calc-range');
+  const planSelect = document.getElementById('calc-plan');
+  const warningEl = document.getElementById('calc-limit-warning');
+  const hintEl = document.getElementById('calc-amount-hint');
+
+  if (!plansData || !plansData.length || !amountInput || !planSelect) return;
+
+  function animateValue(el, from, to, formatter) {
+    const duration = 700;
+    const start = performance.now();
+    function tick(now) {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = from + (to - from) * eased;
+      el.textContent = formatter(current);
+      el.dataset.final = to;
+      if (progress < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  const money = n => n.toLocaleString('en-NG', { maximumFractionDigits: 0 });
+
+  function formatMaturityDate(days) {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function recalc() {
+    const plan = plansData[Number(planSelect.value)] || plansData[0];
+    let amount = parseFloat(amountInput.value) || 0;
+
+    const min = plan.min_amount || 0;
+    const max = plan.max_amount || null;
+
+    if (warningEl) {
+      if (min && amount < min) {
+        warningEl.classList.remove('hidden');
+        warningEl.querySelector('span').textContent = `Minimum for ${plan.name} is ₦${money(min)}`;
+      } else if (max && amount > max) {
+        warningEl.classList.remove('hidden');
+        warningEl.querySelector('span').textContent = `Maximum for ${plan.name} is ₦${money(max)}`;
+      } else {
+        warningEl.classList.add('hidden');
+      }
+    }
+
+    const roi = plan.roi_percent || 0;
+    const days = plan.duration_days || 1;
+    const totalProfit = amount * (roi / 100);
+    const dailyProfit = totalProfit / days;
+    const totalReturn = amount + totalProfit;
+
+    const roiEl = document.getElementById('calc-roi');
+    const dailyEl = document.getElementById('calc-daily');
+    const profitEl = document.getElementById('calc-profit');
+    const totalEl = document.getElementById('calc-total');
+    const maturityEl = document.getElementById('calc-maturity');
+
+    animateValue(roiEl, parseFloat(roiEl.dataset.final || 0), roi, v => v.toFixed(1).replace(/\.0$/, ''));
+    animateValue(dailyEl, parseFloat(dailyEl.dataset.final || 0), dailyProfit, v => money(Math.round(v)));
+    animateValue(profitEl, parseFloat(profitEl.dataset.final || 0), totalProfit, v => money(Math.round(v)));
+    animateValue(totalEl, parseFloat(totalEl.dataset.final || 0), totalReturn, v => money(Math.round(v)));
+    if (maturityEl) maturityEl.textContent = formatMaturityDate(days);
+
+    if (rangeInput) rangeInput.value = Math.min(amount, Number(rangeInput.max));
+    if (hintEl && (min || max)) {
+      hintEl.textContent = `Min ₦${money(min)} · ${max ? 'Max ₦' + money(max) : 'No maximum'}`;
+    }
+  }
+
+  amountInput.addEventListener('input', recalc);
+  planSelect.addEventListener('change', () => {
+    const plan = plansData[Number(planSelect.value)];
+    if (plan && plan.min_amount && (!amountInput.value || parseFloat(amountInput.value) < plan.min_amount)) {
+      amountInput.value = plan.min_amount;
+    }
+    recalc();
+  });
+  if (rangeInput) {
+    rangeInput.addEventListener('input', () => {
+      amountInput.value = rangeInput.value;
+      recalc();
+    });
+  }
+
+  recalc();
+})();
 </script>
 {% endblock %}
