@@ -62,14 +62,7 @@
   {% endfor %}
 </div>
 
-<!-- ── Profit Growth Chart + Daily Profit Card ── -->
-{% set base_earn = (user.total_earnings if user.total_earnings and user.total_earnings > 0 else 45000) %}
-{% set daily_mult = [0.58, 0.74, 0.62, 0.85, 1.05, 0.79, 0.97] %}
-{% set daily_data = [] %}{% for m in daily_mult %}{% set _ = daily_data.append((base_earn / 30 * m) | round(2)) %}{% endfor %}
-{% set today_profit = daily_data[-1] %}
-{% set prev_profit = daily_data[-2] %}
-{% set profit_change_pct = (((today_profit - prev_profit) / prev_profit * 100) if prev_profit else 0) | round(1) %}
-
+<!-- ── Daily Profit Card ── -->
 <div class="grid mb-6">
   <!-- Daily Profit Card -->
   <div class="bg-gradient-to-br from-forest-900 to-forest-950 rounded-2xl p-6 border border-gold-500/10 relative overflow-hidden shadow-lg flex flex-col max-w-md">
@@ -87,7 +80,7 @@
       </span>
       <div class="mt-auto pt-4 border-t border-white/10 flex items-center justify-between">
         <p class="text-white/40 text-xs">Last updated</p>
-        <p class="text-white/70 text-xs font-medium" id="last-updated">just now</p>
+        <p class="text-white/70 text-xs font-medium" id="last-updated">{{ now_utc | date_fmt('%d %b, %I:%M %p') }} UTC</p>
       </div>
     </div>
   </div>
@@ -181,11 +174,9 @@
     </div>
 
     {% if active_investments %}
-    {% set demo_percents = [72, 45, 88, 33, 60, 55] %}
     <div class="space-y-3">
       {% for inv in active_investments %}
-      {% set pct = demo_percents[loop.index0 % demo_percents|length] %}
-      {% set remaining_days = ((inv.duration_days * (1 - pct/100)) | round(0, 'ceil') | int) if inv.duration_days else 0 %}
+      {% set pct = inv.progress_percent %}
       <div class="border border-gray-100 rounded-xl p-4 hover:border-forest-300 hover:bg-forest-50/30 transition-colors fade-in">
         <div class="flex items-center justify-between mb-3">
           <span class="font-semibold text-gray-900 text-sm">{{ inv.plan_name }}</span>
@@ -200,7 +191,7 @@
                 stroke-dasharray="263.9" stroke-dashoffset="263.9" class="circle-progress" data-pct="{{ pct }}"/>
             </svg>
             <div class="absolute inset-0 flex items-center justify-center">
-              <span class="text-sm font-bold text-forest-900">{{ pct }}%</span>
+              <span class="text-sm font-bold text-forest-900">{{ pct | round(0, 'floor') | int }}%</span>
             </div>
           </div>
           <div class="flex-1 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
@@ -218,12 +209,16 @@
             </div>
             <div>
               <p class="text-gray-400 mb-0.5">Remaining</p>
-              <p class="font-bold text-gray-700">{{ remaining_days }} days</p>
+              <p class="font-bold text-gray-700">{{ inv.remaining_days }} day{{ 's' if inv.remaining_days != 1 else '' }}</p>
             </div>
           </div>
         </div>
 
         <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-50 text-xs">
+          <span class="text-gray-400">Daily profit</span>
+          <span class="font-semibold text-emerald-600">+{{ inv.daily_profit | naira }}/day</span>
+        </div>
+        <div class="flex items-center justify-between mt-1.5 text-xs">
           <span class="text-gray-400">Matures</span>
           <span class="font-semibold text-gray-700">{{ inv.end_date | date_fmt }}</span>
         </div>
@@ -436,14 +431,6 @@ document.querySelectorAll('.circle-progress').forEach(function (circle) {
   const offset = circumference - (circumference * pct / 100);
   setTimeout(function () { circle.style.strokeDashoffset = offset; }, 200);
 });
-
-// ── Last updated timestamp (client-side only) ──
-(function () {
-  const el = document.getElementById('last-updated');
-  if (el) {
-    el.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-})();
 
 // ── Transaction filter tabs (client-side only, no backend calls) ──
 (function () {
