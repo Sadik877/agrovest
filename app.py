@@ -852,8 +852,93 @@ def about():
 def plans():
     return render_template('plans.html')
 
-@app.route('/contact')
+@app.route('/contact', methods=['GET', 'POST'])
 def contact():
+    if request.method == 'POST':
+        full_name = request.form.get('full_name', '').strip()
+        email     = request.form.get('email', '').strip().lower()
+        phone     = request.form.get('phone', '').strip()
+        subject   = request.form.get('subject', '').strip() or 'General Enquiry'
+        message   = request.form.get('message', '').strip()
+        attachment = request.files.get('attachment')
+        has_attachment = bool(attachment and attachment.filename)
+
+        wants_json = (request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
+                      'application/json' in (request.headers.get('Accept') or ''))
+
+        errors = []
+        if not full_name or len(full_name) < 3:
+            errors.append('Please enter your full name (at least 3 characters).')
+        if not email or not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+            errors.append('Enter a valid email address.')
+        if not phone or not re.match(r'^[0-9+\-\s]{7,20}$', phone):
+            errors.append('Enter a valid phone number.')
+        if not subject:
+            errors.append('Please select a subject.')
+        if not message or len(message) < 10:
+            errors.append('Please describe your issue (at least 10 characters).')
+
+        if has_attachment:
+            if not is_allowed_file(attachment.filename):
+                errors.append('Only PNG, JPG, JPEG or PDF files are accepted for the attachment.')
+            else:
+                attachment.stream.seek(0, os.SEEK_END)
+                att_size = attachment.stream.tell()
+                attachment.stream.seek(0)
+                if att_size <= 0:
+                    errors.append('That attachment appears to be empty. Please choose a valid file.')
+                elif att_size > 5 * 1024 * 1024:
+                    errors.append('Attachment is too large. Maximum size is 5MB.')
+
+        if errors:
+            if wants_json:
+                return jsonify({'status': 'validation_error', 'errors': errors}), 400
+            for e in errors:
+                flash(e, 'error')
+            return redirect(url_for('contact'))
+
+        attachment_filename = None
+        if has_attachment:
+            attachment_filename = upload_contact_attachment(attachment)
+            if not attachment_filename:
+                msg = 'We could not process your attachment. Please try again.'
+                if wants_json:
+                    return jsonify({'status': 'error', 'message': msg}), 500
+                flash(msg, 'error')
+                return redirect(url_for('contact'))
+
+        try:
+            current = get_current_user()
+        except Exception:
+            current = None
+
+        created = sb_insert('contact_messages', {
+            'user_id':    current['id'] if current else None,
+            'full_name':  full_name,
+            'email':      email,
+            'phone':      phone,
+            'subject':    subject,
+            'message':    message,
+            'attachment': attachment_filename,
+            'status':     'Unread',
+        })
+
+        if not created:
+            msg = 'We could not send your message right now. Please try again shortly.'
+            if wants_json:
+                return jsonify({'status': 'error', 'message': msg}), 500
+            flash(msg, 'error')
+            return redirect(url_for('contact'))
+
+        notify_admins(f'New contact message from {full_name}: {subject}', 'info')
+        send_contact_confirmation_email(email, full_name)
+
+        if wants_json:
+            return jsonify({'status': 'success',
+                             'message': "We've received your message and will reply within 1 hour."})
+        flash("Message sent! We'll reply to your email within 1 hour.", 'success')
+        return redirect(url_for('contact'))
+
     return render_template('contact.html')
 
 # ─────────────────────────────────────────────
