@@ -1113,12 +1113,31 @@ def deposit():
             flash('Please select a payment method.', 'error')
             return redirect(url_for('deposit'))
 
-        proof_filename = None
-        if proof and proof.filename:
-            if not is_allowed_file(proof.filename):
-                flash('Only PNG, JPG, JPEG, PDF files allowed.', 'error')
-                return redirect(url_for('deposit'))
-            proof_filename = upload_proof(proof)
+        # Payment receipt is mandatory. Every check below is enforced here
+        # server-side regardless of what the frontend already validated,
+        # since a client-side check can always be bypassed.
+        if 'proof' not in request.files or not proof or not proof.filename:
+            flash('A payment receipt is required. Please upload your proof of payment.', 'error')
+            return redirect(url_for('deposit'))
+
+        if not is_allowed_file(proof.filename):
+            flash('Only PNG, JPG, JPEG or PDF files are accepted for the receipt.', 'error')
+            return redirect(url_for('deposit'))
+
+        proof.stream.seek(0, os.SEEK_END)
+        proof_size = proof.stream.tell()
+        proof.stream.seek(0)
+        if proof_size <= 0:
+            flash('That receipt file appears to be empty. Please upload a valid file.', 'error')
+            return redirect(url_for('deposit'))
+        if proof_size > 5 * 1024 * 1024:
+            flash('Receipt file is too large. Maximum size is 5MB.', 'error')
+            return redirect(url_for('deposit'))
+
+        proof_filename = upload_proof(proof)
+        if not proof_filename:
+            flash('We could not process your receipt upload. Please try again.', 'error')
+            return redirect(url_for('deposit'))
 
         reference = 'AGV' + uuid.uuid4().hex[:10].upper()
         created = sb_insert('deposits', {
