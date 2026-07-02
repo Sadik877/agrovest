@@ -1,189 +1,115 @@
 {% extends "base.html" %}
-{% block title %}Investment Plans — AgroVest Pro{% endblock %}
-{% block meta_description %}Choose from AgroVest Pro's agricultural investment plans and earn up to 60% ROI backed by real Nigerian farms.{% endblock %}
+{% block title %}Investment Plans{% endblock %}
 
-{% block body %}
-{% include "partials/navbar.html" %}
+{% block content %}
+<style>
+  @keyframes fadeUp{ from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:translateY(0)} }
+  .fade-up{ animation: fadeUp .5s ease both; }
+  .plan-card{ transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease; }
+  .plan-card:hover{ transform: translateY(-6px); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.18); }
+  .invest-btn{ transition: transform .2s ease, box-shadow .2s ease, filter .2s ease; }
+  .invest-btn:hover{ transform: translateY(-2px); filter: brightness(1.05); box-shadow: 0 10px 24px -6px rgba(212,175,55,0.5); }
+  .glass{ backdrop-filter: blur(10px); }
+</style>
 
 <!-- ── Hero ── -->
-<section class="relative pt-32 pb-16 overflow-hidden" style="background:linear-gradient(145deg,#040d09 0%,#06281c 50%,#0a3d26 100%);">
-  <div class="noise-overlay"></div>
-  <div class="absolute inset-0" style="background:radial-gradient(ellipse at 70% 30%,rgba(212,175,55,.12) 0%,transparent 60%);"></div>
-  <div class="blob w-80 h-80 top-[-10%] left-[-8%]" style="background:#10b981;"></div>
-
-  <div class="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 text-center" data-aos="fade-up">
-    <span class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest mb-5 px-4 py-2 rounded-full"
-          style="background:rgba(212,175,55,.12); color:#d4af37; border:1px solid rgba(212,175,55,.25);">
-      <i data-lucide="package" class="w-3.5 h-3.5"></i> Investment Plans
-    </span>
-    <h1 class="font-display font-bold text-white text-4xl sm:text-5xl leading-tight mb-4">
-      Choose Your <span style="color:#d4af37;">Growth Plan</span>
+<section class="bg-gradient-to-br from-forest-950 via-forest-900 to-forest-950 relative overflow-hidden">
+  <div class="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-gold-500/10 blur-3xl"></div>
+  <div class="absolute -bottom-24 -left-24 w-96 h-96 rounded-full bg-emerald-500/5 blur-3xl"></div>
+  <div class="relative max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20 text-center">
+    <p class="text-gold-400 text-xs sm:text-sm font-bold uppercase tracking-[0.2em] mb-3 fade-up">AgroVest Investment Plans</p>
+    <h1 class="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-white mb-4 fade-up">
+      Grow Your Money with <span class="text-gold-400">Real Agriculture</span>
     </h1>
-    <p class="text-gray-300 text-lg max-w-2xl mx-auto">
-      All plans are backed by verified commercial farms across Nigeria. Transparent returns, real yield.
+    <p class="text-gray-300 text-sm sm:text-base max-w-xl mx-auto fade-up">
+      Choose a plan below. Your price is fixed and clear — invest once, watch your return grow automatically until maturity.
     </p>
-
-    <!-- Quick jump tabs -->
-    <div class="flex flex-wrap justify-center gap-2 mt-8">
-      {% for plan in plans %}
-      <a href="#{{ plan.slug }}"
-         class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all"
-         style="background:rgba(255,255,255,.08); color:#cbd5e1; border:1px solid rgba(255,255,255,.1);"
-         onmouseover="this.style.background='rgba(212,175,55,.18)'; this.style.color='#d4af37'; this.style.borderColor='rgba(212,175,55,.35)';"
-         onmouseout="this.style.background='rgba(255,255,255,.08)'; this.style.color='#cbd5e1'; this.style.borderColor='rgba(255,255,255,.1)';">
-        <span>{{ plan.icon }}</span>
-        {{ plan.name }}
-        <span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:rgba(212,175,55,.2);color:#d4af37;">{{ plan.roi_percent }}%</span>
-      </a>
-      {% endfor %}
-    </div>
   </div>
 </section>
 
-<!-- ── Plan Cards ── -->
-<section class="py-16 bg-gray-50 dark:bg-gray-950">
-  <div class="max-w-2xl mx-auto px-4 sm:px-6 space-y-8">
+<!-- ── Plans Grid ── -->
+<section class="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+  {% if plans %}
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
     {% for plan in plans %}
-    <div id="{{ plan.slug }}"
-         class="rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border border-white dark:border-white/5"
-         data-aos="fade-up" data-aos-delay="{{ loop.index0 * 100 }}">
-
-      <!-- Dark header -->
-      <div class="relative px-6 py-8 text-center"
-           style="background:linear-gradient(145deg,#0d1b2a 0%,#0a1628 60%,#0f2040 100%);">
-        <div class="absolute inset-x-0 top-0 h-px" style="background:linear-gradient(90deg,transparent,rgba(212,175,55,.7),transparent);"></div>
-
-        <!-- Badge for popular -->
-        {% if loop.index == 3 %}
-        <div class="absolute top-4 right-4 text-xs font-bold px-3 py-1 rounded-full"
-             style="background:rgba(212,175,55,.2); color:#d4af37; border:1px solid rgba(212,175,55,.4);">
-          ⭐ Most Popular
-        </div>
+    <div class="plan-card fade-up bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+      <!-- Image / icon banner -->
+      <div class="relative h-40 bg-gradient-to-br from-forest-950 via-forest-900 to-forest-950 flex items-center justify-center overflow-hidden">
+        {% if plan.image_url %}
+        <img src="{{ plan.image_url }}" alt="{{ plan.name }}" class="w-full h-full object-cover" />
+        <div class="absolute inset-0 bg-gradient-to-t from-forest-950/70 via-transparent to-transparent"></div>
+        {% elif plan.icon %}
+        <span class="text-6xl">{{ plan.icon }}</span>
+        {% else %}
+        <i data-lucide="sprout" class="w-12 h-12 text-gold-400"></i>
         {% endif %}
 
-        <!-- Icon / image -->
-        <div class="inline-flex items-center justify-center mb-4">
-          {% if plan.image_url %}
-          <img src="{{ plan.image_url }}" alt="{{ plan.name }}" loading="lazy"
-               class="w-20 h-20 object-cover rounded-2xl shadow-xl border-2"
-               style="border-color:rgba(212,175,55,.4);" />
-          {% else %}
-          <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-xl"
-               style="background:rgba(212,175,55,.12); border:2px solid rgba(212,175,55,.3);">
-            {{ plan.icon }}
-          </div>
-          {% endif %}
-        </div>
-
-        <h2 class="font-display font-bold text-white text-3xl">{{ plan.name }}</h2>
-        {% if plan.description %}
-        <p class="text-slate-400 text-sm mt-2 max-w-sm mx-auto">{{ plan.description }}</p>
-        {% endif %}
-
-        <div class="inline-flex items-center gap-2 mt-4 px-5 py-2 rounded-full text-sm font-bold"
-             style="background:rgba(212,175,55,.15); border:1px solid rgba(212,175,55,.35); color:#d4af37;">
-          <i data-lucide="trending-up" class="w-4 h-4"></i>
-          {{ plan.roi_percent }}% Return on Investment
-        </div>
+        <span class="absolute top-3 right-3 bg-gold-500 text-forest-950 text-xs font-bold px-3 py-1 rounded-full shadow">
+          +₦{{ '{:,.0f}'.format(plan.profit) }} profit
+        </span>
+        <span class="absolute bottom-3 left-3 flex items-center gap-1 bg-black/40 text-white text-xs font-semibold px-2.5 py-1 rounded-full glass">
+          <i data-lucide="clock" class="w-3 h-3"></i> {{ plan.duration_days }} days
+        </span>
       </div>
 
-      <!-- White info rows -->
-      <div class="bg-white dark:bg-gray-900">
-        {% set rows = [
-          ('Plan',             plan.name,                                                       'text-gray-900 dark:text-white', false),
-          ('Investment Period', plan.duration_days|string + ' Days',                           'text-gray-900 dark:text-white', false),
-        ] %}
-
-        <!-- Plan row -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/5">
-          <span class="text-gray-500 dark:text-gray-400 text-sm">Plan</span>
-          <span class="font-bold text-gray-900 dark:text-white text-sm">{{ plan.name }}</span>
-        </div>
-
-        <!-- Investment Period -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/5">
-          <span class="text-gray-500 dark:text-gray-400 text-sm">Investment Period</span>
-          <span class="font-bold text-gray-900 dark:text-white text-sm">{{ plan.duration_days }} Days</span>
-        </div>
-
-        <!-- Daily Return -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/5">
-          <span class="text-gray-500 dark:text-gray-400 text-sm">Daily Return</span>
-          <span class="font-bold text-sm" style="color:#d97706;">
-            ₦{{ '{:,.2f}'.format(plan.min_amount * plan.roi_percent / 100 / plan.duration_days) }}
-          </span>
-        </div>
-
-        <!-- Total Return -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/5">
-          <span class="text-gray-500 dark:text-gray-400 text-sm">Total Return</span>
-          <span class="font-bold text-sm" style="color:#059669;">
-            ₦{{ '{:,.2f}'.format(plan.min_amount * plan.total_return / 100) }}
-          </span>
-        </div>
-
-        <!-- Price -->
-        <div class="flex items-center justify-between px-6 py-4">
-          <span class="text-gray-500 dark:text-gray-400 text-sm">Price</span>
-          <span class="font-bold text-sm" style="color:#d97706;">
-            ₦{{ '{:,.2f}'.format(plan.min_amount) }}
-          </span>
-        </div>
-
-        <!-- Features (collapsed, premium look) -->
-        {% if plan.features %}
-        <div class="px-6 pb-4">
-          <div class="rounded-xl p-4" style="background:rgba(5,150,105,.05); border:1px solid rgba(5,150,105,.12);">
-            <p class="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider mb-3">What's Included</p>
-            <div class="grid grid-cols-1 gap-2">
-              {% for f in plan.features %}
-              <div class="flex items-center gap-2.5 text-sm text-gray-600 dark:text-gray-300">
-                <div class="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
-                     style="background:rgba(5,150,105,.15);">
-                  <i data-lucide="check" class="w-2.5 h-2.5" style="color:#059669;"></i>
-                </div>
-                {{ f }}
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
+      <!-- Body -->
+      <div class="p-6 flex-1 flex flex-col">
+        <h3 class="font-display font-bold text-lg text-gray-900 mb-1">{{ plan.name }}</h3>
+        {% if plan.description %}
+        <p class="text-gray-500 text-sm mb-5">{{ plan.description }}</p>
         {% endif %}
 
-        <!-- CTA -->
-        <div class="px-6 pb-6">
+        <div class="flex items-end justify-between mb-5 pb-5 border-b border-gray-100">
+          <div>
+            <p class="text-gray-400 text-[11px] font-bold uppercase tracking-widest mb-1">Price</p>
+            <p class="text-2xl font-display font-bold text-forest-950">₦{{ '{:,.0f}'.format(plan.price) }}</p>
+          </div>
+          <div class="text-right">
+            <p class="text-gray-400 text-[11px] font-bold uppercase tracking-widest mb-1">Total Return</p>
+            <p class="text-xl font-bold text-emerald-600">₦{{ '{:,.0f}'.format(plan.total_return) }}</p>
+          </div>
+        </div>
+
+        {% if plan.features %}
+        <ul class="space-y-2.5 mb-6">
+          {% for f in plan.features %}
+          <li class="flex items-start gap-2 text-sm text-gray-600">
+            <i data-lucide="check-circle" class="w-4 h-4 text-gold-500 flex-shrink-0 mt-0.5"></i>
+            <span>{{ f }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+
+        <div class="mt-auto">
+          {% if session.user_id %}
+          <form method="POST" action="{{ url_for('invest') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="plan_id" value="{{ plan.id }}">
+            <button type="submit"
+                    class="invest-btn w-full flex items-center justify-center gap-2 bg-gradient-to-r from-gold-500 to-gold-600 text-forest-950 font-bold text-sm py-3.5 rounded-xl shadow-md">
+              Invest Now — ₦{{ '{:,.0f}'.format(plan.price) }}
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </form>
+          {% else %}
           <a href="{{ url_for('login') }}"
-             class="block w-full py-4 rounded-xl font-bold text-base text-white text-center transition-all active:scale-95"
-             style="background:linear-gradient(135deg,#d97706 0%,#b45309 100%); box-shadow:0 8px 24px -6px rgba(217,119,6,.45);">
-            Get Started — ₦{{ '{:,.0f}'.format(plan.min_amount) }}
+             class="invest-btn w-full flex items-center justify-center gap-2 bg-gradient-to-r from-gold-500 to-gold-600 text-forest-950 font-bold text-sm py-3.5 rounded-xl shadow-md">
+            Login to Invest
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
           </a>
+          {% endif %}
         </div>
       </div>
     </div>
     {% endfor %}
-
-    {% if not plans %}
-    <div class="text-center py-24 text-gray-400">
-      <i data-lucide="sprout" class="w-16 h-16 mx-auto mb-4 opacity-20"></i>
-      <p class="font-semibold text-lg">No plans available yet</p>
-    </div>
-    {% endif %}
   </div>
-</section>
-
-<!-- ── Risk Disclaimer ── -->
-<section class="py-8 border-t border-amber-100 dark:border-amber-900/30 bg-amber-50 dark:bg-amber-950/20">
-  <div class="max-w-4xl mx-auto px-4 sm:px-6 flex items-start gap-4">
-    <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"></i>
-    <p class="text-amber-800 dark:text-amber-300 text-sm leading-relaxed">
-      <strong class="font-semibold">Risk Disclosure:</strong>
-      Agricultural investments carry inherent risks including weather events and market fluctuations.
-      Past returns do not guarantee future performance. Only invest amounts you are comfortable keeping
-      locked for the plan duration. Please read our full
-      <a href="#" class="underline font-semibold">Risk Disclosure</a> before investing.
-    </p>
+  {% else %}
+  <div class="bg-white rounded-2xl p-16 text-center border border-gray-100 max-w-lg mx-auto">
+    <i data-lucide="package-search" class="w-12 h-12 text-gray-200 mx-auto mb-4"></i>
+    <p class="text-gray-500 font-medium">No investment plans are available right now.</p>
+    <p class="text-gray-400 text-sm mt-1">Please check back shortly.</p>
   </div>
+  {% endif %}
 </section>
-
-{% include "partials/footer.html" %}
 {% endblock %}
