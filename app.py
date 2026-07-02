@@ -1250,6 +1250,49 @@ def mark_notifications_read():
 # ═════════════════════════════════════════════
 # ADMIN — Dashboard
 # ═════════════════════════════════════════════
+def _get_plan_subscriber_counts():
+    """Count active+completed investments per plan_id in one query
+    (avoids N+1 sb_count calls per plan)."""
+    rows = sb_all('investments', filters=[('status', 'in', ['active', 'completed'])])
+    counts = {}
+    for r in rows:
+        pid = r.get('plan_id')
+        counts[pid] = counts.get(pid, 0) + 1
+    return counts
+
+
+def _get_recent_activity(limit=8):
+    """Build a merged, time-sorted activity feed from existing tables only
+    (users, deposits, withdrawals, investments). Reuses _join_users for
+    display names instead of duplicating that lookup logic."""
+    recent_signups     = sb_all('users', filters=[('is_admin', 'eq', False)],
+                                 order=('created_at', 'desc'), limit=limit)
+    recent_deposits     = _join_users(sb_all('deposits', order=('created_at', 'desc'), limit=limit))
+    recent_withdrawals  = _join_users(sb_all('withdrawals', order=('created_at', 'desc'), limit=limit))
+    recent_investments  = _join_users(sb_all('investments', order=('created_at', 'desc'), limit=limit))
+
+    events = []
+    for u in recent_signups:
+        events.append({'type': 'registration', 'title': 'New user registered',
+                        'description': u.get('full_name', 'Unknown'),
+                        'created_at': u.get('created_at')})
+    for d in recent_deposits:
+        events.append({'type': 'deposit', 'title': f"Deposit — {d.get('status','pending').title()}",
+                        'description': f"{d.get('full_name','Unknown')} · ₦{r2(d.get('amount')):,.2f}",
+                        'created_at': d.get('created_at')})
+    for w in recent_withdrawals:
+        events.append({'type': 'withdrawal', 'title': f"Withdrawal — {w.get('status','pending').title()}",
+                        'description': f"{w.get('full_name','Unknown')} · ₦{r2(w.get('amount')):,.2f}",
+                        'created_at': w.get('created_at')})
+    for inv in recent_investments:
+        events.append({'type': 'investment', 'title': f"Investment — {inv.get('plan_name','Plan')}",
+                        'description': f"{inv.get('full_name','Unknown')} · ₦{r2(inv.get('amount')):,.2f}",
+                        'created_at': inv.get('created_at')})
+
+    events.sort(key=lambda e: e.get('created_at') or '', reverse=True)
+    return events[:limit]
+
+
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
@@ -1257,22 +1300,35 @@ def admin_dashboard():
         stats = {
             'total_users':         sb_count('users',       [('is_admin','eq',False)]),
             'total_invested':      sb_sum('investments',   'amount'),
+            'total_deposits':      sb_sum('deposits',      'amount', [('status','eq','approved')]),
+            'total_withdrawals':   sb_sum('withdrawals',   'amount', [('status','eq','approved')]),
             'pending_deposits':    sb_count('deposits',    [('status','eq','pending')]),
             'pending_withdrawals': sb_count('withdrawals', [('status','eq','pending')]),
             'total_paid_out':      sb_sum('withdrawals',   'amount', [('status','eq','approved')]),
             'active_investments':  sb_count('investments', [('status','eq','active')]),
             'total_plans':         sb_count('plans'),
+            'referral_payout':     sb_sum('referrals',     'commission'),
+            # pending_kyc / today_revenue / monthly_revenue intentionally
+            # omitted — no KYC or platform-revenue data exists in the schema
+            # yet. The template defaults these stat cards to 0 rather than
+            # showing an invented number.
         }
     except Exception as e:
         print(f'Admin stats error: {e}')
-        stats = {k: 0 for k in ['total_users','total_invested','pending_deposits',
+        stats = {k: 0 for k in ['total_users','total_invested','total_deposits',
+                                  'total_withdrawals','pending_deposits',
                                   'pending_withdrawals','total_paid_out',
-                                  'active_investments','total_plans']}
+                                  'active_investments','total_plans','referral_payout']}
     try:
         recent_users = sb_all('users', filters=[('is_admin','eq',False)],
                               order=('created_at','desc'), limit=10)
     except Exception:
         recent_users = []
+    try:
+        all_users = sb_all('users', filters=[('is_admin','eq',False)],
+                           order=('created_at','desc'))
+    except Exception:
+        all_users = []
     try:
         pending_deps = _join_users(
             sb_all('deposits', filters=[('status','eq','pending')],
@@ -1285,9 +1341,26 @@ def admin_dashboard():
                    order=('created_at','desc')))
     except Exception:
         pending_wds = []
+    try:
+        raw_plans = sb_all('plans', order=[('sort_order','asc'),('id','asc')])
+        sub_counts = _get_plan_subscriber_counts()
+        dashboard_plans = []
+        for p in raw_plans:
+            ep = _enrich_plan(p)
+            ep['subscribers'] = sub_counts.get(p['id'], 0)
+            dashboard_plans.append(ep)
+    except Exception as e:
+        print(f'Admin plans error: {e}')
+        dashboard_plans = []
+    try:
+        activities = _get_recent_activity(limit=8)
+    except Exception as e:
+        print(f'Admin activity error: {e}')
+        activities = []
     return render_template('admin/dashboard.html',
-        stats=stats, recent_users=recent_users,
-        pending_deps=pending_deps, pending_wds=pending_wds)
+        stats=stats, recent_users=recent_users, users=all_users,
+        pending_deps=pending_deps, pending_wds=pending_wds,
+        plans=dashboard_plans, activities=activities)
 
 
 def _join_users(rows):
