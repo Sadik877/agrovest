@@ -94,13 +94,17 @@
 
           <!-- Mini plans preview -->
           <div class="space-y-3">
-            {% for plan in plans %}
+            {% for plan in plans[:4] %}
             <div class="flex items-center justify-between glass rounded-lg p-3">
-              <div class="flex items-center gap-2">
-                <span class="text-lg">{{ plan.icon }}</span>
-                <span class="text-sm text-white font-medium">{{ plan.name }}</span>
+              <div class="flex items-center gap-2 min-w-0">
+                {% if plan.image_url %}
+                <img src="{{ plan.image_url }}" alt="{{ plan.name }}" class="w-6 h-6 rounded object-cover flex-shrink-0" />
+                {% else %}
+                <span class="text-lg flex-shrink-0">{{ plan.icon or '🌱' }}</span>
+                {% endif %}
+                <span class="text-sm text-white font-medium truncate">{{ plan.name }}</span>
               </div>
-              <span class="text-gold-400 font-bold text-sm">{{ plan.roi_percent }}% ROI</span>
+              <span class="text-gold-400 font-bold text-sm flex-shrink-0">+₦{{ '{:,.0f}'.format(plan.profit) }}</span>
             </div>
             {% endfor %}
           </div>
@@ -202,25 +206,19 @@
           <img src="{{ plan.image_url }}" alt="{{ plan.name }}" loading="lazy"
                class="w-full h-32 object-cover rounded-xl mb-4" />
           {% else %}
-          <div class="text-4xl mb-4">{{ plan.icon }}</div>
+          <div class="text-4xl mb-4">{{ plan.icon or '🌱' }}</div>
           {% endif %}
           <h3 class="font-display font-bold text-lg text-gray-900 mb-1">{{ plan.name }}</h3>
           <p class="text-gray-400 text-xs mb-5">{{ plan.description }}</p>
 
           <div class="flex items-baseline gap-1 mb-1">
-            <span class="text-4xl font-display font-bold text-forest-800">{{ plan.roi_percent }}%</span>
-            <span class="text-gray-400 text-sm">ROI</span>
+            <span class="text-4xl font-display font-bold text-forest-800">₦{{ '{:,.0f}'.format(plan.price) }}</span>
           </div>
-          <p class="text-xs text-gray-400 mb-2">Total Return: <span class="font-semibold text-forest-700">{{ plan.total_return }}%</span></p>
+          <p class="text-xs text-gray-400 mb-2">Total Return: <span class="font-semibold text-forest-700">₦{{ '{:,.0f}'.format(plan.total_return) }}</span></p>
           <p class="text-sm text-gray-500 mb-5">in {{ plan.duration_days }} days</p>
 
           <div class="text-xs text-gray-400 mb-5">
-            Min: <span class="font-semibold text-gray-700">₦{{ '{:,.0f}'.format(plan.min_amount) }}</span>
-            {% if plan.max_amount %}
-            · Max: <span class="font-semibold text-gray-700">₦{{ '{:,.0f}'.format(plan.max_amount) }}</span>
-            {% else %}
-            · No maximum
-            {% endif %}
+            Profit: <span class="font-semibold text-emerald-600">+₦{{ '{:,.0f}'.format(plan.profit) }}</span>
           </div>
 
           <ul class="space-y-2 mb-6">
@@ -270,34 +268,25 @@
     <div class="grid lg:grid-cols-5 gap-6 items-stretch">
       <!-- Inputs -->
       <div class="lg:col-span-2 glass rounded-3xl p-7 flex flex-col justify-center">
-        <label for="calc-amount" class="text-xs font-semibold text-white/60 uppercase tracking-widest mb-2 block">Investment Amount</label>
-        <div class="relative mb-6">
-          <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gold-400 font-bold">₦</span>
-          <input id="calc-amount" type="number" inputmode="numeric" step="1000" value="100000"
-                 class="w-full bg-white/5 border border-white/10 focus:border-gold-500 rounded-xl pl-9 pr-4 py-3.5 text-white font-display font-bold text-xl outline-none transition-colors" />
-        </div>
-        <input id="calc-range" type="range" min="1000" max="5000000" step="1000" value="100000"
-               class="w-full accent-gold-500 mb-1" />
-        <p id="calc-amount-hint" class="text-xs text-white/40 mb-6">Min ₦1,000 · Max ₦5,000,000</p>
+        <span class="text-xs font-semibold text-white/60 uppercase tracking-widest mb-2 block">Investment Amount</span>
+        <p class="font-display font-bold text-3xl text-gold-400 mb-6" id="calc-price-display">₦0</p>
 
         <label for="calc-plan" class="text-xs font-semibold text-white/60 uppercase tracking-widest mb-2 block">Select Plan</label>
         <select id="calc-plan" class="w-full bg-white/5 border border-white/10 focus:border-gold-500 rounded-xl px-4 py-3.5 text-white font-semibold outline-none transition-colors">
           {% for plan in plans %}
-          <option value="{{ loop.index0 }}">{{ plan.icon }} {{ plan.name }} — {{ plan.roi_percent }}% / {{ plan.duration_days }} days</option>
+          <option value="{{ loop.index0 }}">{{ plan.icon or '🌱' }} {{ plan.name }} — ₦{{ '{:,.0f}'.format(plan.price) }}</option>
           {% endfor %}
         </select>
 
-        <p id="calc-limit-warning" class="hidden text-xs text-amber-300 mt-3 flex items-center gap-1.5">
-          <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> <span></span>
-        </p>
+        <p class="text-xs text-white/40 mt-3">Every plan has a fixed price — pick one to see its exact return.</p>
       </div>
 
       <!-- Results -->
       <div class="lg:col-span-3 glass rounded-3xl p-7">
         <div class="grid sm:grid-cols-2 gap-4 mb-4">
           <div class="bg-white/5 rounded-2xl p-5 border border-white/5">
-            <p class="text-xs text-white/50 uppercase tracking-widest mb-2">Expected ROI</p>
-            <p class="font-display font-bold text-3xl text-gold-400"><span id="calc-roi" data-final="0">0</span>%</p>
+            <p class="text-xs text-white/50 uppercase tracking-widest mb-2">Price</p>
+            <p class="font-display font-bold text-3xl text-gold-400">₦<span id="calc-roi" data-final="0">0</span></p>
           </div>
           <div class="bg-white/5 rounded-2xl p-5 border border-white/5">
             <p class="text-xs text-white/50 uppercase tracking-widest mb-2">Maturity Date</p>
@@ -548,13 +537,10 @@
 <script>
 (function () {
   const plansData = {{ plans | tojson }};
-  const amountInput = document.getElementById('calc-amount');
-  const rangeInput = document.getElementById('calc-range');
   const planSelect = document.getElementById('calc-plan');
-  const warningEl = document.getElementById('calc-limit-warning');
-  const hintEl = document.getElementById('calc-amount-hint');
+  const priceDisplay = document.getElementById('calc-price-display');
 
-  if (!plansData || !plansData.length || !amountInput || !planSelect) return;
+  if (!plansData || !plansData.length || !planSelect) return;
 
   function animateValue(el, from, to, formatter) {
     const duration = 700;
@@ -580,61 +566,29 @@
 
   function recalc() {
     const plan = plansData[Number(planSelect.value)] || plansData[0];
-    let amount = parseFloat(amountInput.value) || 0;
 
-    const min = plan.min_amount || 0;
-    const max = plan.max_amount || null;
-
-    if (warningEl) {
-      if (min && amount < min) {
-        warningEl.classList.remove('hidden');
-        warningEl.querySelector('span').textContent = `Minimum for ${plan.name} is ₦${money(min)}`;
-      } else if (max && amount > max) {
-        warningEl.classList.remove('hidden');
-        warningEl.querySelector('span').textContent = `Maximum for ${plan.name} is ₦${money(max)}`;
-      } else {
-        warningEl.classList.add('hidden');
-      }
-    }
-
-    const roi = plan.roi_percent || 0;
+    const price = plan.price || 0;
+    const totalReturn = plan.total_return || 0;
+    const profit = plan.profit != null ? plan.profit : Math.max(totalReturn - price, 0);
     const days = plan.duration_days || 1;
-    const totalProfit = amount * (roi / 100);
-    const dailyProfit = totalProfit / days;
-    const totalReturn = amount + totalProfit;
+    const dailyProfit = profit / days;
 
-    const roiEl = document.getElementById('calc-roi');
+    if (priceDisplay) priceDisplay.textContent = '₦' + money(price);
+
+    const roiEl = document.getElementById('calc-roi');       // now shows Price
     const dailyEl = document.getElementById('calc-daily');
     const profitEl = document.getElementById('calc-profit');
     const totalEl = document.getElementById('calc-total');
     const maturityEl = document.getElementById('calc-maturity');
 
-    animateValue(roiEl, parseFloat(roiEl.dataset.final || 0), roi, v => v.toFixed(1).replace(/\.0$/, ''));
+    animateValue(roiEl, parseFloat(roiEl.dataset.final || 0), price, v => money(Math.round(v)));
     animateValue(dailyEl, parseFloat(dailyEl.dataset.final || 0), dailyProfit, v => money(Math.round(v)));
-    animateValue(profitEl, parseFloat(profitEl.dataset.final || 0), totalProfit, v => money(Math.round(v)));
+    animateValue(profitEl, parseFloat(profitEl.dataset.final || 0), profit, v => money(Math.round(v)));
     animateValue(totalEl, parseFloat(totalEl.dataset.final || 0), totalReturn, v => money(Math.round(v)));
     if (maturityEl) maturityEl.textContent = formatMaturityDate(days);
-
-    if (rangeInput) rangeInput.value = Math.min(amount, Number(rangeInput.max));
-    if (hintEl && (min || max)) {
-      hintEl.textContent = `Min ₦${money(min)} · ${max ? 'Max ₦' + money(max) : 'No maximum'}`;
-    }
   }
 
-  amountInput.addEventListener('input', recalc);
-  planSelect.addEventListener('change', () => {
-    const plan = plansData[Number(planSelect.value)];
-    if (plan && plan.min_amount && (!amountInput.value || parseFloat(amountInput.value) < plan.min_amount)) {
-      amountInput.value = plan.min_amount;
-    }
-    recalc();
-  });
-  if (rangeInput) {
-    rangeInput.addEventListener('input', () => {
-      amountInput.value = rangeInput.value;
-      recalc();
-    });
-  }
+  planSelect.addEventListener('change', recalc);
 
   recalc();
 })();
