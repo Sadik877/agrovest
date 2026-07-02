@@ -116,7 +116,7 @@
     <p class="font-bold text-gray-900 mb-1">I've made the transfer</p>
     <p class="text-sm text-gray-500 mb-5">Upload your payment receipt to confirm your deposit.</p>
 
-    <form method="POST" action="{{ url_for('deposit') }}" enctype="multipart/form-data" class="space-y-4">
+    <form method="POST" action="{{ url_for('deposit') }}" enctype="multipart/form-data" class="space-y-4" onsubmit="return validateSubmit(event)">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="amount" id="form-amount">
       <input type="hidden" name="payment_method" id="form-method">
@@ -146,6 +146,7 @@
           <p class="text-xs text-gray-400 mt-1">Click to change file</p>
         </div>
       </div>
+      <p id="file-error" class="hidden text-xs text-red-600 font-semibold mt-1 px-1" role="alert"></p>
       <input
         type="file"
         name="proof"
@@ -154,11 +155,13 @@
         class="hidden"
         onchange="handleFileSelect(this)"
         aria-label="Payment receipt file"
+        required
       />
 
       <button
         type="submit"
         id="submit-btn"
+        disabled
         class="w-full bg-gradient-to-r from-forest-950 to-forest-800 hover:from-forest-900 hover:to-forest-700 text-white font-bold py-4 rounded-2xl transition-all duration-200 text-base shadow-lg shadow-forest-950/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-forest-500 focus:ring-offset-2"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -334,12 +337,69 @@
   }
 
   // ─── File upload ──────────────────────────────────────────────────
+  const ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'pdf'];
+  const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB
+
+  function resetUploadUI() {
+    document.getElementById('upload-idle').classList.remove('hidden');
+    document.getElementById('upload-selected').classList.add('hidden');
+    document.getElementById('submit-btn').disabled = true;
+  }
+
+  function showFileError(message) {
+    const errorEl = document.getElementById('file-error');
+    errorEl.textContent = message;
+    errorEl.classList.remove('hidden');
+  }
+
+  function clearFileError() {
+    document.getElementById('file-error').classList.add('hidden');
+  }
+
   function handleFileSelect(input) {
     const file = input.files[0];
-    if (!file) return;
+
+    if (!file) {
+      resetUploadUI();
+      showFileError('Please select a receipt to continue.');
+      return;
+    }
+
+    const ext = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      input.value = '';
+      resetUploadUI();
+      showFileError('Only JPG, JPEG, PNG or PDF files are accepted.');
+      return;
+    }
+
+    if (file.size > MAX_FILE_BYTES) {
+      input.value = '';
+      resetUploadUI();
+      showFileError('That file is too large. Maximum size is 5MB.');
+      return;
+    }
+
+    // Valid receipt selected
+    clearFileError();
     document.getElementById('upload-idle').classList.add('hidden');
     document.getElementById('upload-selected').classList.remove('hidden');
     document.getElementById('file-name').textContent = file.name;
+    document.getElementById('submit-btn').disabled = false;
+  }
+
+  // Final guard at submit time — the real enforcement is server-side in
+  // the /dashboard/deposit route, this just avoids an unnecessary round trip.
+  function validateSubmit(event) {
+    const input = document.getElementById('proof-file');
+    const file = input.files[0];
+    if (!file || !ALLOWED_EXTENSIONS.includes(file.name.split('.').pop().toLowerCase()) || file.size > MAX_FILE_BYTES) {
+      event.preventDefault();
+      showFileError('A valid payment receipt (JPG, JPEG, PNG or PDF, max 5MB) is required before you can submit.');
+      document.getElementById('drop-zone').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
+    }
+    return true;
   }
 
   // Drag and drop
