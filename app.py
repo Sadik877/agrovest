@@ -247,6 +247,21 @@ def notify(user_id, message, ntype='info'):
     sb_insert('notifications', {'user_id': user_id, 'message': message, 'type': ntype})
 
 
+def notify_bulk(user_ids, message, ntype='info'):
+    """Insert one notification row per user in a single batched request —
+    used for admin broadcast notifications so sending to every user costs
+    one round trip instead of N calls to notify()."""
+    user_ids = list(user_ids or [])
+    if not user_ids:
+        return 0
+    rows = [{'user_id': uid, 'message': message, 'type': ntype} for uid in user_ids]
+    def _run():
+        r = get_sb().table('notifications').insert(rows).execute()
+        return len(r.data or [])
+    ok, result = _with_retry(_run, 'notify_bulk', retries=0)
+    return result if ok else 0
+
+
 def sb_adjust_balance(user_id, balance_delta=0, total_invested_delta=0,
                        total_earnings_delta=0, referral_earnings_delta=0,
                        require_sufficient_balance=False):
@@ -1386,6 +1401,48 @@ def _join_users(rows):
             'full_name': u.get('full_name', 'Unknown'),
             'email':     u.get('email', '—')})
     return result
+
+
+@app.route('/admin/notifications/send', methods=['POST'])
+@admin_required
+@csrf.exempt
+# Exempt rather than requiring a CSRF token in the fetch() call: this is a
+# JSON POST (Content-Type: application/json), which browsers refuse to send
+# cross-origin without a CORS preflight — and this app sends no CORS headers,
+# so a third-party site can't trigger this request in the first place. Still
+# guarded by @admin_required (session auth), same as every other admin route.
+def admin_send_notification():
+    """Backs the dashboard's 'Send Notification' panel. Sends either to a
+    single selected user or broadcasts to every non-admin user, reusing
+    notify()/notify_bulk() so this creates rows exactly like every other
+    notification in the app — same table, same shape, same bell dropdown."""
+    data = request.get_json(silent=True) or {}
+    title          = (data.get('title') or '').strip()
+    message        = (data.get('message') or '').strip()
+    ntype          = (data.get('type') or 'info').strip() or 'info'
+    recipient_mode = data.get('recipient_mode') or 'all'
+    target_user    = data.get('user') or {}
+
+    if not title or not message:
+        return jsonify({'status': 'error', 'error': 'Title and message are required.'}), 400
+
+    # The notifications table only has a `message` column (no separate
+    # `title`) — reusing it as-is rather than adding a column, so the title
+    # is folded into the stored message text.
+    full_message = f'{title}: {message}'
+
+    if recipient_mode == 'single':
+        uid = target_user.get('id')
+        if not uid:
+            return jsonify({'status': 'error', 'error': 'No recipient selected.'}), 400
+        if not sb_one('users', [('id', 'eq', uid)]):
+            return jsonify({'status': 'error', 'error': 'User not found.'}), 404
+        notify(uid, full_message, ntype)
+        return jsonify({'status': 'ok', 'sent_count': 1})
+
+    recipients = sb_all('users', filters=[('is_admin', 'eq', False)])
+    sent_count = notify_bulk([u['id'] for u in recipients], full_message, ntype)
+    return jsonify({'status': 'ok', 'sent_count': sent_count})
 
 
 # ═════════════════════════════════════════════
