@@ -506,6 +506,93 @@ def resolve_proof_url(proof_filename):
             return None
     return url_for('uploaded_file', filename=proof_filename)
 
+def upload_contact_attachment(file_storage):
+    """Save an uploaded contact-support attachment (receipt/screenshot/PDF).
+    Same Supabase Storage → local-disk fallback pattern as upload_proof().
+    Returns the value to store in contact_messages.attachment, or None.
+    """
+    ext = file_storage.filename.rsplit('.', 1)[-1].lower()
+    stored_name = f"contact_{uuid.uuid4().hex}.{ext}"
+
+    if USE_SUPABASE_STORAGE:
+        try:
+            content_type = {
+                'png': 'image/png', 'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg', 'pdf': 'application/pdf',
+            }.get(ext, 'application/octet-stream')
+            file_bytes = file_storage.read()
+            get_sb().storage.from_(CONTACT_ATTACHMENTS_BUCKET).upload(
+                stored_name, file_bytes, file_options={'content-type': content_type})
+            return f"sb:{stored_name}"
+        except Exception as e:
+            print(f"⚠ Supabase Storage contact-attachment upload failed, falling back to local disk: {e}")
+            try:
+                file_storage.stream.seek(0)
+            except Exception:
+                pass
+
+    file_storage.save(os.path.join(app.config['UPLOAD_FOLDER'], stored_name))
+    return stored_name
+
+
+def resolve_contact_attachment_url(attachment_filename):
+    """Turn a stored contact_messages.attachment value into a viewable URL (or None)."""
+    if not attachment_filename:
+        return None
+    if attachment_filename.startswith('sb:'):
+        path = attachment_filename[3:]
+        try:
+            res = get_sb().storage.from_(CONTACT_ATTACHMENTS_BUCKET).create_signed_url(path, 3600)
+            return res.get('signedURL') or res.get('signedUrl') or res.get('signed_url')
+        except Exception as e:
+            print(f'resolve_contact_attachment_url error: {e}')
+            return None
+    return url_for('uploaded_file', filename=attachment_filename)
+
+
+def notify_admins(message, ntype='info'):
+    """Fan a notification out to every admin user. Reuses the existing
+    notify()/notifications table — just targets every is_admin=True user_id
+    instead of a single one, so the current admin bell/notification UI picks
+    it up with zero changes.
+    """
+    try:
+        admins = sb_all('users', filters=[('is_admin', 'eq', True)])
+        for admin in admins:
+            notify(admin['id'], message, ntype)
+    except Exception as e:
+        print(f'notify_admins error: {e}')
+
+
+def send_contact_confirmation_email(to_email, full_name):
+    """Send the 'We've received your message' confirmation email.
+
+    NOTE: app.py has no existing email-sending integration (no SMTP/provider
+    configured anywhere in the codebase), so per your instructions this is a
+    safe no-op placeholder rather than a new email system — it does not send
+    anything yet. Once you add a provider (SMTP, Resend, SendGrid, etc.),
+    fill this in; the route below already calls it with the right subject.
+    """
+    subject = "We've received your message"
+    print(f"[contact] would send '{subject}' to {to_email} for {full_name} "
+          f"— no email provider configured yet.")
+    return False
+
+
+def get_contact_stats():
+    """Stats for the future admin support inbox."""
+    return {
+        'total_messages':   sb_count('contact_messages'),
+        'unread_messages':  sb_count('contact_messages', [('status', 'eq', 'Unread')]),
+        'read_messages':    sb_count('contact_messages', [('status', 'eq', 'Read')]),
+        'replied_messages': sb_count('contact_messages', [('status', 'eq', 'Replied')]),
+    }
+
+
+def get_recent_contact_messages(limit=10):
+    """Recent messages for the future admin support inbox."""
+    return sb_all('contact_messages', order=('created_at', 'desc'), limit=limit)
+
 
 def is_allowed_plan_image(filename):
     return '.' in filename and filename.rsplit('.', 1)[-1].lower() in PLAN_IMAGE_EXTENSIONS
