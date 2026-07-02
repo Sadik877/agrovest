@@ -67,6 +67,7 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
 PLAN_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 USE_SUPABASE_STORAGE = os.environ.get('USE_SUPABASE_STORAGE', '').strip().lower() == 'true'
 SUPABASE_STORAGE_BUCKET = os.environ.get('SUPABASE_STORAGE_BUCKET', 'deposit-proofs').strip()
+CONTACT_ATTACHMENTS_BUCKET = os.environ.get('CONTACT_ATTACHMENTS_BUCKET', 'contact-attachments').strip()
 PLAN_IMAGES_BUCKET = os.environ.get('PLAN_IMAGES_BUCKET', 'plan-images').strip()
 REFERRAL_COMMISSION = 5  # percent
 
