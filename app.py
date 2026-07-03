@@ -647,32 +647,12 @@ def resolve_plan_image_url(image_filename):
 # ─────────────────────────────────────────────
 # Database Initializer — runs SQL via Supabase RPC
 # We create tables using Supabase Dashboard SQL editor instead.
-# This just seeds admin + default plans if missing.
+# This just seeds the admin account if missing. Plans are NEVER
+# auto-created — they exist only if an admin creates them via
+# Admin → Plans → Add Plan, and a deleted plan stays deleted
+# across restarts/redeploys.
 # ─────────────────────────────────────────────
 def init_db():
-    default_plans = [
-        {'name': 'Starter Farm',
-         'description': 'Perfect entry point for new agricultural investors.',
-         'price': 10000, 'total_return': 11500, 'duration_days': 30,
-         'features': 'Daily profit updates|Email notifications|Basic support',
-         'sort_order': 1, 'is_active': True},
-        {'name': 'Green Harvest',
-         'description': 'Mid-range plan with diversified crop investments.',
-         'price': 50000, 'total_return': 62500, 'duration_days': 45,
-         'features': 'Daily profit updates|Priority support|Monthly reports|Referral bonus',
-         'sort_order': 2, 'is_active': True},
-        {'name': 'Premium Agro',
-         'description': 'Premium returns from large-scale farming operations.',
-         'price': 200000, 'total_return': 280000, 'duration_days': 60,
-         'features': 'Daily profit updates|24/7 VIP support|Weekly reports|Higher referral bonus|Early withdrawal option',
-         'sort_order': 3, 'is_active': True},
-        {'name': 'Elite Farm',
-         'description': 'Elite tier for serious investors seeking maximum returns.',
-         'price': 1000000, 'total_return': 1600000, 'duration_days': 90,
-         'features': 'Daily profit updates|Dedicated account manager|Daily reports|Maximum referral bonus|Flexible withdrawal|Farm visit opportunity',
-         'sort_order': 4, 'is_active': True},
-    ]
-
     # Ride out the brief DNS/network window right after a fresh deploy or
     # restart, before retrying anything that needs real DB access below.
     connected = False
@@ -708,24 +688,6 @@ def init_db():
             })
             print("✓ Admin user seeded" if admin else
                   "⚠ Admin user seed FAILED — will retry on next restart")
-
-        # Seed default plans one-by-one (not "only if the table is totally
-        # empty") so a partial failure on a previous attempt gets healed
-        # automatically instead of leaving the platform permanently short
-        # a plan or two.
-        seeded, failed = 0, 0
-        for p in default_plans:
-            if not sb_one('plans', [('name', 'eq', p['name'])]):
-                if sb_insert('plans', p):
-                    seeded += 1
-                else:
-                    failed += 1
-        if seeded:
-            print(f"✓ {seeded} plan(s) seeded")
-        if failed:
-            print(f"⚠ {failed} plan(s) FAILED to seed — will retry on next restart")
-        if not seeded and not failed:
-            print("✓ Plans already seeded")
 
         print("✓ Database ready")
     except Exception as e:
