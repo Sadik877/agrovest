@@ -24,6 +24,7 @@
     </p>
 
     <!-- Quick jump tabs -->
+    {% if plans %}
     <div class="flex flex-wrap justify-center gap-2 mt-8">
       {% for plan in plans %}
       <a href="#plan-{{ plan.id }}"
@@ -43,6 +44,7 @@
       </a>
       {% endfor %}
     </div>
+    {% endif %}
   </div>
 </section>
 
@@ -173,9 +175,10 @@
     {% endfor %}
 
     {% if not plans %}
-    <div class="text-center py-24 text-gray-400">
-      <i data-lucide="sprout" class="w-16 h-16 mx-auto mb-4 opacity-20"></i>
+    <div class="text-center py-10 text-gray-400">
+      <i data-lucide="sprout" class="w-12 h-12 mx-auto mb-3 opacity-20"></i>
       <p class="font-semibold text-lg">No plans available yet</p>
+      <p class="text-sm text-gray-400 mt-1">Check back soon — new investment plans are added regularly.</p>
     </div>
     {% endif %}
   </div>
