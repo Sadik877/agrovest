@@ -25,6 +25,51 @@
 
   .no-scrollbar::-webkit-scrollbar{display:none}
   .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+
+  /* ── Mobile safety net ────────────────────────────────────────────
+     Scoped to this dashboard content block only, and only below the
+     `lg` breakpoint — desktop layout is untouched. Belt-and-braces on
+     top of the two real min-w-0 fixes above: guarantees every card
+     (stat cards, wallet card, active-investments, transactions,
+     referral banner, badges, leaderboard) can never render wider than
+     the viewport, stays centered, and keeps consistent spacing even
+     if a future edit reintroduces an unshrinkable flex/grid child. */
+  @media (max-width: 1023px) {
+    #dashboard-mobile-safe,
+    #dashboard-mobile-safe * {
+      box-sizing: border-box;
+    }
+    #dashboard-mobile-safe {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+    #dashboard-mobile-safe > * {
+      width: 100%;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    #dashboard-mobile-safe img,
+    #dashboard-mobile-safe svg {
+      max-width: 100%;
+      height: auto;
+    }
+    /* Bring the white/dark rounded-2xl cards to 16-20px padding on
+       small phones instead of the desktop 24px (p-6), without
+       touching the Tailwind classes that drive desktop spacing. */
+    @media (max-width: 420px) {
+      #dashboard-mobile-safe .rounded-2xl {
+        padding: 18px;
+      }
+    }
+    /* Smoother native-feeling momentum scroll for the horizontally
+       scrollable referral table and filter-pill row. */
+    #dashboard-mobile-safe .overflow-x-auto,
+    #dashboard-mobile-safe .no-scrollbar {
+      -webkit-overflow-scrolling: touch;
+    }
+  }
 </style>
 
 <!-- Shared SVG gradient for circular progress rings -->
@@ -36,6 +81,8 @@
     </linearGradient>
   </defs>
 </svg>
+
+<div id="dashboard-mobile-safe">
 
 <!-- ── Stat Cards ── -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -105,7 +152,7 @@
 
       <div class="flex-shrink-0 w-full lg:w-auto">
         <div class="bg-white/10 rounded-xl px-4 py-3 flex items-center gap-2 mb-3">
-          <code class="text-gold-400 text-sm font-mono truncate flex-1" id="ref-code">{{ request.host_url }}register?ref={{ user.referral_code }}</code>
+          <code class="text-gold-400 text-sm font-mono truncate flex-1 min-w-0" id="ref-code">{{ request.host_url }}register?ref={{ user.referral_code }}</code>
           <button onclick="copyRef()" class="text-gray-300 hover:text-white transition-colors flex-shrink-0">
             <i data-lucide="copy" class="w-4 h-4"></i>
           </button>
@@ -194,7 +241,7 @@
               <span class="text-sm font-bold text-forest-900">{{ pct | round(0, 'floor') | int }}%</span>
             </div>
           </div>
-          <div class="flex-1 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+          <div class="flex-1 min-w-0 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
             <div>
               <p class="text-gray-400 mb-0.5">Invested</p>
               <p class="font-bold text-gray-900">{{ inv.amount | naira }}</p>
@@ -423,6 +470,8 @@
   {% endif %}
 </div>
 
+</div>
+
 <script>
 // ── Circular progress ring animation ──
 document.querySelectorAll('.circle-progress').forEach(function (circle) {
@@ -482,21 +531,7 @@ function copyRef() {
 // Build share-intent links client-side from the existing referral code (no backend calls)
 (function() {
   const refUrl = document.getElementById('ref-code').textContent.trim();
-  const message = `🌱 Start Growing Your Money with AgroVest!
-
-Invest in verified Nigerian agricultural projects and enjoy reliable daily returns.
-
-✅ Investment Plans from ₦3,000
-💰 Daily Profit
-🔒 Secure Platform
-⚡ Fast Withdrawals
-🎁 Referral Rewards
-
-🚀 Create your FREE account today using my invitation:
-
-${refUrl}
-
-AgroVest — Growing Wealth Through Agriculture.`;
+  const message = "Join me and start growing your money — sign up here: " + refUrl;
 
   const wa = document.getElementById('share-whatsapp');
   if (wa) wa.href = "https://wa.me/?text=" + encodeURIComponent(message);
