@@ -51,14 +51,14 @@
     <!-- Quick jump tabs -->
     <div class="flex flex-wrap justify-center gap-2 mt-8 max-w-full">
       {% for plan in plans %}
-      <a href="#{{ plan.slug }}"
+      <a href="#{{ plan.slug|default(plan.name|lower|replace(' ', '-'), true) }}"
          class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all max-w-full"
          style="background:rgba(255,255,255,.08); color:#cbd5e1; border:1px solid rgba(255,255,255,.1);"
          onmouseover="this.style.background='rgba(212,175,55,.18)'; this.style.color='#d4af37'; this.style.borderColor='rgba(212,175,55,.35)';"
          onmouseout="this.style.background='rgba(255,255,255,.08)'; this.style.color='#cbd5e1'; this.style.borderColor='rgba(255,255,255,.1)';">
-        <span>{{ plan.icon }}</span>
+        <span>{{ plan.icon|default('🌱', true) }}</span>
         {{ plan.name }}
-        <span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:rgba(212,175,55,.2);color:#d4af37;">{{ plan.roi_percent }}%</span>
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:rgba(212,175,55,.2);color:#d4af37;">{{ '%.0f'|format((plan.profit / plan.price * 100) if plan.price else 0) }}%</span>
       </a>
       {% endfor %}
     </div>
@@ -69,7 +69,7 @@
 <section class="py-16 bg-gray-50 dark:bg-gray-950">
   <div class="max-w-2xl mx-auto px-4 sm:px-6 space-y-8">
     {% for plan in plans %}
-    <div id="{{ plan.slug }}"
+    <div id="{{ plan.slug|default(plan.name|lower|replace(' ', '-'), true) }}"
          class="rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border border-white dark:border-white/5">
 
       <!-- Dark header -->
@@ -94,7 +94,7 @@
           {% else %}
           <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-xl"
                style="background:rgba(212,175,55,.12); border:2px solid rgba(212,175,55,.3);">
-            {{ plan.icon }}
+            {{ plan.icon|default('🌱', true) }}
           </div>
           {% endif %}
         </div>
@@ -107,7 +107,7 @@
         <div class="inline-flex items-center gap-2 mt-4 px-5 py-2 rounded-full text-sm font-bold"
              style="background:rgba(212,175,55,.15); border:1px solid rgba(212,175,55,.35); color:#d4af37;">
           <i data-lucide="trending-up" class="w-4 h-4"></i>
-          {{ plan.roi_percent }}% Return on Investment
+          {{ '%.0f'|format((plan.profit / plan.price * 100) if plan.price else 0) }}% Return on Investment
         </div>
       </div>
 
@@ -130,7 +130,7 @@
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/5">
           <span class="text-gray-500 dark:text-gray-400 text-sm">Daily Return</span>
           <span class="font-bold text-sm" style="color:#d97706;">
-            ₦{{ '{:,.2f}'.format(plan.min_amount * plan.roi_percent / 100 / plan.duration_days) }}
+            ₦{{ '{:,.2f}'.format(plan.profit / plan.duration_days if plan.duration_days else 0) }}
           </span>
         </div>
 
@@ -138,7 +138,7 @@
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/5">
           <span class="text-gray-500 dark:text-gray-400 text-sm">Total Return</span>
           <span class="font-bold text-sm" style="color:#059669;">
-            ₦{{ '{:,.2f}'.format(plan.min_amount * plan.total_return / 100) }}
+            ₦{{ '{:,.2f}'.format(plan.total_return) }}
           </span>
         </div>
 
@@ -146,7 +146,7 @@
         <div class="flex items-center justify-between px-6 py-4">
           <span class="text-gray-500 dark:text-gray-400 text-sm">Price</span>
           <span class="font-bold text-sm" style="color:#d97706;">
-            ₦{{ '{:,.2f}'.format(plan.min_amount) }}
+            ₦{{ '{:,.2f}'.format(plan.price) }}
           </span>
         </div>
 
@@ -178,7 +178,7 @@
             <button type="submit"
                     class="block w-full py-4 rounded-xl font-bold text-base text-white text-center transition-all active:scale-95"
                     style="background:linear-gradient(135deg,#d97706 0%,#b45309 100%); box-shadow:0 8px 24px -6px rgba(217,119,6,.45); cursor:pointer; border:none;">
-              Get Started — ₦{{ '{:,.0f}'.format(plan.min_amount) }}
+              Get Started — ₦{{ '{:,.0f}'.format(plan.price) }}
             </button>
           </form>
         </div>
