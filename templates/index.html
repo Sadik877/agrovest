@@ -331,6 +331,168 @@
 
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
       {% set farms = [
+        ('Rice Farm', '🌾', 'rice-farm.jpg', 'Irrigated paddy fields across Kebbi and Niger states, harvested twice yearly.'),
+        ('Maize Farm', '🌽', 'maize-farm.jpg', 'High-yield hybrid maize grown on mechanized farmland in Kaduna.'),
+        ('Poultry Farm', '🐔', 'poultry-farm.jpg', 'Broiler and layer houses supplying eggs and meat to regional markets.'),
+        ('Fish Farm', '🐟', 'fish-farm.jpg', 'Catfish and tilapia ponds with controlled water quality and feeding cycles.'),
+        ('Greenhouse', '🥬', 'greenhouse.jpg', 'Climate-controlled greenhouses producing vegetables year-round.'),
+        ('Cattle Ranch', '🐄', 'cattle-ranch.jpg', 'Grazing ranches with veterinary oversight across the Middle Belt.'),
+      ] %}
+      {% for name, icon, img, desc in farms %}
+      <div class="group relative rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 animate-on-scroll" style="animation-delay: {{ loop.index0 * 0.1 }}s">
+        <div class="aspect-[4/5] w-full overflow-hidden bg-forest-950">
+          <img src="{{ url_for('static', filename='images/farms/' + img) }}" alt="{{ name }}" loading="lazy"
+               class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" />
+        </div>
+
+        <!-- Glassmorphism overlay -->
+        <div class="absolute inset-0 bg-gradient-to-t from-forest-950 via-forest-950/40 to-transparent"></div>
+
+        <!-- Verified badge -->
+        <div class="absolute top-4 right-4 flex items-center gap-1.5 glass rounded-full pl-2 pr-3 py-1.5">
+          <i data-lucide="badge-check" class="w-3.5 h-3.5 text-gold-400"></i>
+          <span class="text-[11px] font-bold text-white uppercase tracking-wide">Verified Farm</span>
+        </div>
+
+        <!-- Content -->
+        <div class="absolute inset-x-0 bottom-0 p-6">
+          <div class="w-11 h-11 rounded-xl glass flex items-center justify-center text-xl mb-3">{{ icon }}</div>
+          <h3 class="font-display font-bold text-white text-xl mb-1.5">{{ name }}</h3>
+          <p class="text-gray-300 text-sm leading-relaxed opacity-90 group-hover:opacity-100 transborder-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-on-scroll {% if loop.index == 3 %}ring-2 ring-gold-500{% endif %}"
+           style="animation-delay: {{ loop.index0 * 0.1 }}s">
+        {% if loop.index == 3 %}
+        <div class="absolute top-0 left-0 right-0 bg-gold-500 text-forest-950 text-xs font-bold text-center py-1.5 uppercase tracking-widest">Most Popular</div>
+        {% endif %}
+        <div class="p-6 {{ 'pt-10' if loop.index == 3 else '' }}">
+          {% if plan.image_url %}
+          <img src="{{ plan.image_url }}" alt="{{ plan.name }}" loading="lazy"
+               class="w-full h-32 object-cover rounded-xl mb-4" />
+          {% else %}
+          <div class="text-4xl mb-4">{{ plan.icon or '🌱' }}</div>
+          {% endif %}
+          <h3 class="font-display font-bold text-lg text-gray-900 mb-1">{{ plan.name }}</h3>
+          <p class="text-gray-400 text-xs mb-5">{{ plan.description }}</p>
+
+          <div class="flex items-baseline gap-1 mb-1">
+            <span class="text-4xl font-display font-bold text-forest-800">₦{{ '{:,.0f}'.format(plan.price) }}</span>
+          </div>
+          <p class="text-xs text-gray-400 mb-2">Total Return: <span class="font-semibold text-forest-700">₦{{ '{:,.0f}'.format(plan.total_return) }}</span></p>
+          <p class="text-sm text-gray-500 mb-5">in {{ plan.duration_days }} days</p>
+
+          <div class="text-xs text-gray-400 mb-5">
+            Profit: <span class="font-semibold text-emerald-600">+₦{{ '{:,.0f}'.format(plan.profit) }}</span>
+          </div>
+
+          <ul class="space-y-2 mb-6">
+            {% for feature in plan.features %}
+            <li class="flex items-center gap-2 text-xs text-gray-600">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5 text-forest-600 flex-shrink-0"></i>
+              {{ feature }}
+            </li>
+            {% endfor %}
+          </ul>
+
+          <a href="{{ url_for('register') }}" class="block text-center py-3 rounded-xl font-semibold text-sm transition-all
+            {% if loop.index == 3 %}bg-gold-500 hover:bg-gold-600 text-forest-950 shadow-lg{% else %}bg-forest-950 hover:bg-forest-800 text-white{% endif %}">
+            Invest Now
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="text-center mt-10">
+      <a href="{{ url_for('plans') }}" class="inline-flex items-center gap-2 text-forest-700 font-semibold hover:text-forest-900 transition-colors">
+        View full plan details <i data-lucide="arrow-right" class="w-4 h-4"></i>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     INVESTMENT CALCULATOR  (new — frontend only)
+     Reads the existing `plans` Jinja variable via |tojson.
+     No Flask route, DB call, or backend logic is touched;
+     every number below is computed client-side in JS.
+══════════════════════════════════════════ -->
+<section id="calculator" class="relative py-20 overflow-hidden" style="background:linear-gradient(150deg,#040d09 0%,#06281c 55%,#0a3d26 100%);">
+  <div class="noise-overlay"></div>
+  <div class="blob w-[28rem] h-[28rem] -top-24 -right-24" style="background:#C9A84C;"></div>
+  <div class="blob w-72 h-72 bottom-[-15%] left-[-8%]" style="background:#16a34a;"></div>
+
+  <div class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-12 animate-on-scroll">
+      <span class="inline-block text-xs font-bold text-gold-400 uppercase tracking-widest mb-3">Investment Calculator</span>
+      <h2 class="font-display text-3xl sm:text-4xl font-bold text-white">See What Your Money Could Earn</h2>
+      <p class="text-gray-300 mt-3 max-w-xl mx-auto">Enter an amount and pick a plan — your projected returns update instantly.</p>
+    </div>
+
+    <div class="grid lg:grid-cols-5 gap-6 items-stretch">
+      <!-- Inputs -->
+      <div class="lg:col-span-2 glass rounded-3xl p-7 flex flex-col justify-center">
+        <span class="text-xs font-semibold text-white/60 uppercase tracking-widest mb-2 block">Investment Amount</span>
+        <p class="font-display font-bold text-3xl text-gold-400 mb-6" id="calc-price-display">₦0</p>
+
+        <label for="calc-plan" class="text-xs font-semibold text-white/60 uppercase tracking-widest mb-2 block">Select Plan</label>
+        <select id="calc-plan" class="w-full bg-white/5 border border-white/10 focus:border-gold-500 rounded-xl px-4 py-3.5 text-white font-semibold outline-none transition-colors">
+          {% for plan in plans %}
+          <option value="{{ loop.index0 }}">{{ plan.icon or '🌱' }} {{ plan.name }} — ₦{{ '{:,.0f}'.format(plan.price) }}</option>
+          {% endfor %}
+        </select>
+
+        <p class="text-xs text-white/40 mt-3">Every plan has a fixed price — pick one to see its exact return.</p>
+      </div>
+
+      <!-- Results -->
+      <div class="lg:col-span-3 glass rounded-3xl p-7">
+        <div class="grid sm:grid-cols-2 gap-4 mb-4">
+          <div class="bg-white/5 rounded-2xl p-5 border border-white/5">
+            <p class="text-xs text-white/50 uppercase tracking-widest mb-2">Price</p>
+            <p class="font-display font-bold text-3xl text-gold-400">₦<span id="calc-roi" data-final="0">0</span></p>
+          </div>
+          <div class="bg-white/5 rounded-2xl p-5 border border-white/5">
+            <p class="text-xs text-white/50 uppercase tracking-widest mb-2">Maturity Date</p>
+            <p class="font-display font-bold text-xl text-white" id="calc-maturity">—</p>
+          </div>
+          <div class="bg-white/5 rounded-2xl p-5 border border-white/5">
+            <p class="text-xs text-white/50 uppercase tracking-widest mb-2">Daily Profit</p>
+            <p class="font-display font-bold text-2xl text-green-400">₦<span id="calc-daily" data-final="0">0</span></p>
+          </div>
+          <div class="bg-white/5 rounded-2xl p-5 border border-white/5">
+            <p class="text-xs text-white/50 uppercase tracking-widest mb-2">Total Profit</p>
+            <p class="font-display font-bold text-2xl text-green-400">₦<span id="calc-profit" data-final="0">0</span></p>
+          </div>
+        </div>
+
+        <div class="rounded-2xl p-5 flex items-center justify-between" style="background:linear-gradient(135deg,rgba(201,168,76,.18),rgba(201,168,76,.06)); border:1px solid rgba(201,168,76,.3);">
+          <div>
+            <p class="text-xs text-gold-300 uppercase tracking-widest mb-1">Total Return at Maturity</p>
+            <p class="text-white/50 text-xs">Principal + profit, paid to your wallet</p>
+          </div>
+          <p class="font-display font-bold text-3xl text-white">₦<span id="calc-total" data-final="0">0</span></p>
+        </div>
+
+        <a href="{{ url_for('register') }}" class="mt-6 flex items-center justify-center gap-2 w-full bg-gold-500 hover:bg-gold-600 text-forest-950 font-bold py-4 rounded-xl transition-all shadow-xl hover:-translate-y-0.5">
+          Start This Plan <i data-lucide="arrow-right" class="w-5 h-5"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     OUR FARMS  (new — premium gallery, static content)
+══════════════════════════════════════════ -->
+<section class="py-20 bg-white relative overflow-hidden">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-14 animate-on-scroll">
+      <span class="inline-block text-xs font-bold text-gold-600 uppercase tracking-widest mb-3">Verified Operations</span>
+      <h2 class="font-display text-3xl sm:text-4xl font-bold text-gray-900">Our Farms</h2>
+      <p class="text-gray-500 mt-3 max-w-xl mx-auto">Every plan is funded by a real, inspected farm — not a promise. Here's where your money actually works.</p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {% set farms = [
         ('Rice Farm', '🌾', 'loremflickr.com/800/900/rice,paddy,farm', 'Irrigated paddy fields across Kebbi and Niger states, harvested twice yearly.'),
         ('Maize Farm', '🌽', 'loremflickr.com/800/900/maize,cornfield,farm', 'High-yield hybrid maize grown on mechanized farmland in Kaduna.'),
         ('Poultry Farm', '🐔', 'loremflickr.com/800/900/poultry,chicken,farm', 'Broiler and layer houses supplying eggs and meat to regional markets.'),
