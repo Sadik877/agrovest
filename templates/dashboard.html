@@ -317,7 +317,7 @@
     </div>
 
     <!-- Filter tabs (JS-only, no backend filtering) -->
-    <div class="flex items-center gap-2 mb-4 overflow-x-auto no-scrollbar" id="txn-filters">
+    <div class="flex flex-wrap items-center gap-2 mb-4" id="txn-filters">
       <button data-filter="all" class="txn-filter-btn active text-xs font-semibold px-3 py-1.5 rounded-full bg-forest-950 text-white whitespace-nowrap">All</button>
       <button data-filter="deposit" class="txn-filter-btn text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">Deposits</button>
       <button data-filter="withdrawal" class="txn-filter-btn text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">Withdrawals</button>
@@ -336,37 +336,37 @@
       {% endif %}
 
       {% for dep in recent_deposits[:4] %}
-      <div class="txn-row flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0" data-type="deposit">
-        <div class="flex items-center gap-3">
+      <div class="txn-row flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 last:border-0" data-type="deposit">
+        <div class="flex items-center gap-3 min-w-0">
           <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
             <i data-lucide="arrow-down-left" class="w-3.5 h-3.5 text-green-600"></i>
           </div>
-          <div>
-            <p class="text-sm font-medium text-gray-900">Deposit</p>
-            <p class="text-xs text-gray-400">{{ dep.created_at | date_fmt }}</p>
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-900 truncate">Deposit</p>
+            <p class="text-xs text-gray-400 truncate">{{ dep.created_at | date_fmt }}</p>
           </div>
         </div>
-        <div class="text-right">
-          <p class="text-sm font-bold text-green-600">+{{ dep.amount | naira }}</p>
-          <span class="{{ dep.status | status_badge }} badge">{{ dep.status.title() }}</span>
+        <div class="text-right flex-shrink-0">
+          <p class="text-sm font-bold text-green-600 whitespace-nowrap">+{{ dep.amount | naira }}</p>
+          <span class="{{ dep.status | status_badge }} badge whitespace-nowrap">{{ dep.status.title() }}</span>
         </div>
       </div>
       {% endfor %}
 
       {% for wd in recent_withdrawals[:3] %}
-      <div class="txn-row flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0" data-type="withdrawal">
-        <div class="flex items-center gap-3">
+      <div class="txn-row flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 last:border-0" data-type="withdrawal">
+        <div class="flex items-center gap-3 min-w-0">
           <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
             <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-red-600"></i>
           </div>
-          <div>
-            <p class="text-sm font-medium text-gray-900">Withdrawal</p>
-            <p class="text-xs text-gray-400">{{ wd.created_at | date_fmt }}</p>
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-gray-900 truncate">Withdrawal</p>
+            <p class="text-xs text-gray-400 truncate">{{ wd.created_at | date_fmt }}</p>
           </div>
         </div>
-        <div class="text-right">
-          <p class="text-sm font-bold text-red-600">-{{ wd.amount | naira }}</p>
-          <span class="{{ wd.status | status_badge }} badge">{{ wd.status.title() }}</span>
+        <div class="text-right flex-shrink-0">
+          <p class="text-sm font-bold text-red-600 whitespace-nowrap">-{{ wd.amount | naira }}</p>
+          <span class="{{ wd.status | status_badge }} badge whitespace-nowrap">{{ wd.status.title() }}</span>
         </div>
       </div>
       {% endfor %}
