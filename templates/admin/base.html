@@ -36,6 +36,7 @@
         ('admin_deposits',   'wallet',           'Deposits'),
         ('admin_withdrawals','banknote',         'Withdrawals'),
         ('admin_investments','trending-up',      'Investments'),
+        ('admin_messages',   'mail',             'Messages'),
       ] %}
       {% for endpoint, icon, label in admin_links %}
       <a href="{{ url_for(endpoint) }}"

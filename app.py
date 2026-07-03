@@ -834,7 +834,7 @@ def check_env():
     elif not url.startswith('https://'):
         errors.append(f'SUPABASE_URL must start with https:// — got: {url[:60]}')
     if not key:
-        missing.append('SUPABASE_SECER_KEY')
+        missing.append('SUPABASE_SECRET_KEY')
     return (len(missing) == 0 and len(errors) == 0), missing, errors
 
 @app.before_request
@@ -1248,6 +1248,9 @@ def invest():
             'daily_profit': daily_profit,
             'last_profit_date': start_dt.isoformat(),
             'total_profit': 0,
+            # Kept for the admin investments table, which still displays a
+            # ROI % column — derived from the plan's fixed price/return.
+            'roi_percent': r2((profit / amount) * 100) if amount else 0,
         })
         if not new_investment:
             rolled_back = sb_adjust_balance(user['id'], balance_delta=amount,
@@ -2025,6 +2028,56 @@ def admin_complete_investment(inv_id):
         else:
             flash('This investment was already processed.', 'warning')
     return redirect(url_for('admin_investments'))
+
+
+# ═════════════════════════════════════════════
+# ADMIN — Contact Support Inbox
+# ═════════════════════════════════════════════
+@app.route('/admin/messages')
+@admin_required
+def admin_messages():
+    messages = sb_all('contact_messages', order=('created_at', 'desc'))
+    for m in messages:
+        m['attachment'] = resolve_contact_attachment_url(m.get('attachment'))
+    stats = get_contact_stats()
+    return render_template('admin/messages.html', messages=messages, stats=stats)
+
+
+@app.route('/admin/messages/<int:msg_id>/read', methods=['POST'])
+@admin_required
+def admin_read_message(msg_id):
+    sb_update('contact_messages', {'status': 'Read'},
+              [('id', 'eq', msg_id), ('status', 'eq', 'Unread')])
+    return redirect(url_for('admin_messages'))
+
+
+@app.route('/admin/messages/<int:msg_id>/reply', methods=['POST'])
+@admin_required
+def admin_reply_message(msg_id):
+    reply = request.form.get('reply', '').strip()
+    msg   = sb_one('contact_messages', [('id', 'eq', msg_id)])
+    if not msg:
+        flash('Message not found.', 'error')
+        return redirect(url_for('admin_messages'))
+    if not reply:
+        flash('Reply cannot be empty.', 'error')
+        return redirect(url_for('admin_messages'))
+
+    updated = sb_update('contact_messages', {
+        'status': 'Replied', 'admin_reply': reply,
+        'replied_at': datetime.utcnow().isoformat(),
+    }, [('id', 'eq', msg_id)])
+
+    if updated:
+        # If the sender has an account, drop them an in-app notification too.
+        acct = sb_one('users', [('email', 'eq', msg['email'])])
+        if acct:
+            notify(acct['id'],
+                   f'Support replied to your message "{msg["subject"]}".', 'info')
+        flash('Reply sent.', 'success')
+    else:
+        flash('Could not save the reply — please try again.', 'error')
+    return redirect(url_for('admin_messages'))
 
 
 # ═════════════════════════════════════════════

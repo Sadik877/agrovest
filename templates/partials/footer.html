@@ -43,8 +43,8 @@
         <h4 class="font-semibold text-gold-400 mb-5 text-sm uppercase tracking-wider">Investment Plans</h4>
         <ul class="space-y-3 text-sm text-gray-400">
           {% for plan in plans %}
-          <li><a href="{{ url_for('plans') }}#{{ plan.slug }}" class="hover:text-gold-400 transition-colors flex items-center gap-2">
-            <span>{{ plan.icon }}</span> {{ plan.name }}
+          <li><a href="{{ url_for('plans') }}" class="hover:text-gold-400 transition-colors flex items-center gap-2">
+            <i data-lucide="sprout" class="w-3.5 h-3.5 text-gold-400 flex-shrink-0"></i> {{ plan.name }}
           </a></li>
           {% endfor %}
         </ul>
