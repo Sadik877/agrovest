@@ -58,15 +58,16 @@
         <p class="text-gray-400 text-sm mb-7">We'll get back to you as soon as possible.</p>
 
         <form id="contact-form" class="space-y-5" onsubmit="handleSubmit(event)">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="grid sm:grid-cols-2 gap-5">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-              <input type="text" required placeholder="Emeka Okonkwo"
+              <input type="text" name="full_name" required placeholder="Emeka Okonkwo"
                 class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
-              <input type="email" required placeholder="emeka@example.com"
+              <input type="email" name="email" required placeholder="emeka@example.com"
                 class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
             </div>
           </div>
@@ -74,12 +75,13 @@
           <div class="grid sm:grid-cols-2 gap-5">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-              <input type="tel" placeholder="0801 234 5678"
+              <input type="tel" name="phone" required placeholder="0801 234 5678"
                 class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Subject</label>
-              <select class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500">
+              <select name="subject"
+                class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500">
                 <option>General Enquiry</option>
                 <option>Investment Plans</option>
                 <option>Deposit Issue</option>
@@ -92,7 +94,7 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Message</label>
-            <textarea required rows="5" placeholder="Describe your question or issue in detail..."
+            <textarea name="message" required rows="5" placeholder="Describe your question or issue in detail..."
               class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500 resize-none"></textarea>
           </div>
 
@@ -101,6 +103,9 @@
             <i data-lucide="send" class="w-4 h-4"></i> Send Message
           </button>
         </form>
+
+        <!-- Error Message (same visual language as the success box, red variant) -->
+        <div id="error-msg" class="hidden mt-4 bg-red-50 border border-red-200 rounded-xl p-5 text-center"></div>
 
         <!-- Success Message -->
         <div id="success-msg" class="hidden mt-4 bg-green-50 border border-green-200 rounded-xl p-5 text-center">
@@ -130,17 +135,56 @@
 {% include "partials/footer.html" %}
 
 <script>
-function handleSubmit(e) {
+async function handleSubmit(e) {
   e.preventDefault();
-  const btn = document.getElementById('submit-btn');
+  const form     = document.getElementById('contact-form');
+  const btn      = document.getElementById('submit-btn');
+  const errorBox = document.getElementById('error-msg');
+
+  errorBox.classList.add('hidden');
+  errorBox.innerHTML = '';
+
+  const originalBtnHTML = btn.innerHTML;
   btn.innerHTML = '<svg class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="white" stroke-width="4" opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke="white" stroke-width="4" stroke-linecap="round"/></svg> Sending...';
   btn.disabled = true;
 
-  setTimeout(() => {
-    document.getElementById('contact-form').classList.add('hidden');
-    document.getElementById('success-msg').classList.remove('hidden');
+  try {
+    const res = await fetch("{{ url_for('contact') }}", {
+      method: 'POST',
+      body: new FormData(form),
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok && data.status === 'success') {
+      form.reset();
+      form.classList.add('hidden');
+      document.getElementById('success-msg').classList.remove('hidden');
+      lucide.createIcons();
+    } else {
+      const msgs = (data.errors && data.errors.length) ? data.errors
+                 : [data.message || 'Something went wrong. Please try again.'];
+      msgs.forEach(m => {
+        const p = document.createElement('p');
+        p.className = 'text-red-700 text-sm';
+        p.textContent = m;
+        errorBox.appendChild(p);
+      });
+      errorBox.classList.remove('hidden');
+      btn.innerHTML = originalBtnHTML;
+      btn.disabled = false;
+      lucide.createIcons();
+    }
+  } catch (err) {
+    const p = document.createElement('p');
+    p.className = 'text-red-700 text-sm';
+    p.textContent = 'Network error — please check your connection and try again.';
+    errorBox.appendChild(p);
+    errorBox.classList.remove('hidden');
+    btn.innerHTML = originalBtnHTML;
+    btn.disabled = false;
     lucide.createIcons();
-  }, 1800);
+  }
 }
 </script>
 {% endblock %}
