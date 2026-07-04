@@ -965,7 +965,12 @@ def index():
         }
     except Exception:
         stats = {'total_users': 0, 'total_invested': 0, 'active_investments': 0, 'total_paid': 0}
-    return render_template('index.html', stats=stats)
+    try:
+        plans = get_plans(active_only=True)
+    except Exception as e:
+        print(f'index() plans error: {e}')
+        plans = []
+    return render_template('index.html', stats=stats, plans=plans)
 
 @app.route('/about')
 def about():
