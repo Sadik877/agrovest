@@ -462,6 +462,18 @@
 <!-- ════════════════════════════════════════════
      STATUS BANNER
 ════════════════════════════════════════════ -->
+{% if maintenance_mode | default(false) %}
+<div class="anim-fade-up mb-3">
+  <div class="notif-banner notif-warning">
+    <i data-lucide="power" class="w-4 h-4 flex-shrink-0 text-amber-600"></i>
+    <span>
+      <strong>Maintenance mode is ON</strong> — the site is offline for non-admin users.
+      {% if maintenance_message %}Message shown to users: "{{ maintenance_message }}".{% endif %}
+      Turn it off from <a href="#" onclick="openModal('siteSettingsModal'); return false;" class="underline font-semibold">Site Settings</a>.
+    </span>
+  </div>
+</div>
+{% endif %}
 <div class="anim-fade-up mb-6" style="animation-delay:.08s">
   {% set total_pending = (pending_deps | default([]) | length) + (pending_wds | default([]) | length) %}
   {% if total_pending > 0 %}
@@ -1104,9 +1116,33 @@
           <input type="number" class="field-input" placeholder="5" disabled>
         </div>
       </div>
+
+      <div class="mt-5 pt-5" style="border-top:1px solid var(--border);">
+        <div class="flex items-center justify-between mb-2">
+          <label class="field-label mb-0">Maintenance Mode</label>
+          {% if maintenance_mode | default(false) %}
+          <span class="badge badge-error"><i data-lucide="power" class="w-3 h-3"></i> ON — site is offline for users</span>
+          {% else %}
+          <span class="badge badge-success"><i data-lucide="check-circle-2" class="w-3 h-3"></i> OFF — site is live</span>
+          {% endif %}
+        </div>
+        <form method="POST" action="{{ url_for('admin_toggle_maintenance') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% if not (maintenance_mode | default(false)) %}
+          <input type="text" name="maintenance_message" class="field-input mb-3"
+                 placeholder="Optional message shown to users while offline (e.g. an ETA)">
+          {% endif %}
+          <button type="submit" class="{{ 'btn-secondary-lg' if maintenance_mode | default(false) else 'btn-primary-lg' }}"
+                  onclick="return confirm('{{ 'Turn maintenance mode OFF? The site will become live again.' if maintenance_mode | default(false) else 'Turn maintenance mode ON? Non-admin users will be locked out immediately.' }}');">
+            <i data-lucide="power" class="w-4 h-4"></i>
+            {{ 'Turn Maintenance Mode OFF' if maintenance_mode | default(false) else 'Turn Maintenance Mode ON' }}
+          </button>
+        </form>
+      </div>
+
       <div class="notif-banner notif-warning mt-5">
         <i data-lucide="info" class="w-4 h-4 flex-shrink-0"></i>
-        <span>Site settings are display-only for now — wire this panel to your settings route when ready.</span>
+        <span>Other site settings above are display-only for now — wire this panel to your settings route when ready.</span>
       </div>
     </div>
     <div class="modal-foot">
@@ -1114,6 +1150,7 @@
     </div>
   </div>
 </div>
+
 
 <!-- ════════════════════════════════════════════
      MODAL: NOTIFICATION PREVIEW
