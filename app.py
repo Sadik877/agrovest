@@ -244,8 +244,16 @@ def sb_sum(table, col, filters=None):
         print(f'sb_sum error ({table}/{col}): {e}')
         return 0
 
-def notify(user_id, message, ntype='info'):
-    sb_insert('notifications', {'user_id': user_id, 'message': message, 'type': ntype})
+def notify(user_id, message, ntype='info', title=None):
+    """Insert one notification row. `title` is optional and backward-compatible —
+    every existing call site (which passes no title) behaves exactly as before.
+    Requires a nullable `title` text column on `notifications`:
+        alter table notifications add column if not exists title text;
+    """
+    payload = {'user_id': user_id, 'message': message, 'type': ntype}
+    if title:
+        payload['title'] = title
+    sb_insert('notifications', payload)
 
 
 def notify_bulk(user_ids, message, ntype='info'):
@@ -301,7 +309,7 @@ def sb_adjust_balance(user_id, balance_delta=0, total_invested_delta=0,
 def _parse_dt(value):
     """Parse a Supabase timestamp string (or datetime) into a naive UTC datetime."""
     if isinstance(value, datetime):
-        return value
+        return value.replace(tzinfo=None) if value.tzinfo else value
     if not value:
         return None
     return datetime.fromisoformat(str(value).replace('Z', '+00:00')).replace(tzinfo=None)
@@ -332,6 +340,40 @@ def get_daily_profit_amount(investment):
     # Legacy fallback for rows predating the total_return-based plan model.
     roi_pct = float(investment.get('roi_percent') or 0)
     return r2((amount * roi_pct / 100) / duration)
+
+
+def _record_roi_transaction(user_id, investment_id, plan_name, amount):
+    """Insert one row into the transactions table for a daily-profit credit.
+
+    Reuses sb_insert() — the same helper used everywhere else in the codebase.
+    A failed insert is logged but never allowed to abort the profit credit
+    itself, so a transactions-table outage can never prevent users being paid.
+
+    Table schema expected (create once in Supabase SQL editor if not present):
+        create table if not exists transactions (
+            id               bigserial primary key,
+            user_id          bigint       not null,
+            investment_id    bigint,
+            plan_name        text,
+            amount           numeric      not null,
+            transaction_type text         not null default 'ROI',
+            status           text         not null default 'Completed',
+            description      text,
+            created_at       timestamptz  not null default now()
+        );
+    """
+    try:
+        sb_insert('transactions', {
+            'user_id':          user_id,
+            'investment_id':    investment_id,
+            'plan_name':        plan_name,
+            'amount':           r2(amount),
+            'transaction_type': 'ROI',
+            'status':           'Completed',
+            'description':      f'Daily profit credited from {plan_name}',
+        })
+    except Exception as e:
+        print(f'⚠ ROI transaction record failed (inv {investment_id}): {e}')
 
 
 def sb_credit_daily_profit(investment_id, user_id, credit_amount, new_last_profit_date,
@@ -369,7 +411,21 @@ def process_investment_daily_profit(inv):
     visited in 4 days, all 4 days are credited in one shot). Never credits
     past the investment's end_date. Marks the investment 'completed' and
     returns the principal once end_date is reached, and never credits profit
-    again afterwards."""
+    again afterwards.
+
+    After every successful credit:
+      • Records a transactions row (type='ROI', status='Completed') so the
+        credit appears immediately in the user's Recent Transactions page.
+      • Sends a wallet notification so the user sees the exact amount credited.
+      • On maturity, sends a separate maturity notification.
+
+    Safety guarantees (unchanged from the original):
+      • The underlying Postgres RPC takes a row lock — concurrent calls from
+        cron + a dashboard visit at the same moment cannot double-credit.
+      • elapsed_days is based on calendar dates, so calling this more than
+        once per day simply finds elapsed_days == 0 and returns False.
+      • Inactive / completed / cancelled investments are rejected immediately.
+    """
     if inv.get('status') != 'active':
         return False
 
@@ -383,7 +439,7 @@ def process_investment_daily_profit(inv):
 
     now = datetime.utcnow()
     effective_now = min(now, end_date)
-    elapsed_days = (effective_now - last_profit_date).days
+    elapsed_days  = (effective_now - last_profit_date).days
 
     matured = now >= end_date
     if elapsed_days <= 0 and not matured:
@@ -397,39 +453,82 @@ def process_investment_daily_profit(inv):
         return False
 
     principal_return = r2(inv['amount']) if matured else 0
+
     credited = sb_credit_daily_profit(
         investment_id=inv['id'], user_id=inv['user_id'],
         credit_amount=credit_amount, new_last_profit_date=new_last_date,
         mark_completed=matured, principal_return=principal_return,
     )
-    if credited:
-        if credit_amount > 0:
-            notify(inv['user_id'],
-                   f'₦{credit_amount:,.2f} daily profit credited for {inv.get("plan_name","your investment")}.',
-                   'success')
-        if matured:
-            notify(inv['user_id'],
-                   f'{inv.get("plan_name","Your investment")} has matured — principal of '
-                   f'₦{principal_return:,.2f} returned to your wallet.', 'success')
-    return credited
+
+    if not credited:
+        # RPC returned False → investment already processed or not active.
+        # Not an error — idempotent by design.
+        return False
+
+    plan_name = inv.get('plan_name', 'your investment')
+
+    # ── Transaction record ───────────────────────────────────────────────
+    # One ROI transaction per credit run. For catch-up runs (multiple missed
+    # days), we record the combined amount in a single row rather than one
+    # row per day — this keeps the transactions table lean and the
+    # description accurate ("₦2,700 for 3 days" is clearer than 3 × "₦900").
+    if credit_amount > 0:
+        _record_roi_transaction(
+            user_id=inv['user_id'],
+            investment_id=inv['id'],
+            plan_name=plan_name,
+            amount=credit_amount,
+        )
+
+    # ── User notifications ───────────────────────────────────────────────
+    if credit_amount > 0:
+        notify(
+            inv['user_id'],
+            f'₦{credit_amount:,.2f} daily profit has been credited to your wallet '
+            f'from your {plan_name} investment.',
+            'success',
+            title='Daily Profit Credited',
+        )
+
+    if matured:
+        notify(
+            inv['user_id'],
+            f'Your {plan_name} investment has matured — your principal of '
+            f'₦{principal_return:,.2f} has been returned to your wallet.',
+            'success',
+        )
+
+    return True
 
 
 def run_daily_profit_distribution(user_id=None):
     """Process daily profit for all active investments (optionally scoped to
     one user). Safe to call as often as needed — already-credited investments
-    are simply skipped. Call sites: lazily on dashboard load (per-user) and
-    from the /cron/daily-profits endpoint (global, for an external scheduler)."""
+    are simply skipped (elapsed_days == 0 → early return in
+    process_investment_daily_profit). Call sites:
+
+      1. Lazily on every dashboard page-load (per-user) — self-healing even
+         if the external cron hasn't fired.
+      2. From POST /cron/daily-profits (global) — the authoritative daily run.
+
+    Errors for individual investments are caught, logged, and do NOT abort
+    processing of the remaining investments.
+    """
     filters = [('status', 'eq', 'active')]
     if user_id is not None:
         filters.append(('user_id', 'eq', user_id))
+
     investments = sb_all('investments', filters=filters)
     processed = 0
+
     for inv in investments:
         try:
             if process_investment_daily_profit(inv):
                 processed += 1
         except Exception as e:
-            print(f'⚠ daily profit error for investment {inv.get("id")}: {e}')
+            print(f'⚠ daily profit error for investment {inv.get("id")} '
+                  f'(user {inv.get("user_id")}): {e}')
+
     return processed
 
 
@@ -1232,11 +1331,23 @@ def dashboard():
     total_invested = float(user.get('total_invested') or 0)
     profit_change_pct = r2((today_profit / total_invested * 100) if total_invested > 0 else 0)
 
+    # Recent transactions (ROI credits + any other types) — fetched after
+    # run_daily_profit_distribution() above so today's credit is already
+    # in the table when the template renders.
+    try:
+        recent_transactions = sb_all('transactions',
+            filters=[('user_id', 'eq', uid)],
+            order=('created_at', 'desc'), limit=10)
+    except Exception as e:
+        print(f'dashboard: transactions fetch error: {e}')
+        recent_transactions = []
+
     return render_template('dashboard.html',
         user=user, active_investments=active_investments,
         recent_deposits=recent_deposits, recent_withdrawals=recent_withdrawals,
         referrals=referrals, notifications=notifications,
         today_profit=today_profit, profit_change_pct=profit_change_pct,
+        recent_transactions=recent_transactions,
         now_utc=datetime.utcnow())
 
 
@@ -1665,6 +1776,40 @@ def admin_dashboard():
         latest_investments=latest_investments,
         recent_contact_messages=recent_contact_messages,
         maintenance_mode=maintenance_mode, maintenance_message=maintenance_message)
+
+
+@app.route('/admin/messages')
+@admin_required
+def admin_messages():
+    """Admin inbox for Contact Support messages. THIS ROUTE WAS MISSING —
+    admin/base.html's nav already links to url_for('admin_messages'), which
+    raised werkzeug.routing.exceptions.BuildError on every admin page render
+    (including right after admin login), producing the reported HTTP 500.
+    Normal users never touch admin/base.html, so they were unaffected.
+
+    Reuses get_contact_stats() and resolve_contact_attachment_url() — both
+    already existed as data helpers, just never had a route wired to them.
+    """
+    messages = sb_all('contact_messages', order=('created_at', 'desc'))
+    for m in messages:
+        m['attachment_url'] = resolve_contact_attachment_url(m.get('attachment'))
+    stats = get_contact_stats()
+    return render_template('admin/messages.html', messages=messages, stats=stats)
+
+
+@app.route('/admin/messages/<int:msg_id>/read', methods=['POST'])
+@admin_required
+def admin_mark_message_read(msg_id):
+    sb_update('contact_messages', {'status': 'Read'},
+              [('id', 'eq', msg_id), ('status', 'eq', 'Unread')])
+    return redirect(url_for('admin_messages'))
+
+
+@app.route('/admin/messages/<int:msg_id>/replied', methods=['POST'])
+@admin_required
+def admin_mark_message_replied(msg_id):
+    sb_update('contact_messages', {'status': 'Replied'}, [('id', 'eq', msg_id)])
+    return redirect(url_for('admin_messages'))
 
 
 @app.route('/admin/maintenance/toggle', methods=['POST'])
@@ -2149,130 +2294,4 @@ def admin_complete_investment(inv_id):
         updated = sb_update('investments', {'status':'completed'},
                              [('id','eq',inv_id), ('status','eq','active')])
         if updated:
-            if sb_adjust_balance(inv['user_id'], balance_delta=remaining_payout,
-                                  total_earnings_delta=profit):
-                notify(inv['user_id'],
-                       f'{inv["plan_name"]} matured! ₦{remaining_payout:,.2f} credited.',
-                       'success')
-                flash('Investment completed and balance credited.', 'success')
-            else:
-                flash('Investment marked completed, but crediting the balance failed — '
-                      'please credit the user manually and check the logs.', 'error')
-        else:
-            flash('This investment was already processed.', 'warning')
-    return redirect(url_for('admin_investments'))
-
-
-# ═════════════════════════════════════════════
-# Daily Profit Cron Endpoint
-# Trigger this every 24h (or more often — it's
-# idempotent) from Render Cron Jobs, GitHub
-# Actions, or an external pinger like cron-job.org,
-# passing ?key=<CRON_SECRET>. Profit is also caught
-# up lazily whenever a user opens their dashboard,
-# so this is a belt-and-suspenders job to cover
-# users who don't log in for a while.
-# ═════════════════════════════════════════════
-@app.route('/cron/daily-profits', methods=['GET', 'POST'])
-@csrf.exempt
-def cron_daily_profits():
-    secret = os.environ.get('CRON_SECRET', '').strip()
-    provided = request.args.get('key', '') or request.headers.get('X-Cron-Secret', '')
-    if not secret or provided != secret:
-        abort(403)
-    processed = run_daily_profit_distribution()
-    return jsonify({'status': 'ok', 'investments_processed': processed})
-
-
-
-@app.route('/admin/debug')
-@admin_required
-def admin_debug():
-    """Shows live connection status and any errors. Check Render logs for detail."""
-    results = {}
-    url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
-    results['supabase_url'] = (url[:40] + '...') if url else 'NOT SET'
-    results['supabase_key_set'] = bool(key)
-    results['is_render'] = IS_RENDER
-    results['use_supabase_storage'] = USE_SUPABASE_STORAGE
-    try:
-        results['users_count']    = sb_count('users')
-        results['plans_count']    = sb_count('plans')
-        results['deposits_count'] = sb_count('deposits')
-        results['status'] = 'OK - Database connection working'
-    except Exception as e:
-        import traceback
-        results['error'] = str(e)
-        results['traceback'] = traceback.format_exc()
-        results['status'] = 'ERROR'
-    return jsonify(results)
-
-# ═════════════════════════════════════════════
-# Error Handlers
-# ═════════════════════════════════════════════
-@app.errorhandler(403)
-def forbidden(e):
-    return render_template('errors/403.html'), 403
-
-@app.errorhandler(404)
-def not_found(e):
-    return render_template('errors/404.html'), 404
-
-@app.errorhandler(500)
-def server_error(e):
-    return render_template('errors/500.html'), 500
-
-
-# ═════════════════════════════════════════════
-# Template Filters
-# ═════════════════════════════════════════════
-@app.template_filter('naira')
-def naira_filter(value):
-    try:
-        return f'₦{float(value or 0):,.2f}'
-    except (TypeError, ValueError):
-        return '₦0.00'
-
-@app.template_filter('date_fmt')
-def date_fmt(value, fmt='%d %b %Y'):
-    if not value:
-        return '—'
-    if isinstance(value, str):
-        try:
-            value = datetime.fromisoformat(value.replace('Z','+00:00'))
-        except Exception:
-            return value
-    try:
-        return value.strftime(fmt)
-    except Exception:
-        return str(value)
-
-@app.template_filter('status_badge')
-def status_badge(status):
-    return {
-        'pending':   'badge-warning',
-        'approved':  'badge-success',
-        'rejected':  'badge-error',
-        'active':    'badge-info',
-        'completed': 'badge-success',
-    }.get(str(status or '').lower(), 'badge-neutral')
-
-
-# ═════════════════════════════════════════════
-# Startup — only seed DB if env vars are present
-# ═════════════════════════════════════════════
-with app.app_context():
-    url = os.environ.get('SUPABASE_URL', '').strip()
-    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
-    if url and key and url.startswith('https://'):
-        try:
-            init_db()
-            print("✓ AgroVest Pro started with Supabase connection")
-        except Exception as _e:
-            print(f"⚠ DB seed skipped (tables may not exist yet — run supabase_setup.sql): {_e}")
-    else:
-        print("⚠ SUPABASE_URL / SUPABASE_SECRET_KEY not set — visit /setup for instructions")
-
-if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=5000)
+            if sb_adjust_balance(inv['user_id'], balance
