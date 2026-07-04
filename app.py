@@ -647,12 +647,32 @@ def resolve_plan_image_url(image_filename):
 # ─────────────────────────────────────────────
 # Database Initializer — runs SQL via Supabase RPC
 # We create tables using Supabase Dashboard SQL editor instead.
-# This just seeds the admin account if missing. Plans are NEVER
-# auto-created — they exist only if an admin creates them via
-# Admin → Plans → Add Plan, and a deleted plan stays deleted
-# across restarts/redeploys.
+# This just seeds admin + default plans if missing.
 # ─────────────────────────────────────────────
 def init_db():
+    default_plans = [
+        {'name': 'Starter Farm',
+         'description': 'Perfect entry point for new agricultural investors.',
+         'price': 10000, 'total_return': 11500, 'duration_days': 30,
+         'features': 'Daily profit updates|Email notifications|Basic support',
+         'sort_order': 1, 'is_active': True},
+        {'name': 'Green Harvest',
+         'description': 'Mid-range plan with diversified crop investments.',
+         'price': 50000, 'total_return': 62500, 'duration_days': 45,
+         'features': 'Daily profit updates|Priority support|Monthly reports|Referral bonus',
+         'sort_order': 2, 'is_active': True},
+        {'name': 'Premium Agro',
+         'description': 'Premium returns from large-scale farming operations.',
+         'price': 200000, 'total_return': 280000, 'duration_days': 60,
+         'features': 'Daily profit updates|24/7 VIP support|Weekly reports|Higher referral bonus|Early withdrawal option',
+         'sort_order': 3, 'is_active': True},
+        {'name': 'Elite Farm',
+         'description': 'Elite tier for serious investors seeking maximum returns.',
+         'price': 1000000, 'total_return': 1600000, 'duration_days': 90,
+         'features': 'Daily profit updates|Dedicated account manager|Daily reports|Maximum referral bonus|Flexible withdrawal|Farm visit opportunity',
+         'sort_order': 4, 'is_active': True},
+    ]
+
     # Ride out the brief DNS/network window right after a fresh deploy or
     # restart, before retrying anything that needs real DB access below.
     connected = False
@@ -688,6 +708,24 @@ def init_db():
             })
             print("✓ Admin user seeded" if admin else
                   "⚠ Admin user seed FAILED — will retry on next restart")
+
+        # Seed default plans one-by-one (not "only if the table is totally
+        # empty") so a partial failure on a previous attempt gets healed
+        # automatically instead of leaving the platform permanently short
+        # a plan or two.
+        seeded, failed = 0, 0
+        for p in default_plans:
+            if not sb_one('plans', [('name', 'eq', p['name'])]):
+                if sb_insert('plans', p):
+                    seeded += 1
+                else:
+                    failed += 1
+        if seeded:
+            print(f"✓ {seeded} plan(s) seeded")
+        if failed:
+            print(f"⚠ {failed} plan(s) FAILED to seed — will retry on next restart")
+        if not seeded and not failed:
+            print("✓ Plans already seeded")
 
         print("✓ Database ready")
     except Exception as e:
@@ -783,6 +821,41 @@ def uploaded_file(filename):
 
 
 # ─────────────────────────────────────────────
+# Settings — tiny key/value store for platform
+# toggles that need to apply instantly (no
+# redeploy), unlike env vars. Requires a
+# `settings` table: key text primary key,
+# value text, updated_at timestamptz default now().
+# ─────────────────────────────────────────────
+def get_setting(key, default=None):
+    """Fetch a single setting value by key. Returns `default` if unset."""
+    row = sb_one('settings', [('key', 'eq', key)])
+    return row['value'] if row else default
+
+def set_setting(key, value):
+    """Set a setting value (update-if-exists else insert — no upsert
+    helper exists in this codebase, so this follows the same
+    sb_update/sb_insert pattern used everywhere else)."""
+    value = str(value)
+    existing = sb_one('settings', [('key', 'eq', key)])
+    if existing:
+        return sb_update('settings', {'value': value}, [('key', 'eq', key)]) is not False
+    return sb_insert('settings', {'key': key, 'value': value}) is not None
+
+def is_maintenance_mode():
+    """DB flag (instant, admin-toggleable) OR the MAINTENANCE_MODE env var
+    (kept as a redeploy-based fallback/emergency switch) — either can turn
+    maintenance mode on."""
+    if (get_setting('maintenance_mode', 'false') or 'false').strip().lower() == 'true':
+        return True
+    return os.environ.get('MAINTENANCE_MODE', '').strip().lower() == 'true'
+
+def get_maintenance_message():
+    return (get_setting('maintenance_message', '') or '').strip() \
+        or os.environ.get('MAINTENANCE_MESSAGE', '').strip() or None
+
+
+# ─────────────────────────────────────────────
 # Env-var health check — shown instead of 500
 # when Supabase credentials are missing/wrong
 # ─────────────────────────────────────────────
@@ -796,26 +869,26 @@ def check_env():
     elif not url.startswith('https://'):
         errors.append(f'SUPABASE_URL must start with https:// — got: {url[:60]}')
     if not key:
-        missing.append('SUPABASE_SECRET_KEY')
+        missing.append('SUPABASE_SECER_KEY')
     return (len(missing) == 0 and len(errors) == 0), missing, errors
 
 @app.before_request
 def check_maintenance():
     """Show a maintenance page to everyone except logged-in admins.
 
-    Toggle with the MAINTENANCE_MODE env var on Render (true/false) — changing
-    an env var triggers a redeploy, so it takes ~30-60s to apply, same as any
-    other env var change. Optionally set MAINTENANCE_MESSAGE to customize the
-    text shown (e.g. an ETA).
+    Instant toggle: admins flip this from the admin dashboard (persisted in
+    the `settings` table via is_maintenance_mode()/set_setting()) — no
+    redeploy needed. The MAINTENANCE_MODE env var still works too, as a
+    redeploy-based fallback for when the dashboard/DB itself is unreachable.
     """
-    if os.environ.get('MAINTENANCE_MODE', '').strip().lower() != 'true':
+    if not is_maintenance_mode():
         return
     if request.endpoint in ('static', 'uploaded_file', 'login', 'logout', 'cron_daily_profits'):
         return
     if session.get('is_admin'):
         return  # admins can still use the site to fix things / lift maintenance
     return render_template('maintenance.html',
-                           maintenance_message=os.environ.get('MAINTENANCE_MESSAGE', '').strip() or None), 503
+                           maintenance_message=get_maintenance_message()), 503
 
 @app.before_request
 def guard_env():
@@ -1210,9 +1283,6 @@ def invest():
             'daily_profit': daily_profit,
             'last_profit_date': start_dt.isoformat(),
             'total_profit': 0,
-            # Kept for the admin investments table, which still displays a
-            # ROI % column — derived from the plan's fixed price/return.
-            'roi_percent': r2((profit / amount) * 100) if amount else 0,
         })
         if not new_investment:
             rolled_back = sb_adjust_balance(user['id'], balance_delta=amount,
@@ -1416,13 +1486,16 @@ def _get_plan_subscriber_counts():
 
 def _get_recent_activity(limit=8):
     """Build a merged, time-sorted activity feed from existing tables only
-    (users, deposits, withdrawals, investments). Reuses _join_users for
-    display names instead of duplicating that lookup logic."""
+    (users, deposits, withdrawals, investments, contact_messages). Reuses
+    _join_users for display names instead of duplicating that lookup logic,
+    and reuses get_recent_contact_messages() for the contact-support feed
+    instead of querying contact_messages a second time."""
     recent_signups     = sb_all('users', filters=[('is_admin', 'eq', False)],
                                  order=('created_at', 'desc'), limit=limit)
     recent_deposits     = _join_users(sb_all('deposits', order=('created_at', 'desc'), limit=limit))
     recent_withdrawals  = _join_users(sb_all('withdrawals', order=('created_at', 'desc'), limit=limit))
     recent_investments  = _join_users(sb_all('investments', order=('created_at', 'desc'), limit=limit))
+    recent_messages     = get_recent_contact_messages(limit=limit)
 
     events = []
     for u in recent_signups:
@@ -1441,6 +1514,10 @@ def _get_recent_activity(limit=8):
         events.append({'type': 'investment', 'title': f"Investment — {inv.get('plan_name','Plan')}",
                         'description': f"{inv.get('full_name','Unknown')} · ₦{r2(inv.get('amount')):,.2f}",
                         'created_at': inv.get('created_at')})
+    for m in recent_messages:
+        events.append({'type': 'contact', 'title': f"Contact message — {m.get('status','Unread')}",
+                        'description': f"{m.get('full_name','Unknown')} · {m.get('subject','')}",
+                        'created_at': m.get('created_at')})
 
     events.sort(key=lambda e: e.get('created_at') or '', reverse=True)
     return events[:limit]
@@ -1465,13 +1542,41 @@ def admin_dashboard():
             # omitted — no KYC or platform-revenue data exists in the schema
             # yet. The template defaults these stat cards to 0 rather than
             # showing an invented number.
+
+            # ── Additional real counts (not yet in the fixed admin_stats
+            # card list, but made available on `stats` for any card/table
+            # that references them) — all backed by real columns already
+            # in the schema. 'Verified Users' is intentionally NOT included
+            # here for the same reason as pending_kyc above: there is no
+            # is_verified column anywhere in the schema, so it would be an
+            # invented number rather than real data.
+            'active_users':          sb_count('users', [('is_admin','eq',False),('is_active','eq',True)]),
+            'total_investments':     sb_count('investments'),
+            'completed_investments': sb_count('investments', [('status','eq','completed')]),
+            'approved_deposits':     sb_count('deposits',    [('status','eq','approved')]),
+            'rejected_deposits':     sb_count('deposits',    [('status','eq','rejected')]),
+            'approved_withdrawals':  sb_count('withdrawals', [('status','eq','approved')]),
+            'rejected_withdrawals':  sb_count('withdrawals', [('status','eq','rejected')]),
+            'wallet_balance_total':  sb_sum('users', 'balance', [('is_admin','eq',False)]),
+            'referral_earnings_total': sb_sum('users', 'referral_earnings', [('is_admin','eq',False)]),
         }
+        # inactive_users derived in Python — avoids a 3rd users query
+        stats['inactive_users'] = max(stats['total_users'] - stats['active_users'], 0)
+
+        # Contact Support stats — reuses the existing get_contact_stats()
+        # helper (already implemented) instead of duplicating its queries.
+        stats.update(get_contact_stats())
     except Exception as e:
         print(f'Admin stats error: {e}')
         stats = {k: 0 for k in ['total_users','total_invested','total_deposits',
                                   'total_withdrawals','pending_deposits',
                                   'pending_withdrawals','total_paid_out',
-                                  'active_investments','total_plans','referral_payout']}
+                                  'active_investments','total_plans','referral_payout',
+                                  'active_users','inactive_users','total_investments',
+                                  'completed_investments','approved_deposits','rejected_deposits',
+                                  'approved_withdrawals','rejected_withdrawals',
+                                  'wallet_balance_total','referral_earnings_total',
+                                  'total_messages','unread_messages','read_messages','replied_messages']}
     try:
         recent_users = sb_all('users', filters=[('is_admin','eq',False)],
                               order=('created_at','desc'), limit=10)
@@ -1510,10 +1615,71 @@ def admin_dashboard():
     except Exception as e:
         print(f'Admin activity error: {e}')
         activities = []
+
+    # ── "Latest" lists (Latest Deposits / Withdrawals / Investments).
+    # Same _join_users pattern already used for pending_deps/pending_wds
+    # above — no new helper needed, just the existing building blocks
+    # called with no status filter and a limit instead.
+    try:
+        latest_deposits = _join_users(sb_all('deposits', order=('created_at','desc'), limit=10))
+    except Exception:
+        latest_deposits = []
+    try:
+        latest_withdrawals = _join_users(sb_all('withdrawals', order=('created_at','desc'), limit=10))
+    except Exception:
+        latest_withdrawals = []
+    try:
+        latest_investments = _join_users(sb_all('investments', order=('created_at','desc'), limit=10))
+    except Exception:
+        latest_investments = []
+
+    # ── Contact Support: latest messages for a future support-inbox
+    # widget on this dashboard. Reuses the existing get_recent_contact_messages()
+    # helper — same one _get_recent_activity() uses internally, so this is
+    # a second, cheap call rather than a duplicated query implementation.
+    try:
+        recent_contact_messages = get_recent_contact_messages(limit=10)
+    except Exception as e:
+        print(f'Admin contact messages error: {e}')
+        recent_contact_messages = []
+
+    # ── Maintenance mode current state, for the dashboard toggle to
+    # reflect reality (button label, status badge).
+    try:
+        maintenance_mode = is_maintenance_mode()
+        maintenance_message = get_maintenance_message()
+    except Exception as e:
+        print(f'Admin maintenance-state error: {e}')
+        maintenance_mode, maintenance_message = False, None
+
     return render_template('admin/dashboard.html',
         stats=stats, recent_users=recent_users, users=all_users,
         pending_deps=pending_deps, pending_wds=pending_wds,
-        plans=dashboard_plans, activities=activities)
+        plans=dashboard_plans, activities=activities,
+        latest_deposits=latest_deposits, latest_withdrawals=latest_withdrawals,
+        latest_investments=latest_investments,
+        recent_contact_messages=recent_contact_messages,
+        maintenance_mode=maintenance_mode, maintenance_message=maintenance_message)
+
+
+@app.route('/admin/maintenance/toggle', methods=['POST'])
+@admin_required
+def admin_toggle_maintenance():
+    """Flip maintenance mode on/off instantly (DB-backed, no redeploy).
+    Reuses set_setting()/is_maintenance_mode() — see check_maintenance()."""
+    turning_on = not is_maintenance_mode()
+    message = request.form.get('maintenance_message', '').strip()
+    ok = set_setting('maintenance_mode', 'true' if turning_on else 'false')
+    if ok and turning_on and message:
+        set_setting('maintenance_message', message)
+    if ok:
+        flash('Maintenance mode turned ON — the site is now unavailable to non-admins.'
+              if turning_on else
+              'Maintenance mode turned OFF — the site is live again.',
+              'warning' if turning_on else 'success')
+    else:
+        flash('Could not update maintenance mode — check the logs.', 'error')
+    return redirect(url_for('admin_dashboard'))
 
 
 def _join_users(rows):
@@ -1990,56 +2156,6 @@ def admin_complete_investment(inv_id):
         else:
             flash('This investment was already processed.', 'warning')
     return redirect(url_for('admin_investments'))
-
-
-# ═════════════════════════════════════════════
-# ADMIN — Contact Support Inbox
-# ═════════════════════════════════════════════
-@app.route('/admin/messages')
-@admin_required
-def admin_messages():
-    messages = sb_all('contact_messages', order=('created_at', 'desc'))
-    for m in messages:
-        m['attachment'] = resolve_contact_attachment_url(m.get('attachment'))
-    stats = get_contact_stats()
-    return render_template('admin/messages.html', messages=messages, stats=stats)
-
-
-@app.route('/admin/messages/<int:msg_id>/read', methods=['POST'])
-@admin_required
-def admin_read_message(msg_id):
-    sb_update('contact_messages', {'status': 'Read'},
-              [('id', 'eq', msg_id), ('status', 'eq', 'Unread')])
-    return redirect(url_for('admin_messages'))
-
-
-@app.route('/admin/messages/<int:msg_id>/reply', methods=['POST'])
-@admin_required
-def admin_reply_message(msg_id):
-    reply = request.form.get('reply', '').strip()
-    msg   = sb_one('contact_messages', [('id', 'eq', msg_id)])
-    if not msg:
-        flash('Message not found.', 'error')
-        return redirect(url_for('admin_messages'))
-    if not reply:
-        flash('Reply cannot be empty.', 'error')
-        return redirect(url_for('admin_messages'))
-
-    updated = sb_update('contact_messages', {
-        'status': 'Replied', 'admin_reply': reply,
-        'replied_at': datetime.utcnow().isoformat(),
-    }, [('id', 'eq', msg_id)])
-
-    if updated:
-        # If the sender has an account, drop them an in-app notification too.
-        acct = sb_one('users', [('email', 'eq', msg['email'])])
-        if acct:
-            notify(acct['id'],
-                   f'Support replied to your message "{msg["subject"]}".', 'info')
-        flash('Reply sent.', 'success')
-    else:
-        flash('Could not save the reply — please try again.', 'error')
-    return redirect(url_for('admin_messages'))
 
 
 # ═════════════════════════════════════════════
