@@ -2294,4 +2294,165 @@ def admin_complete_investment(inv_id):
         updated = sb_update('investments', {'status':'completed'},
                              [('id','eq',inv_id), ('status','eq','active')])
         if updated:
-            if sb_adjust_balance(inv['user_id'], balance
+            if sb_adjust_balance(inv['user_id'], balance_delta=remaining_payout,
+                                  total_earnings_delta=profit):
+                notify(inv['user_id'],
+                       f'{inv["plan_name"]} matured! ₦{remaining_payout:,.2f} credited.',
+                       'success')
+                flash('Investment completed and balance credited.', 'success')
+            else:
+                flash('Investment marked completed, but crediting the balance failed — '
+                      'please credit the user manually and check the logs.', 'error')
+        else:
+            flash('This investment was already processed.', 'warning')
+    return redirect(url_for('admin_investments'))
+
+
+# ═════════════════════════════════════════════
+# Daily Profit Cron Endpoint
+#
+# HOW TO SCHEDULE (pick any one):
+#
+# Option A — Render Cron Jobs (recommended for Render deploys)
+#   Render Dashboard → your service → "Cron Jobs" tab → Add Cron Job
+#   Command : curl -s -o /dev/null "https://<your-domain>/cron/daily-profits?key=$CRON_SECRET"
+#   Schedule: 0 1 * * *    (runs at 01:00 UTC every day)
+#
+# Option B — GitHub Actions (free, reliable)
+#   .github/workflows/daily_profits.yml:
+#     on:
+#       schedule:
+#         - cron: '0 1 * * *'
+#     jobs:
+#       trigger:
+#         runs-on: ubuntu-latest
+#         steps:
+#           - run: curl -fsS "$APP_URL/cron/daily-profits?key=$CRON_SECRET"
+#             env:
+#               APP_URL: ${{ secrets.APP_URL }}
+#               CRON_SECRET: ${{ secrets.CRON_SECRET }}
+#
+# Option C — cron-job.org (free external pinger, zero infrastructure)
+#   URL  : https://<your-domain>/cron/daily-profits?key=<CRON_SECRET>
+#   Time : Daily at 01:00 UTC
+#   Method: GET
+#
+# The endpoint is intentionally idempotent — it is safe to call it
+# more than once a day. investments already credited for the day are
+# simply skipped (elapsed_days == 0). The dashboard lazy-catch-up in
+# run_daily_profit_distribution(user_id=uid) is a belt-and-suspenders
+# fallback for users who don't rely on the cron alone.
+#
+# REQUIRED ENV VAR: CRON_SECRET — set in Render → Environment.
+# Requests without the correct key receive a 403.
+# ═════════════════════════════════════════════
+@app.route('/cron/daily-profits', methods=['GET', 'POST'])
+@csrf.exempt
+def cron_daily_profits():
+    secret = os.environ.get('CRON_SECRET', '').strip()
+    provided = request.args.get('key', '') or request.headers.get('X-Cron-Secret', '')
+    if not secret or provided != secret:
+        abort(403)
+    started_at = datetime.utcnow()
+    processed  = run_daily_profit_distribution()
+    elapsed_ms = int((datetime.utcnow() - started_at).total_seconds() * 1000)
+    return jsonify({
+        'status':                'ok',
+        'investments_processed': processed,
+        'elapsed_ms':            elapsed_ms,
+        'run_at':                started_at.isoformat() + 'Z',
+    })
+
+
+
+@app.route('/admin/debug')
+@admin_required
+def admin_debug():
+    """Shows live connection status and any errors. Check Render logs for detail."""
+    results = {}
+    url = os.environ.get('SUPABASE_URL', '').strip()
+    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
+    results['supabase_url'] = (url[:40] + '...') if url else 'NOT SET'
+    results['supabase_key_set'] = bool(key)
+    results['is_render'] = IS_RENDER
+    results['use_supabase_storage'] = USE_SUPABASE_STORAGE
+    try:
+        results['users_count']    = sb_count('users')
+        results['plans_count']    = sb_count('plans')
+        results['deposits_count'] = sb_count('deposits')
+        results['status'] = 'OK - Database connection working'
+    except Exception as e:
+        import traceback
+        results['error'] = str(e)
+        results['traceback'] = traceback.format_exc()
+        results['status'] = 'ERROR'
+    return jsonify(results)
+
+# ═════════════════════════════════════════════
+# Error Handlers
+# ═════════════════════════════════════════════
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template('errors/403.html'), 403
+
+@app.errorhandler(404)
+def not_found(e):
+    return render_template('errors/404.html'), 404
+
+@app.errorhandler(500)
+def server_error(e):
+    return render_template('errors/500.html'), 500
+
+
+# ═════════════════════════════════════════════
+# Template Filters
+# ═════════════════════════════════════════════
+@app.template_filter('naira')
+def naira_filter(value):
+    try:
+        return f'₦{float(value or 0):,.2f}'
+    except (TypeError, ValueError):
+        return '₦0.00'
+
+@app.template_filter('date_fmt')
+def date_fmt(value, fmt='%d %b %Y'):
+    if not value:
+        return '—'
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace('Z','+00:00'))
+        except Exception:
+            return value
+    try:
+        return value.strftime(fmt)
+    except Exception:
+        return str(value)
+
+@app.template_filter('status_badge')
+def status_badge(status):
+    return {
+        'pending':   'badge-warning',
+        'approved':  'badge-success',
+        'rejected':  'badge-error',
+        'active':    'badge-info',
+        'completed': 'badge-success',
+    }.get(str(status or '').lower(), 'badge-neutral')
+
+
+# ═════════════════════════════════════════════
+# Startup — only seed DB if env vars are present
+# ═════════════════════════════════════════════
+with app.app_context():
+    url = os.environ.get('SUPABASE_URL', '').strip()
+    key = os.environ.get('SUPABASE_SECRET_KEY', '').strip()
+    if url and key and url.startswith('https://'):
+        try:
+            init_db()
+            print("✓ AgroVest Pro started with Supabase connection")
+        except Exception as _e:
+            print(f"⚠ DB seed skipped (tables may not exist yet — run supabase_setup.sql): {_e}")
+    else:
+        print("⚠ SUPABASE_URL / SUPABASE_SECRET_KEY not set — visit /setup for instructions")
+
+if __name__ == '__main__':
+    app.run(debug=False, host='0.0.0.0', port=5000)
