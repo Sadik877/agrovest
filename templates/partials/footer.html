@@ -8,20 +8,31 @@
           <div class="w-9 h-9 rounded-lg bg-gold-500 flex items-center justify-center">
             <span class="text-forest-950 font-display font-bold text-lg">A</span>
           </div>
-          <span class="font-display font-bold text-xl">Agro<span class="text-gold-500">Vest</span></span>
+          <span class="font-display font-bold text-xl">{{ site_settings.site_name }}</span>
         </a>
         <p class="text-gray-400 text-sm leading-relaxed mb-6">Nigeria's most trusted agricultural investment platform. Grow your wealth through sustainable farming.</p>
         <div class="flex gap-3">
-          <a href="#" class="w-9 h-9 rounded-full bg-white/10 hover:bg-gold-500 hover:text-forest-950 flex items-center justify-center transition-all">
+          {% if site_settings.facebook_link %}
+          <a href="{{ site_settings.facebook_link }}" target="_blank" rel="noopener" class="w-9 h-9 rounded-full bg-white/10 hover:bg-gold-500 hover:text-forest-950 flex items-center justify-center transition-all">
             <i data-lucide="facebook" class="w-4 h-4"></i>
           </a>
-          <a href="#" class="w-9 h-9 rounded-full bg-white/10 hover:bg-gold-500 hover:text-forest-950 flex items-center justify-center transition-all">
+          {% endif %}
+          {% if site_settings.twitter_link %}
+          <a href="{{ site_settings.twitter_link }}" target="_blank" rel="noopener" class="w-9 h-9 rounded-full bg-white/10 hover:bg-gold-500 hover:text-forest-950 flex items-center justify-center transition-all">
             <i data-lucide="twitter" class="w-4 h-4"></i>
           </a>
-          <a href="#" class="w-9 h-9 rounded-full bg-white/10 hover:bg-gold-500 hover:text-forest-950 flex items-center justify-center transition-all">
+          {% endif %}
+          {% if site_settings.instagram_link %}
+          <a href="{{ site_settings.instagram_link }}" target="_blank" rel="noopener" class="w-9 h-9 rounded-full bg-white/10 hover:bg-gold-500 hover:text-forest-950 flex items-center justify-center transition-all">
             <i data-lucide="instagram" class="w-4 h-4"></i>
           </a>
-          <a href="https://wa.me/2348000000000" class="w-9 h-9 rounded-full bg-white/10 hover:bg-gold-500 hover:text-forest-950 flex items-center justify-center transition-all">
+          {% endif %}
+          {% if site_settings.telegram_link %}
+          <a href="{{ site_settings.telegram_link }}" target="_blank" rel="noopener" class="w-9 h-9 rounded-full bg-white/10 hover:bg-gold-500 hover:text-forest-950 flex items-center justify-center transition-all">
+            <i data-lucide="send" class="w-4 h-4"></i>
+          </a>
+          {% endif %}
+          <a href="{{ site_settings.whatsapp_link or 'https://wa.me/2348000000000' }}" target="_blank" rel="noopener" class="w-9 h-9 rounded-full bg-white/10 hover:bg-gold-500 hover:text-forest-950 flex items-center justify-center transition-all">
             <i data-lucide="message-circle" class="w-4 h-4"></i>
           </a>
         </div>
@@ -56,7 +67,7 @@
         <ul class="space-y-3 text-sm text-gray-400">
           <li class="flex items-start gap-3">
             <i data-lucide="map-pin" class="w-4 h-4 text-gold-500 mt-0.5 flex-shrink-0"></i>
-            <span>12 Agric Investment Plaza, Victoria Island, Lagos, Nigeria</span>
+            <span>{{ site_settings.office_address or '12 Agric Investment Plaza, Victoria Island, Lagos, Nigeria' }}</span>
           </li>
           <li class="flex items-center gap-3">
             <i data-lucide="phone" class="w-4 h-4 text-gold-500 flex-shrink-0"></i>
@@ -64,7 +75,7 @@
           </li>
           <li class="flex items-center gap-3">
             <i data-lucide="mail" class="w-4 h-4 text-gold-500 flex-shrink-0"></i>
-            <a href="mailto:invest@agrovest.ng" class="hover:text-gold-400">invest@agrovest.ng</a>
+            <a href="mailto:{{ site_settings.support_email }}" class="hover:text-gold-400">{{ site_settings.support_email }}</a>
           </li>
           <li class="flex items-center gap-3">
             <i data-lucide="clock" class="w-4 h-4 text-gold-500 flex-shrink-0"></i>
@@ -76,7 +87,7 @@
 
     <!-- Divider -->
     <div class="border-t border-white/10 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-      <p class="text-gray-500 text-sm">&copy; 2024 AgroVest Pro. All rights reserved.</p>
+      <p class="text-gray-500 text-sm">&copy; 2026 {{ site_settings.site_name }}. All rights reserved.</p>
       <div class="flex gap-6 text-xs text-gray-500">
         <a href="privacy.html" class="hover:text-gold-400 transition-colors">Privacy Policy</a>
         <a href="terms.html" class="hover:text-gold-400 transition-colors">Terms of Service</a>
