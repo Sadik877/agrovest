@@ -16,7 +16,7 @@
           <span class="text-forest-950 font-bold text-sm">A</span>
         </div>
         <div>
-          <p class="text-white font-bold text-sm">AgroVest</p>
+          <p class="text-white font-bold text-sm">{{ site_settings.site_name }}</p>
           <p class="text-gray-400 text-xs">Admin Panel</p>
         </div>
       </div>
@@ -37,6 +37,9 @@
         ('admin_withdrawals','banknote',         'Withdrawals'),
         ('admin_investments','trending-up',      'Investments'),
         ('admin_messages',   'mail',             'Messages'),
+        ('admin_payment_settings', 'landmark',   'Payment Settings'),
+        ('admin_announcements', 'megaphone',     'Announcements'),
+        ('admin_settings',    'sliders-horizontal', 'Settings'),
       ] %}
       {% for endpoint, icon, label in admin_links %}
       <a href="{{ url_for(endpoint) }}"

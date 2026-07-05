@@ -38,7 +38,12 @@
             <p class="font-medium text-gray-900">{{ wd.full_name }}</p>
             <p class="text-xs text-gray-400">{{ wd.email }}</p>
           </td>
-          <td class="px-5 py-4 font-bold text-red-600">{{ wd.amount | naira }}</td>
+          <td class="px-5 py-4 font-bold text-red-600">
+            {{ wd.amount | naira }}
+            {% if wd.fee_amount and wd.fee_amount > 0 %}
+            <p class="text-xs font-normal text-gray-400 mt-0.5">Fee {{ wd.fee_amount | naira }} · Pay out {{ wd.net_amount | naira }}</p>
+            {% endif %}
+          </td>
           <td class="px-5 py-4">
             <p class="font-medium text-gray-800 text-xs">{{ wd.bank_name }}</p>
             <p class="font-mono text-gray-500 text-xs">{{ wd.account_number }}</p>
