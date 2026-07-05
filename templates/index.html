@@ -329,24 +329,29 @@
       <p class="text-gray-500 mt-3 max-w-xl mx-auto">Every plan is funded by a real, inspected farm — not a promise. Here's where your money actually works.</p>
     </div>
 
-    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       {% set farms = [
-        ('Rice Farm', '🌾', 'loremflickr.com/800/900/rice,paddy,farm', 'Irrigated paddy fields across Kebbi and Niger states, harvested twice yearly.'),
-        ('Maize Farm', '🌽', 'loremflickr.com/800/900/maize,cornfield,farm', 'High-yield hybrid maize grown on mechanized farmland in Kaduna.'),
-        ('Poultry Farm', '🐔', 'loremflickr.com/800/900/poultry,chicken,farm', 'Broiler and layer houses supplying eggs and meat to regional markets.'),
-        ('Fish Farm', '🐟', 'loremflickr.com/800/900/fish,aquaculture,farm', 'Catfish and tilapia ponds with controlled water quality and feeding cycles.'),
-        ('Greenhouse', '🥬', 'loremflickr.com/800/900/greenhouse,vegetables,farm', 'Climate-controlled greenhouses producing vegetables year-round.'),
-        ('Cattle Ranch', '🐄', 'loremflickr.com/800/900/cattle,ranch,farm', 'Grazing ranches with veterinary oversight across the Middle Belt.'),
+        ('Rice Farm', '🌾', 'farm1.jpg', 'Irrigated paddy fields across Kebbi and Niger states, harvested twice yearly.', '🌽 Crop Farming'),
+        ('Maize Farm', '🌽', 'farm2.jpg', 'High-yield hybrid maize grown on mechanized farmland in Kaduna.', '🌽 Crop Farming'),
+        ('Poultry Farm', '🐔', 'farm3.jpg', 'Broiler and layer houses supplying eggs and meat to regional markets.', '🐓 Poultry'),
+        ('Fish Farm', '🐟', 'farm4.jpg', 'Catfish and tilapia ponds with controlled water quality and feeding cycles.', '🐟 Fish Farming'),
+        ('Greenhouse', '🥬', 'farm5.jpg', 'Climate-controlled greenhouses producing vegetables year-round.', '🌿 Greenhouse'),
+        ('Cattle Ranch', '🐄', 'farm6.jpg', 'Grazing ranches with veterinary oversight across the Middle Belt.', '🐄 Livestock'),
       ] %}
-      {% for name, icon, img, desc in farms %}
-      <div class="group relative rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 animate-on-scroll" style="animation-delay: {{ loop.index0 * 0.1 }}s">
-        <div class="aspect-[4/5] w-full overflow-hidden bg-forest-950">
-          <img src="https://{{ img }}" alt="{{ name }}" loading="lazy"
-               class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" />
+      {% for name, icon, img, desc, category in farms %}
+      <div class="group relative rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-500 animate-on-scroll" style="animation-delay: {{ loop.index0 * 0.1 }}s">
+        <div class="aspect-[4/5] w-full overflow-hidden bg-forest-950 rounded-xl">
+          <img src="{{ url_for('static', filename='images/' ~ img) }}" alt="AgroVest Farm" loading="lazy"
+               class="w-full h-full object-cover rounded-xl transition-transform duration-700 ease-out group-hover:scale-110" />
         </div>
 
         <!-- Glassmorphism overlay -->
-        <div class="absolute inset-0 bg-gradient-to-t from-forest-950 via-forest-950/40 to-transparent"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-forest-950 via-forest-950/40 to-transparent rounded-xl pointer-events-none"></div>
+
+        <!-- Category label -->
+        <div class="absolute top-4 left-4 glass rounded-full px-3 py-1.5">
+          <span class="text-[11px] font-bold text-white">{{ category }}</span>
+        </div>
 
         <!-- Verified badge -->
         <div class="absolute top-4 right-4 flex items-center gap-1.5 glass rounded-full pl-2 pr-3 py-1.5">
