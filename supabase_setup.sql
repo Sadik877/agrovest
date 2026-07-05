@@ -249,3 +249,44 @@ SELECT 'AgroVest tables created successfully!' AS status;
 -- INSERT INTO storage.buckets (id, name, public)
 -- VALUES ('plan-images', 'plan-images', true)
 -- ON CONFLICT (id) DO NOTHING;
+
+-- ════════════════════════════════════════════
+-- MIGRATION — Payment Settings & Multi-Bank Accounts
+-- Safe to re-run. Adds:
+--   1. `settings` key/value table (used by maintenance mode already —
+--      created here in case your database doesn't have it yet).
+--   2. `bank_accounts` table — unlimited admin-managed accounts, with
+--      exactly one flagged is_active at a time (enforced by the app,
+--      not a DB constraint, so admins can freely add/remove accounts).
+--   3. `fee_amount` / `net_amount` columns on withdrawals — used when
+--      an admin configures a withdrawal fee percentage in Payment
+--      Settings. Existing rows are unaffected (defaults to 0 / amount).
+-- ════════════════════════════════════════════
+
+-- 8. SETTINGS (key/value store — also used by maintenance mode)
+CREATE TABLE IF NOT EXISTS public.settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;
+
+-- 9. BANK ACCOUNTS (unlimited, admin-managed — only one is_active shows on payment.html)
+CREATE TABLE IF NOT EXISTS public.bank_accounts (
+    id             BIGSERIAL PRIMARY KEY,
+    bank_name      TEXT NOT NULL,
+    account_number TEXT NOT NULL,
+    account_name   TEXT NOT NULL,
+    logo_color     TEXT DEFAULT '#0f3d2e',
+    is_active      BOOLEAN DEFAULT FALSE,
+    sort_order     INTEGER DEFAULT 0,
+    created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_bank_accounts_active ON public.bank_accounts(is_active);
+ALTER TABLE public.bank_accounts DISABLE ROW LEVEL SECURITY;
+
+-- Withdrawal fee columns (percentage-based fee, configured in Payment Settings)
+ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS fee_amount NUMERIC(15,2) DEFAULT 0;
+ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS net_amount NUMERIC(15,2);
+
+SELECT 'Payment settings & bank accounts migration applied successfully!' AS status;

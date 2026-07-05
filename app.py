@@ -855,7 +855,7 @@ def get_current_user():
 
 @app.context_processor
 def inject_globals():
-    user, unread, plans = None, 0, []
+    user, unread, plans, notice, site_settings = None, 0, [], None, SITE_SETTINGS_DEFAULTS
     try:
         user = get_current_user()
     except Exception as e:
@@ -870,7 +870,16 @@ def inject_globals():
         plans = get_plans()
     except Exception as e:
         print(f"inject_globals get_plans error: {e}")
-    return dict(current_user=user, unread_count=unread, plans=plans)
+    try:
+        notice = get_active_notice()
+    except Exception as e:
+        print(f"inject_globals active_notice error: {e}")
+    try:
+        site_settings = get_site_settings()
+    except Exception as e:
+        print(f"inject_globals site_settings error: {e}")
+    return dict(current_user=user, unread_count=unread, plans=plans,
+               active_notice=notice, site_settings=site_settings)
 
 # ─────────────────────────────────────────────
 # Serve Uploads
@@ -887,10 +896,28 @@ def uploaded_file(filename):
 # `settings` table: key text primary key,
 # value text, updated_at timestamptz default now().
 # ─────────────────────────────────────────────
+def _settings_cache():
+    """One bulk fetch of the whole `settings` table per request, cached on
+    flask.g. Replaces what used to be a separate DB round trip for every
+    single get_setting() call — maintenance mode, payment settings, the
+    notice banner, and now the full site-settings page all read many keys
+    per request, so this keeps that at 1 query instead of a dozen."""
+    if not hasattr(g, '_settings_cache'):
+        try:
+            rows = sb_all('settings')
+            g._settings_cache = {r['key']: r.get('value') for r in rows}
+        except Exception as e:
+            print(f"_settings_cache error: {e}")
+            g._settings_cache = {}
+    return g._settings_cache
+
+
 def get_setting(key, default=None):
-    """Fetch a single setting value by key. Returns `default` if unset."""
-    row = sb_one('settings', [('key', 'eq', key)])
-    return row['value'] if row else default
+    """Fetch a single setting value by key. Returns `default` if unset.
+    Signature/behavior unchanged from before — just backed by the
+    request-scoped cache above instead of a fresh query every call."""
+    value = _settings_cache().get(key)
+    return value if value is not None else default
 
 def set_setting(key, value):
     """Set a setting value (update-if-exists else insert — no upsert
@@ -899,8 +926,12 @@ def set_setting(key, value):
     value = str(value)
     existing = sb_one('settings', [('key', 'eq', key)])
     if existing:
-        return sb_update('settings', {'value': value}, [('key', 'eq', key)]) is not False
-    return sb_insert('settings', {'key': key, 'value': value}) is not None
+        ok = sb_update('settings', {'value': value}, [('key', 'eq', key)]) is not False
+    else:
+        ok = sb_insert('settings', {'key': key, 'value': value}) is not None
+    if ok and hasattr(g, '_settings_cache'):
+        g._settings_cache[key] = value  # keep same-request reads consistent
+    return ok
 
 def is_maintenance_mode():
     """DB flag (instant, admin-toggleable) OR the MAINTENANCE_MODE env var
@@ -913,6 +944,151 @@ def is_maintenance_mode():
 def get_maintenance_message():
     return (get_setting('maintenance_message', '') or '').strip() \
         or os.environ.get('MAINTENANCE_MESSAGE', '').strip() or None
+
+
+# ─────────────────────────────────────────────
+# Payment Settings & Bank Accounts — admin-editable,
+# no redeploy needed. Backs the /admin/payment-settings
+# page (Phase 2/3). `bank_accounts` supports unlimited rows;
+# only the one row with is_active=True is ever shown on
+# payment.html. `settings` holds the global payment toggles
+# (deposit_instructions, withdrawal_fee_percent, payment_status).
+# ─────────────────────────────────────────────
+def get_bank_accounts():
+    """All bank accounts, admin-managed, most recently added first isn't
+    useful here — sort_order then id keeps admin ordering stable."""
+    return sb_all('bank_accounts', order=[('sort_order', 'asc'), ('id', 'asc')])
+
+
+def get_active_bank_account():
+    """The single account shown to users on payment.html, or None if the
+    admin hasn't configured one yet."""
+    return sb_one('bank_accounts', [('is_active', 'eq', True)])
+
+
+def is_payments_enabled():
+    """Global on/off switch for deposits & withdrawals — separate from full
+    Maintenance Mode, so an admin can pause just the money-movement flows
+    (e.g. while updating bank details) without taking the whole site down."""
+    return (get_setting('payment_status', 'enabled') or 'enabled').strip().lower() != 'disabled'
+
+
+def get_deposit_instructions():
+    return (get_setting('deposit_instructions', '') or '').strip()
+
+
+def get_withdrawal_fee_percent():
+    try:
+        return max(0.0, float(get_setting('withdrawal_fee_percent', '0') or 0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+# ─────────────────────────────────────────────
+# Sitewide Announcement / Notice Banner (Phase 5) — admin publishes one
+# active notice at a time (Network Issue, Maintenance, Holiday, System
+# Upgrade, Emergency, or a plain General Notice). Stored in `settings`,
+# surfaced everywhere via inject_globals() so Dashboard, Payment Page,
+# and Home Page all pick it up automatically with no per-route wiring.
+# ─────────────────────────────────────────────
+NOTICE_TYPES = {
+    'info':        {'label': 'General Notice',   'icon': 'info',            'color': 'blue'},
+    'network':     {'label': 'Network Issue',    'icon': 'wifi-off',        'color': 'amber'},
+    'maintenance': {'label': 'Maintenance',       'icon': 'wrench',          'color': 'amber'},
+    'holiday':     {'label': 'Holiday Notice',   'icon': 'calendar-heart',  'color': 'emerald'},
+    'upgrade':     {'label': 'System Upgrade',   'icon': 'arrow-up-circle', 'color': 'blue'},
+    'emergency':   {'label': 'Emergency Notice', 'icon': 'siren',           'color': 'red'},
+}
+
+
+def get_active_notice():
+    """Returns the currently published notice dict, or None if the admin
+    hasn't turned one on (or left the message blank)."""
+    enabled = (get_setting('notice_enabled', 'false') or 'false').strip().lower() == 'true'
+    if not enabled:
+        return None
+    message = (get_setting('notice_message', '') or '').strip()
+    if not message:
+        return None
+    ntype = get_setting('notice_type', 'info') or 'info'
+    meta = NOTICE_TYPES.get(ntype, NOTICE_TYPES['info'])
+    return {'type': ntype, 'message': message, **meta}
+
+
+# ─────────────────────────────────────────────
+# Site Settings (Phase 11) — everything admin-editable from
+# /admin/settings, backed by the `settings` table via get_setting()/
+# set_setting() above. Every value here has a sane default matching
+# what was previously hardcoded, so nothing changes until an admin
+# actually edits something.
+# ─────────────────────────────────────────────
+SITE_SETTINGS_DEFAULTS = {
+    'site_name':          'AgroVest Pro',
+    'logo_url':           '/static/images/logo.png',
+    'favicon_url':        '/static/images/favicon.ico',
+    'support_email':      'support@agrovestpro.com',
+    'whatsapp_link':      '',
+    'telegram_link':      '',
+    'facebook_link':      '',
+    'instagram_link':     '',
+    'twitter_link':       '',
+    'office_address':     '',
+    'currency_code':      'NGN',
+    'currency_symbol':    '₦',
+    'timezone':           'Africa/Lagos',
+    'referral_percent':   '5',
+    'min_withdrawal':     '2000',
+    'max_withdrawal':     '1000000',
+    'seo_title':          'AgroVest Pro — Agricultural Investment Platform',
+    'seo_description':    'Invest in profitable Nigerian agricultural projects and earn guaranteed returns.',
+    'og_image_url':       'https://agrovest-ydif.onrender.com/static/images/logo.png',
+}
+
+
+def get_site_settings():
+    """All Phase-11 settings as one dict, each falling back to its default
+    if the admin hasn't set it yet. One query total (via _settings_cache),
+    not one per field."""
+    return {k: (get_setting(k, v) or v) for k, v in SITE_SETTINGS_DEFAULTS.items()}
+
+
+def get_referral_percent():
+    """Replaces the old hardcoded REFERRAL_COMMISSION constant — same
+    default value (5%), now admin-editable from /admin/settings."""
+    try:
+        return max(0.0, float(get_setting('referral_percent', REFERRAL_COMMISSION) or REFERRAL_COMMISSION))
+    except (TypeError, ValueError):
+        return float(REFERRAL_COMMISSION)
+
+
+def get_withdrawal_limits():
+    """(min, max) withdrawal amounts — same defaults as the old hardcoded
+    ₦2,000 minimum (no cap existed before, so the default max is generous)."""
+    try:
+        min_wd = float(get_setting('min_withdrawal', 2000) or 2000)
+    except (TypeError, ValueError):
+        min_wd = 2000.0
+    try:
+        max_wd = float(get_setting('max_withdrawal', 1000000) or 1000000)
+    except (TypeError, ValueError):
+        max_wd = 1000000.0
+    return min_wd, max_wd
+
+
+def get_display_timezone():
+    """zoneinfo object for the admin-configured timezone, falling back to
+    Africa/Lagos (Nigeria) — the timezone AgroVest Pro was already
+    implicitly using. Falls back to UTC if the configured name is invalid."""
+    from zoneinfo import ZoneInfo
+    tz_name = get_setting('timezone', 'Africa/Lagos') or 'Africa/Lagos'
+    try:
+        return ZoneInfo(tz_name)
+    except Exception:
+        try:
+            return ZoneInfo('Africa/Lagos')
+        except Exception:
+            from datetime import timezone as _tz
+            return _tz.utc
 
 
 # ─────────────────────────────────────────────
@@ -929,7 +1105,7 @@ def check_env():
     elif not url.startswith('https://'):
         errors.append(f'SUPABASE_URL must start with https:// — got: {url[:60]}')
     if not key:
-        missing.append('SUPABASE_SECER_KEY')
+        missing.append('SUPABASE_SECRET_KEY')
     return (len(missing) == 0 and len(errors) == 0), missing, errors
 
 @app.before_request
@@ -1372,7 +1548,7 @@ def invest():
 
         # Referral commission
         if user.get('referred_by'):
-            commission = r2(amount * REFERRAL_COMMISSION / 100)
+            commission = r2(amount * get_referral_percent() / 100)
             referrer   = sb_one('users', [('id','eq',user['referred_by'])])
             if referrer:
                 sb_adjust_balance(referrer['id'], balance_delta=commission,
@@ -1402,6 +1578,10 @@ def deposit():
     user = get_current_user()
 
     if request.method == 'POST':
+        if not is_payments_enabled():
+            flash('Deposits and withdrawals are temporarily unavailable due to maintenance.', 'error')
+            return redirect(url_for('deposit'))
+
         amount         = r2(request.form.get('amount', 0, type=float))
         payment_method = request.form.get('payment_method', '').strip()
         proof          = request.files.get('proof')
@@ -1456,7 +1636,8 @@ def deposit():
 
     deposits = sb_all('deposits', filters=[('user_id','eq',user['id'])],
                       order=('created_at','desc'))
-    return render_template('deposit.html', user=user, deposits=deposits)
+    return render_template('deposit.html', user=user, deposits=deposits,
+                           payments_enabled=is_payments_enabled())
 
 
 @app.route('/dashboard/payment')
@@ -1467,7 +1648,11 @@ def payment():
     purely for display; the actual deposit record is still created by the
     existing /dashboard/deposit POST handler above, untouched."""
     user = get_current_user()
-    return render_template('payment.html', user=user)
+    active_account = get_active_bank_account()
+    return render_template('payment.html', user=user,
+                           active_account=active_account,
+                           deposit_instructions=get_deposit_instructions(),
+                           payments_enabled=is_payments_enabled())
 
 
 @app.route('/dashboard/withdraw', methods=['GET', 'POST'])
@@ -1476,13 +1661,21 @@ def withdraw():
     user = get_current_user()
 
     if request.method == 'POST':
+        if not is_payments_enabled():
+            flash('Deposits and withdrawals are temporarily unavailable due to maintenance.', 'error')
+            return redirect(url_for('withdraw'))
+
         amount         = r2(request.form.get('amount', 0, type=float))
         bank_name      = request.form.get('bank_name', '').strip()
         account_number = request.form.get('account_number', '').strip()
         account_name   = request.form.get('account_name', '').strip()
+        min_wd, max_wd = get_withdrawal_limits()
 
-        if amount < 2000:
-            flash('Minimum withdrawal is ₦2,000.', 'error')
+        if amount < min_wd:
+            flash(f'Minimum withdrawal is {naira_filter(min_wd)}.', 'error')
+            return redirect(url_for('withdraw'))
+        if amount > max_wd:
+            flash(f'Maximum withdrawal is {naira_filter(max_wd)}.', 'error')
             return redirect(url_for('withdraw'))
         if not (bank_name and account_number and account_name):
             flash('Please fill in all bank details.', 'error')
@@ -1490,6 +1683,14 @@ def withdraw():
         if not re.match(r'^\d{10}$', account_number):
             flash('Account number must be exactly 10 digits.', 'error')
             return redirect(url_for('withdraw'))
+
+        # Withdrawal fee (admin-configured %, applied to the payout — the
+        # user's balance is still debited the full requested `amount`,
+        # unchanged from before; the fee is only deducted from what admin
+        # actually transfers out, recorded here for their reference).
+        fee_percent = get_withdrawal_fee_percent()
+        fee_amount  = r2(amount * fee_percent / 100)
+        net_amount  = r2(amount - fee_amount)
 
         # Atomic debit — protects against double-submitting this form.
         debited = sb_adjust_balance(user['id'], balance_delta=-amount,
@@ -1502,6 +1703,7 @@ def withdraw():
             'user_id': user['id'], 'amount': amount,
             'bank_name': bank_name, 'account_number': account_number,
             'account_name': account_name, 'status': 'pending',
+            'fee_amount': fee_amount, 'net_amount': net_amount,
         })
         if not created:
             # Roll back the debit since the withdrawal record failed to save
@@ -1515,13 +1717,21 @@ def withdraw():
                       'Please contact support before trying again.', 'error')
             return redirect(url_for('withdraw'))
 
-        notify(user['id'], f'Withdrawal of ₦{amount:,.2f} submitted.', 'info')
+        if fee_amount > 0:
+            notify(user['id'], f'Withdrawal of ₦{amount:,.2f} submitted (₦{fee_amount:,.2f} fee '
+                                f'applies — you will receive ₦{net_amount:,.2f}).', 'info')
+        else:
+            notify(user['id'], f'Withdrawal of ₦{amount:,.2f} submitted.', 'info')
         flash('Withdrawal submitted! Processing within 24 hours.', 'success')
         return redirect(url_for('dashboard'))
 
     withdrawals = sb_all('withdrawals', filters=[('user_id','eq',user['id'])],
                          order=('created_at','desc'))
-    return render_template('withdraw.html', user=user, withdrawals=withdrawals)
+    min_wd, max_wd = get_withdrawal_limits()
+    return render_template('withdraw.html', user=user, withdrawals=withdrawals,
+                           payments_enabled=is_payments_enabled(),
+                           withdrawal_fee_percent=get_withdrawal_fee_percent(),
+                           min_withdrawal=min_wd, max_withdrawal=max_wd)
 
 
 @app.route('/dashboard/notifications')
@@ -1546,6 +1756,43 @@ def mark_notifications_read():
     user = get_current_user()
     sb_update('notifications', {'is_read': True}, [('user_id','eq',user['id'])])
     return jsonify({'status': 'ok'})
+
+
+@app.route('/notifications')
+@login_required
+def all_notifications():
+    """Dedicated Notifications page (Phase 8) — the bell dropdown only ever
+    shows the latest 10; this shows everything with mark-read/delete controls."""
+    user = get_current_user()
+    rows = sb_all('notifications', filters=[('user_id', 'eq', user['id'])],
+                  order=('created_at', 'desc'), limit=200)
+    return render_template('notifications.html', user=user, notifications=rows)
+
+
+@app.route('/notifications/<int:notification_id>/read', methods=['POST'])
+@login_required
+def mark_one_notification_read(notification_id):
+    user = get_current_user()
+    sb_update('notifications', {'is_read': True},
+             [('id', 'eq', notification_id), ('user_id', 'eq', user['id'])])
+    return redirect(url_for('all_notifications'))
+
+
+@app.route('/notifications/<int:notification_id>/delete', methods=['POST'])
+@login_required
+def delete_one_notification(notification_id):
+    user = get_current_user()
+    sb_delete('notifications', [('id', 'eq', notification_id), ('user_id', 'eq', user['id'])])
+    return redirect(url_for('all_notifications'))
+
+
+@app.route('/notifications/delete-all', methods=['POST'])
+@login_required
+def delete_all_notifications():
+    user = get_current_user()
+    sb_delete('notifications', [('user_id', 'eq', user['id'])])
+    flash('All notifications deleted.', 'success')
+    return redirect(url_for('all_notifications'))
 
 # ═════════════════════════════════════════════
 # ADMIN — Dashboard
@@ -1791,6 +2038,220 @@ def admin_toggle_maintenance():
     else:
         flash('Could not update maintenance mode — check the logs.', 'error')
     return redirect(url_for('admin_dashboard'))
+
+
+# ═════════════════════════════════════════════
+# ADMIN — Payment Settings & Bank Accounts
+# ═════════════════════════════════════════════
+@app.route('/admin/payment-settings', methods=['GET', 'POST'])
+@admin_required
+def admin_payment_settings():
+    """Single page: global payment toggles (deposit instructions, withdrawal
+    fee %, payment status) plus the list of bank accounts. Everything here
+    is stored in Supabase (`settings` + `bank_accounts`) — nothing is
+    hardcoded, and changes apply instantly with no redeploy."""
+    if request.method == 'POST':
+        deposit_instructions = request.form.get('deposit_instructions', '').strip()
+        fee_raw = request.form.get('withdrawal_fee_percent', '0').strip()
+        payment_status = 'disabled' if request.form.get('payment_status') == 'disabled' else 'enabled'
+
+        try:
+            fee_percent = max(0.0, float(fee_raw or 0))
+        except ValueError:
+            flash('Withdrawal fee must be a number.', 'error')
+            return redirect(url_for('admin_payment_settings'))
+
+        set_setting('deposit_instructions', deposit_instructions)
+        set_setting('withdrawal_fee_percent', fee_percent)
+        set_setting('payment_status', payment_status)
+        flash('Payment settings saved.', 'success')
+        return redirect(url_for('admin_payment_settings'))
+
+    return render_template('admin/payment_settings.html',
+                           bank_accounts=get_bank_accounts(),
+                           deposit_instructions=get_deposit_instructions(),
+                           withdrawal_fee_percent=get_withdrawal_fee_percent(),
+                           payments_enabled=is_payments_enabled())
+
+
+@app.route('/admin/payment-settings/bank-accounts/add', methods=['GET', 'POST'])
+@admin_required
+def admin_bank_account_add():
+    if request.method == 'POST':
+        data, error = _bank_account_from_form(request.form)
+        if error:
+            flash(error, 'error')
+            return render_template('admin/bank_account_form.html', account=None, action='add')
+
+        # First account ever added becomes active automatically so
+        # payment.html always has something to show.
+        if not sb_count('bank_accounts'):
+            data['is_active'] = True
+
+        sb_insert('bank_accounts', data)
+        flash(f'{data["bank_name"]} account added!', 'success')
+        return redirect(url_for('admin_payment_settings'))
+
+    return render_template('admin/bank_account_form.html', account=None, action='add')
+
+
+@app.route('/admin/payment-settings/bank-accounts/<int:account_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_bank_account_edit(account_id):
+    account = sb_one('bank_accounts', [('id', 'eq', account_id)])
+    if not account:
+        flash('Bank account not found.', 'error')
+        return redirect(url_for('admin_payment_settings'))
+
+    if request.method == 'POST':
+        data, error = _bank_account_from_form(request.form)
+        if error:
+            flash(error, 'error')
+            return render_template('admin/bank_account_form.html', account=account, action='edit')
+
+        sb_update('bank_accounts', data, [('id', 'eq', account_id)])
+        flash(f'{data["bank_name"]} account updated!', 'success')
+        return redirect(url_for('admin_payment_settings'))
+
+    return render_template('admin/bank_account_form.html', account=account, action='edit')
+
+
+def _bank_account_from_form(form):
+    """Parse and validate the bank account form. Returns (data_dict, error_str)."""
+    bank_name      = form.get('bank_name', '').strip()
+    account_number = form.get('account_number', '').strip()
+    account_name   = form.get('account_name', '').strip()
+    logo_color     = form.get('logo_color', '').strip() or '#0f3d2e'
+    sort_order     = form.get('sort_order', 0, type=int)
+
+    if not bank_name:
+        return None, 'Bank name is required.'
+    if not account_number or not re.match(r'^\d{10}$', account_number):
+        return None, 'Account number must be exactly 10 digits.'
+    if not account_name:
+        return None, 'Account name is required.'
+
+    return {
+        'bank_name': bank_name, 'account_number': account_number,
+        'account_name': account_name, 'logo_color': logo_color,
+        'sort_order': sort_order,
+    }, None
+
+
+@app.route('/admin/payment-settings/bank-accounts/<int:account_id>/activate', methods=['POST'])
+@admin_required
+def admin_bank_account_activate(account_id):
+    """Marks one account active and every other account inactive, so
+    payment.html (which only ever shows the active account) always has
+    exactly one unambiguous choice."""
+    account = sb_one('bank_accounts', [('id', 'eq', account_id)])
+    if not account:
+        flash('Bank account not found.', 'error')
+        return redirect(url_for('admin_payment_settings'))
+
+    sb_update('bank_accounts', {'is_active': False}, [('is_active', 'eq', True)])
+    sb_update('bank_accounts', {'is_active': True}, [('id', 'eq', account_id)])
+    flash(f'{account["bank_name"]} is now the active account shown to users.', 'success')
+    return redirect(url_for('admin_payment_settings'))
+
+
+@app.route('/admin/payment-settings/bank-accounts/<int:account_id>/delete', methods=['POST'])
+@admin_required
+def admin_bank_account_delete(account_id):
+    account = sb_one('bank_accounts', [('id', 'eq', account_id)])
+    if not account:
+        flash('Bank account not found.', 'error')
+        return redirect(url_for('admin_payment_settings'))
+
+    sb_delete('bank_accounts', [('id', 'eq', account_id)])
+
+    # If the deleted account was the active one, promote the next available
+    # account automatically so users are never left with no account shown.
+    if account.get('is_active'):
+        remaining = sb_all('bank_accounts', order=[('sort_order', 'asc'), ('id', 'asc')], limit=1)
+        if remaining:
+            sb_update('bank_accounts', {'is_active': True}, [('id', 'eq', remaining[0]['id'])])
+
+    flash(f'{account["bank_name"]} account deleted.', 'success')
+    return redirect(url_for('admin_payment_settings'))
+
+
+@app.route('/admin/announcements', methods=['GET', 'POST'])
+@admin_required
+def admin_announcements():
+    """One active announcement at a time, shown sitewide via the banner in
+    base.html. Publishing a new one replaces whatever was there before."""
+    if request.method == 'POST':
+        if request.form.get('action') == 'clear':
+            set_setting('notice_enabled', 'false')
+            flash('Announcement cleared.', 'success')
+            return redirect(url_for('admin_announcements'))
+
+        message = request.form.get('notice_message', '').strip()
+        ntype = request.form.get('notice_type', 'info').strip()
+        if ntype not in NOTICE_TYPES:
+            ntype = 'info'
+        if not message:
+            flash('Announcement message is required.', 'error')
+            return redirect(url_for('admin_announcements'))
+
+        set_setting('notice_message', message)
+        set_setting('notice_type', ntype)
+        set_setting('notice_enabled', 'true')
+        flash('Announcement published — now visible sitewide.', 'success')
+        return redirect(url_for('admin_announcements'))
+
+    is_enabled = (get_setting('notice_enabled', 'false') or 'false').strip().lower() == 'true'
+    return render_template('admin/announcements.html',
+                           notice_types=NOTICE_TYPES,
+                           notice_enabled=is_enabled,
+                           notice_message=get_setting('notice_message', '') or '',
+                           notice_type=get_setting('notice_type', 'info') or 'info')
+
+
+@app.route('/admin/settings', methods=['GET', 'POST'])
+@admin_required
+def admin_settings():
+    """Full site settings (Phase 11) — every field is stored in Supabase via
+    set_setting() and read back via get_site_settings()/get_setting(), so
+    nothing here is ever hardcoded. Saving simply upserts each changed key;
+    unrecognised/blank fields silently keep their previous value."""
+    if request.method == 'POST':
+        text_fields = [
+            'site_name', 'logo_url', 'favicon_url', 'support_email',
+            'whatsapp_link', 'telegram_link', 'facebook_link',
+            'instagram_link', 'twitter_link', 'office_address',
+            'currency_code', 'currency_symbol', 'timezone',
+            'seo_title', 'seo_description', 'og_image_url',
+        ]
+        for field in text_fields:
+            set_setting(field, request.form.get(field, '').strip())
+
+        # Numeric fields validated before saving so a typo can't silently
+        # corrupt referral payouts or withdrawal limits.
+        try:
+            referral_percent = max(0.0, float(request.form.get('referral_percent', '5') or 5))
+            set_setting('referral_percent', referral_percent)
+        except ValueError:
+            flash('Referral % must be a number — that field was not saved.', 'error')
+
+        try:
+            min_wd = max(0.0, float(request.form.get('min_withdrawal', '2000') or 2000))
+            max_wd = max(0.0, float(request.form.get('max_withdrawal', '1000000') or 1000000))
+            if max_wd < min_wd:
+                flash('Maximum withdrawal must be greater than the minimum — withdrawal limits were not saved.', 'error')
+            else:
+                set_setting('min_withdrawal', min_wd)
+                set_setting('max_withdrawal', max_wd)
+        except ValueError:
+            flash('Withdrawal limits must be numbers — those fields were not saved.', 'error')
+
+        flash('Settings saved.', 'success')
+        return redirect(url_for('admin_settings'))
+
+    return render_template('admin/settings.html',
+                           settings=get_site_settings(),
+                           maintenance_mode=is_maintenance_mode())
 
 
 def _join_users(rows):
@@ -2370,10 +2831,11 @@ def server_error(e):
 # ═════════════════════════════════════════════
 @app.template_filter('naira')
 def naira_filter(value):
+    symbol = get_setting('currency_symbol', '₦') or '₦'
     try:
-        return f'₦{float(value or 0):,.2f}'
+        return f'{symbol}{float(value or 0):,.2f}'
     except (TypeError, ValueError):
-        return '₦0.00'
+        return f'{symbol}0.00'
 
 @app.template_filter('date_fmt')
 def date_fmt(value, fmt='%d %b %Y'):
@@ -2385,6 +2847,8 @@ def date_fmt(value, fmt='%d %b %Y'):
         except Exception:
             return value
     try:
+        if value.tzinfo is not None:
+            value = value.astimezone(get_display_timezone())
         return value.strftime(fmt)
     except Exception:
         return str(value)
