@@ -531,21 +531,7 @@ function copyRef() {
 // Build share-intent links client-side from the existing referral code (no backend calls)
 (function() {
   const refUrl = document.getElementById('ref-code').textContent.trim();
-  const message = `🌱 Start Growing Your Money with AgroVest!
-
-Invest in verified Nigerian agricultural projects and enjoy reliable daily returns.
-
-✅ Investment Plans from ₦3,000
-💰 Daily Profit
-🔒 Secure Platform
-⚡ Fast Withdrawals
-🎁 Referral Rewards
-
-🚀 Create your FREE account today using my invitation:
-
-${refUrl}
-
-AgroVest — Growing Wealth Through Agriculture.`;
+  const message = "Join me and start growing your money — sign up here: " + refUrl;
 
   const wa = document.getElementById('share-whatsapp');
   if (wa) wa.href = "https://wa.me/?text=" + encodeURIComponent(message);
