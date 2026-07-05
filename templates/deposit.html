@@ -19,6 +19,12 @@
     </div>
 
     <div class="p-8">
+      {% if not payments_enabled %}
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
+        <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5"></i>
+        <p class="text-sm font-semibold text-amber-800">Deposits and withdrawals are temporarily unavailable due to maintenance.</p>
+      </div>
+      {% endif %}
       <div class="mb-8">
         <h2 class="text-xl font-bold text-gray-900 mb-1">How much do you want to deposit?</h2>
         <p class="text-sm text-gray-500">Minimum deposit is ₦1,000. Funds arrive within 30 minutes.</p>
@@ -87,7 +93,8 @@
       </div>
 
       <!-- Continue button -->
-      <button type="button" onclick="proceedToPayment()" class="w-full bg-forest-950 hover:bg-forest-800 text-white font-bold py-4 rounded-2xl transition-colors text-base shadow-lg flex items-center justify-center gap-2">
+      <button type="button" onclick="proceedToPayment()" {{ 'disabled' if not payments_enabled else '' }}
+        class="w-full bg-forest-950 hover:bg-forest-800 text-white font-bold py-4 rounded-2xl transition-colors text-base shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
         Continue to Payment
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
       </button>

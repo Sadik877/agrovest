@@ -69,18 +69,14 @@
         <span id="copy-label">Copy Account Number</span>
       </button>
 
-      <!-- Switch account (manual only) -->
-      <button
-        type="button"
-        onclick="nextAccount()"
-        aria-label="Switch to next bank account"
-        class="mt-2 w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-gray-500 text-sm font-semibold hover:text-forest-700 hover:bg-forest-50/60 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-forest-500 focus:ring-offset-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-        Use a different account
-      </button>
+      {% if not active_account %}
+      <div class="mt-5 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
+        <p class="text-sm font-semibold text-amber-800">No payment account is configured yet.</p>
+        <p class="text-xs text-amber-600 mt-1">Please contact support before making a transfer.</p>
+      </div>
+      {% endif %}
 
-      <!-- Account position dots -->
+      <!-- Account position dots (only relevant when more than one account is shown) -->
       <div class="flex items-center justify-center gap-1.5 mt-4" id="account-dots" role="tablist" aria-label="Bank account selector"></div>
     </div>
   </div>
@@ -111,8 +107,20 @@
     </ol>
   </div>
 
+  {% if deposit_instructions %}
+  <div class="bg-forest-50 border border-forest-100 rounded-3xl p-6 mb-5">
+    <p class="text-xs font-bold text-forest-800 uppercase tracking-widest mb-2">A Note From AgroVest</p>
+    <p class="text-sm text-forest-900 whitespace-pre-line leading-relaxed">{{ deposit_instructions }}</p>
+  </div>
+  {% endif %}
+
   <!-- Proof upload form (submits to existing deposit route) -->
   <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+    {% if not payments_enabled %}
+    <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5 text-center">
+      <p class="text-sm font-bold text-amber-800">Deposits and withdrawals are temporarily unavailable due to maintenance.</p>
+    </div>
+    {% endif %}
     <p class="font-bold text-gray-900 mb-1">I've made the transfer</p>
     <p class="text-sm text-gray-500 mb-5">Upload your payment receipt to confirm your deposit.</p>
 
@@ -190,29 +198,21 @@
 </style>
 
 <script>
-  // ─── Bank accounts pool (logos are inline SVG markup) ─────────────
+  // ─── Bank account(s) — sourced from Supabase via Admin → Payment Settings.
+  // Only the admin's ACTIVE account is ever passed here, so this array has
+  // at most one entry (never hardcoded/fake data). ────────────────────────
+  {% if active_account %}
   const ACCOUNTS = [
     {
-      bank: 'Zenith Bank', number: '2089234567', name: 'AgroVest Nigeria Ltd',
-      logo: `<svg viewBox="0 0 100 100" class="w-7 h-7" aria-hidden="true"><rect width="100" height="100" rx="20" fill="#E60000"/><text x="50" y="64" font-family="Inter, sans-serif" font-size="44" font-weight="900" fill="#fff" text-anchor="middle">Z</text></svg>`
-    },
-    {
-      bank: 'GTBank', number: '0123456789', name: 'AgroVest Nigeria Ltd',
-      logo: `<svg viewBox="0 0 100 100" class="w-7 h-7" aria-hidden="true"><rect width="100" height="100" rx="20" fill="#FF6600"/><text x="50" y="62" font-family="Inter, sans-serif" font-size="32" font-weight="900" fill="#fff" text-anchor="middle">GT</text></svg>`
-    },
-    {
-      bank: 'Access Bank', number: '0987654321', name: 'AgroVest Nigeria Ltd',
-      logo: `<svg viewBox="0 0 100 100" class="w-7 h-7" aria-hidden="true"><rect width="100" height="100" rx="20" fill="#000000"/><circle cx="50" cy="50" r="26" fill="none" stroke="#FF7A00" stroke-width="8"/></svg>`
-    },
-    {
-      bank: 'First Bank', number: '3012345678', name: 'AgroVest Nigeria Ltd',
-      logo: `<svg viewBox="0 0 100 100" class="w-7 h-7" aria-hidden="true"><rect width="100" height="100" rx="20" fill="#002F6C"/><text x="50" y="63" font-family="Inter, sans-serif" font-size="30" font-weight="900" fill="#F2A900" text-anchor="middle">FB</text></svg>`
-    },
-    {
-      bank: 'UBA', number: '1023456789', name: 'AgroVest Nigeria Ltd',
-      logo: `<svg viewBox="0 0 100 100" class="w-7 h-7" aria-hidden="true"><rect width="100" height="100" rx="20" fill="#CC0000"/><text x="50" y="63" font-family="Inter, sans-serif" font-size="28" font-weight="900" fill="#fff" text-anchor="middle">UBA</text></svg>`
+      bank: {{ active_account.bank_name | tojson }},
+      number: {{ active_account.account_number | tojson }},
+      name: {{ active_account.account_name | tojson }},
+      logo: `<svg viewBox="0 0 100 100" class="w-7 h-7" aria-hidden="true"><rect width="100" height="100" rx="20" fill="{{ active_account.logo_color or '#0f3d2e' }}"/><text x="50" y="63" font-family="Inter, sans-serif" font-size="34" font-weight="900" fill="#fff" text-anchor="middle">{{ (active_account.bank_name or '?')[0] }}</text></svg>`
     },
   ];
+  {% else %}
+  const ACCOUNTS = [];
+  {% endif %}
 
   let currentIndex = 0;
   let sessionSeconds = 30 * 60; // 30 min
@@ -224,6 +224,8 @@
 
   const rawAmount = parseFloat(getParam('amount')) || 0;
   const method    = getParam('method') || 'bank_transfer';
+  const PAYMENTS_ENABLED = {{ 'true' if payments_enabled else 'false' }};
+  const HAS_ACCOUNT = ACCOUNTS.length > 0;
 
   // ─── Format helpers ───────────────────────────────────────────────
   function formatNaira(n) {
@@ -257,8 +259,17 @@
 
   // ─── Render active account (manual switching only — no auto rotation) ──
   function renderAccount(animate = true) {
-    const acc = ACCOUNTS[currentIndex];
     const display = document.getElementById('account-display');
+
+    if (ACCOUNTS.length === 0) {
+      display.innerHTML = '';
+      document.getElementById('copy-btn').disabled = true;
+      document.getElementById('copy-btn').classList.add('opacity-40', 'cursor-not-allowed');
+      renderDots();
+      return;
+    }
+
+    const acc = ACCOUNTS[currentIndex];
 
     const html = `
       <div class="account-animate">
@@ -312,6 +323,7 @@
 
   // ─── Copy to clipboard ────────────────────────────────────────────
   function copyAccountNumber() {
+    if (ACCOUNTS.length === 0) return;
     const acc = ACCOUNTS[currentIndex];
     navigator.clipboard.writeText(acc.number).then(() => {
       const btn   = document.getElementById('copy-btn');
@@ -385,12 +397,16 @@
     document.getElementById('upload-idle').classList.add('hidden');
     document.getElementById('upload-selected').classList.remove('hidden');
     document.getElementById('file-name').textContent = file.name;
-    document.getElementById('submit-btn').disabled = false;
+    document.getElementById('submit-btn').disabled = !(PAYMENTS_ENABLED && HAS_ACCOUNT);
   }
 
   // Final guard at submit time — the real enforcement is server-side in
   // the /dashboard/deposit route, this just avoids an unnecessary round trip.
   function validateSubmit(event) {
+    if (!PAYMENTS_ENABLED || !HAS_ACCOUNT) {
+      event.preventDefault();
+      return false;
+    }
     const input = document.getElementById('proof-file');
     const file = input.files[0];
     if (!file || !ALLOWED_EXTENSIONS.includes(file.name.split('.').pop().toLowerCase()) || file.size > MAX_FILE_BYTES) {

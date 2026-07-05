@@ -22,6 +22,12 @@
     </div>
 
     <div class="p-6">
+      {% if not payments_enabled %}
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
+        <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5"></i>
+        <p class="text-sm font-semibold text-amber-800">Deposits and withdrawals are temporarily unavailable due to maintenance.</p>
+      </div>
+      {% endif %}
       <!-- Balance card -->
       <div class="bg-gradient-to-br from-forest-950 to-forest-800 rounded-2xl p-5 mb-6 relative overflow-hidden">
         <div class="absolute inset-0 opacity-5" style="background-image: radial-gradient(circle at 20% 80%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px); background-size: 40px 40px;"></div>
@@ -49,15 +55,20 @@
               name="amount"
               id="amount-input"
               required
-              min="2000"
-              max="{{ user.balance }}"
+              min="{{ min_withdrawal | int }}"
+              max="{{ [user.balance, max_withdrawal] | min }}"
               placeholder="0"
               oninput="validateAmount(this)"
               class="w-full border-2 border-gray-200 rounded-2xl pl-12 pr-4 py-4 text-xl font-bold text-gray-900 focus:outline-none focus:border-forest-500 transition-colors placeholder-gray-200"
             />
           </div>
           <div class="flex items-center justify-between mt-1.5">
-            <p class="text-xs text-gray-400">Minimum: ₦2,000</p>
+            <p class="text-xs text-gray-400">
+              Minimum: {{ min_withdrawal | naira }}
+              {% if withdrawal_fee_percent > 0 %}
+              · {{ withdrawal_fee_percent }}% withdrawal fee applies
+              {% endif %}
+            </p>
             <p id="amount-error" class="text-xs text-red-500 hidden">Exceeds available balance</p>
           </div>
         </div>
@@ -127,7 +138,8 @@
           </ul>
         </div>
 
-        <button type="submit" class="w-full bg-forest-950 hover:bg-forest-800 text-white font-bold py-4 rounded-2xl transition-colors text-base shadow-lg flex items-center justify-center gap-2">
+        <button type="submit" {{ 'disabled' if not payments_enabled else '' }}
+          class="w-full bg-forest-950 hover:bg-forest-800 text-white font-bold py-4 rounded-2xl transition-colors text-base shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
           <i data-lucide="send" class="w-4 h-4"></i>
           Request Withdrawal
         </button>
@@ -151,6 +163,9 @@
           {{ wd.bank_name }}
         </div>
         <p class="text-xs font-mono text-gray-400 ml-[18px]">{{ wd.account_number }}</p>
+        {% if wd.fee_amount and wd.fee_amount > 0 %}
+        <p class="text-xs text-gray-400 mt-1">Fee: {{ wd.fee_amount | naira }} · Net payout: {{ wd.net_amount | naira }}</p>
+        {% endif %}
         <p class="text-xs text-gray-300 mt-2">{{ wd.created_at | date_fmt }}</p>
         {% if wd.admin_note %}
         <div class="mt-2 pt-2 border-t border-gray-50 flex items-start gap-1.5">
@@ -173,7 +188,7 @@
 </div>
 
 <script>
-  const MAX_BALANCE = {{ user.balance | float }};
+  const MAX_BALANCE = Math.min({{ user.balance | float }}, {{ max_withdrawal | float }});
 
   function validateAmount(input) {
     const val = parseFloat(input.value) || 0;

@@ -3,20 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}AgroVest Pro — Agricultural Investment Platform{% endblock %}</title>
-  <meta name="description" content="{% block meta_description %}Invest in profitable Nigerian agricultural projects and earn guaranteed returns.{% endblock %}" />
+  <title>{% block title %}{{ site_settings.seo_title }}{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}{{ site_settings.seo_description }}{% endblock %}" />
   <meta name="csrf-token" content="{{ csrf_token() }}" />
+  <link rel="icon" href="{{ site_settings.favicon_url }}" />
 
   <link rel="canonical" href="{{ self.og_url() }}" />
 
   <!-- Open Graph / Facebook, WhatsApp, Telegram, LinkedIn, Discord -->
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="AgroVest Pro" />
+  <meta property="og:site_name" content="{{ site_settings.site_name }}" />
   <meta property="og:title" content="{{ self.title() }}" />
   <meta property="og:description" content="{{ self.meta_description() }}" />
-  <meta property="og:image" content="{% block og_image %}https://agrovest-ydif.onrender.com/static/images/logo.png{% endblock %}" />
+  <meta property="og:image" content="{% block og_image %}{{ site_settings.og_image_url }}{% endblock %}" />
   <meta property="og:image:secure_url" content="{{ self.og_image() }}" />
-  <meta property="og:image:alt" content="AgroVest logo" />
+  <meta property="og:image:alt" content="{{ site_settings.site_name }} logo" />
   <meta property="og:url" content="{% block og_url %}https://agrovest-ydif.onrender.com{{ request.path }}{% endblock %}" />
   <meta property="og:locale" content="en_NG" />
 
@@ -25,7 +26,7 @@
   <meta name="twitter:title" content="{{ self.title() }}" />
   <meta name="twitter:description" content="{{ self.meta_description() }}" />
   <meta name="twitter:image" content="{{ self.og_image() }}" />
-  <meta name="twitter:image:alt" content="AgroVest Pro logo" />
+  <meta name="twitter:image:alt" content="{{ site_settings.site_name }} logo" />
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -170,6 +171,25 @@
   </script>
   {% endif %}
   {% endwith %}
+
+  <!-- ── Sitewide Announcement Banner ── -->
+  {% if active_notice %}
+  <div id="site-notice" class="relative z-[60]
+    {% if active_notice.color == 'red' %}bg-red-600
+    {% elif active_notice.color == 'amber' %}bg-amber-500
+    {% elif active_notice.color == 'emerald' %}bg-emerald-600
+    {% else %}bg-blue-600{% endif %} text-white">
+    <div class="max-w-7xl mx-auto px-4 py-2.5 flex items-center gap-3">
+      <i data-lucide="{{ active_notice.icon }}" class="w-4 h-4 flex-shrink-0"></i>
+      <p class="text-sm font-medium flex-1 min-w-0">
+        <span class="font-bold">{{ active_notice.label }}:</span> {{ active_notice.message }}
+      </p>
+      <button onclick="document.getElementById('site-notice').remove()" class="text-white/70 hover:text-white flex-shrink-0" aria-label="Dismiss">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </div>
+  {% endif %}
 
   {% block body %}{% endblock %}
 
