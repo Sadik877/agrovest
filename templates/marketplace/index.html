@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% block title %}Browse Products — MercX Digital{% endblock %}
+{% block content %}
+<div style="max-width:1400px;margin:0 auto;padding:2rem 1.25rem">
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+    <div>
+      <h1 class="font-display text-2xl font-bold">
+        {{ 'Browse ' ~ current_category.name if current_category else 'All Products' }}
+      </h1>
+      <p style="color:var(--text-muted);font-size:.88rem">{{ total }} products found</p>
+    </div>
+    <!-- Sort -->
+    <div class="flex items-center gap-3">
+      <select onchange="location.href=this.value" class="input" style="width:auto">
+        {% for val, label in [('popular','Most Popular'),('newest','Newest'),('price_low','Price: Low→High'),('price_high','Price: High→Low'),('rating','Top Rated')] %}
+        <option value="{{ url_for('marketplace.index', sort=val, category=request.args.get('category','')) }}"
+                {% if sort == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="flex gap-5">
+    <!-- Sidebar filters -->
+    <aside style="width:220px;flex-shrink:0" class="hidden lg:block">
+      <div class="card" style="position:sticky;top:80px">
+        <h3 class="font-display font-semibold text-sm mb-3" style="color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em">Categories</h3>
+        <div class="space-y-1">
+          <a href="{{ url_for('marketplace.index', sort=sort) }}"
+             class="sidebar-link {% if not current_category %}active{% endif %}" style="margin:0;padding:.5rem .75rem">
+            All Products
+          </a>
+          {% for cat in categories %}
+          <a href="{{ url_for('marketplace.index', category=cat.slug, sort=sort) }}"
+             class="sidebar-link {% if current_category and current_category.id == cat.id %}active{% endif %}"
+             style="margin:0;padding:.5rem .75rem">
+            <span style="width:8px;height:8px;border-radius:50%;background:{{ cat.color or 'var(--primary)' }};display:inline-block;flex-shrink:0"></span>
+            {{ cat.name }}
+            <span class="ml-auto text-xs" style="color:var(--text-dim)">{{ cat.listing_count or 0 }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+    </aside>
+
+    <!-- Product grid -->
+    <div style="flex:1;min-width:0">
+      {% if listings %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {% for listing in listings %}
+        <a href="{{ url_for('marketplace.listing_detail', slug=listing.slug) }}" class="product-card reveal" style="text-decoration:none">
+          {% if listing.preview_images %}
+            <img src="{{ listing.preview_images[0] }}" class="product-card__img" loading="lazy" alt="{{ listing.title }}">
+          {% else %}
+            <div class="product-card__img-placeholder">
+              <i data-feather="package" style="width:32px;height:32px;opacity:.3"></i>
+            </div>
+          {% endif %}
+          {% if listing.is_featured %}
+          <div style="position:absolute;top:.5rem;left:.5rem">
+            <span class="badge badge-warning" style="font-size:.65rem">⭐ Featured</span>
+          </div>
+          {% endif %}
+          <div class="product-card__body">
+            <div class="product-card__title">{{ listing.title }}</div>
+            <div class="product-card__rating">
+              <span style="color:#F59E0B">★</span>
+              {{ '%.1f'|format(listing.rating|float) }}
+              <span style="color:var(--text-dim)">({{ listing.review_count or 0 }})</span>
+              <span class="ml-auto" style="font-size:.73rem;color:var(--text-dim)">{{ listing.sales_count or 0 }} sold</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="product-card__price">${{ '%.2f'|format(listing.price|float) }}</span>
+              {% if listing.compare_price %}
+              <span class="product-card__compare-price">${{ '%.2f'|format(listing.compare_price|float) }}</span>
+              <span class="badge badge-discount" style="font-size:.65rem">{{ ((1-listing.price|float/listing.compare_price|float)*100)|int }}% OFF</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="product-card__footer" onclick="event.stopPropagation()">
+            <form method="POST" action="{{ url_for('marketplace.cart_add', listing_id=listing.id) }}" style="flex:1">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-primary btn-sm w-full justify-center">
+                <i data-feather="shopping-cart" style="width:13px;height:13px"></i> Add to Cart
+              </button>
+            </form>
+            <button data-wishlist="{{ listing.id }}" class="btn btn-ghost btn-sm p-2"
+                    style="color:{{ '#EF4444' if listing.id in [] else 'var(--text-muted)' }}">
+              <i data-feather="heart" style="width:14px;height:14px"></i>
+            </button>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      <!-- Pagination -->
+      {% if pages > 1 %}
+      <div class="flex justify-center mt-8">
+        <div class="pagination">
+          {% for p in range(1, pages+1) %}
+          <a href="{{ url_for('marketplace.index', page=p, sort=sort, category=request.args.get('category','')) }}"
+             class="page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% else %}
+      <div style="text-align:center;padding:5rem 2rem">
+        <i data-feather="search" style="width:48px;height:48px;color:var(--text-dim);margin-bottom:1rem"></i>
+        <h3 class="font-display text-xl font-bold mb-2">No products found</h3>
+        <p style="color:var(--text-muted)">Try a different category or check back later.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

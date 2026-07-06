@@ -1,0 +1,48 @@
+{% extends 'admin/base.html' %}
+{% block title %}Coupons — Admin{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-6">Coupons</h1>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+  <div class="lg:col-span-2">
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="table">
+        <thead><tr><th>Code</th><th>Discount</th><th>Uses</th><th>Expires</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {% for c in coupons %}
+        <tr>
+          <td class="font-mono font-semibold" style="color:var(--primary-light)">{{ c.code }}</td>
+          <td>{{ c.value }}{{ '%' if c.type == 'percentage' else '$' }} off</td>
+          <td style="color:var(--text-muted)">{{ c.used_count or 0 }}{{ '/'~c.max_uses if c.max_uses else '' }}</td>
+          <td style="color:var(--text-muted);font-size:.82rem">{{ c.expires_at[:10] if c.expires_at else 'Never' }}</td>
+          <td><span class="badge badge-{{ 'success' if c.is_active else 'neutral' }}">{{ 'Active' if c.is_active else 'Disabled' }}</span></td>
+          <td>
+            <form method="POST" action="{{ url_for('admin.toggle_coupon', coupon_id=c.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-ghost btn-sm">{{ 'Disable' if c.is_active else 'Enable' }}</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <h3 class="font-display font-bold mb-4">Create Coupon</h3>
+    <form method="POST" action="{{ url_for('admin.coupons') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group"><label class="form-label">Code</label><input type="text" name="code" class="input" style="text-transform:uppercase" placeholder="SAVE20" required></div>
+      <div class="form-group"><label class="form-label">Type</label>
+        <select name="type" class="input"><option value="percentage">Percentage %</option><option value="fixed">Fixed $</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Value</label><input type="number" name="value" class="input" placeholder="20" step="0.01" required></div>
+      <div class="form-group"><label class="form-label">Min Order ($)</label><input type="number" name="min_order" class="input" placeholder="0" step="0.01"></div>
+      <div class="form-group"><label class="form-label">Max Discount ($)</label><input type="number" name="max_discount" class="input" placeholder="Optional" step="0.01"></div>
+      <div class="form-group"><label class="form-label">Max Uses</label><input type="number" name="max_uses" class="input" placeholder="Unlimited"></div>
+      <div class="form-group"><label class="form-label">Expires At</label><input type="date" name="expires_at" class="input"></div>
+      <div class="form-group"><label class="form-label">Description</label><input type="text" name="description" class="input" placeholder="Summer sale"></div>
+      <button type="submit" class="btn btn-primary w-full justify-center">Create Coupon</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

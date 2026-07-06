@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block content %}
+<div style="display:flex;min-height:calc(100vh - 65px)">
+
+  <!-- ── Sidebar ────────────────────────────────────────── -->
+  <aside class="sidebar hidden lg:flex flex-col" style="width:256px;min-height:calc(100vh - 65px)">
+    <!-- User card -->
+    <div style="padding:1.25rem;border-bottom:1px solid var(--border)">
+      <div class="flex items-center gap-3">
+        {% if profile and profile.avatar_url %}
+        <img src="{{ profile.avatar_url }}" class="w-10 h-10 rounded-full object-cover flex-shrink-0" alt="">
+        {% else %}
+        <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white"
+             style="background:linear-gradient(135deg,#7C3AED,#06B6D4);font-family:'Space Grotesk',sans-serif">
+          {{ (current_username or 'U')[0].upper() }}
+        </div>
+        {% endif %}
+        <div style="overflow:hidden">
+          <div class="font-display font-semibold text-sm truncate" style="color:var(--text)">{{ current_username }}</div>
+          <div style="font-size:.75rem;color:var(--success);font-weight:600">${{ '%.2f'|format(current_balance|float) }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav links -->
+    <nav style="padding:.75rem;flex:1;overflow-y:auto">
+      {% set nav = [
+        ('dashboard.index',        'layout',       'Overview'),
+        ('dashboard.wallet',       'credit-card',  'Wallet'),
+        ('dashboard.orders',       'package',      'Orders'),
+        ('dashboard.purchases',    'download',     'Downloads'),
+        ('dashboard.messages',     'message-circle','Messages'),
+        ('dashboard.notifications','bell',         'Notifications'),
+        ('dashboard.wishlist',     'heart',        'Wishlist'),
+        ('dashboard.referrals',    'gift',         'Referrals'),
+      ] %}
+      {% for endpoint, icon, label in nav %}
+      <a href="{{ url_for(endpoint) }}"
+         class="sidebar-link {% if request.endpoint == endpoint %}active{% endif %}">
+        <i data-feather="{{ icon }}" class="icon"></i>{{ label }}
+      </a>
+      {% endfor %}
+
+      <div class="sidebar-section mt-4">Account</div>
+      <a href="{{ url_for('dashboard.settings') }}"
+         class="sidebar-link {% if request.endpoint == 'dashboard.settings' %}active{% endif %}">
+        <i data-feather="settings" class="icon"></i>Settings
+      </a>
+
+      {% if current_role in ('seller','admin') %}
+      <div class="sidebar-section mt-4">Seller</div>
+      <a href="{{ url_for('seller.dashboard') }}" class="sidebar-link">
+        <i data-feather="trending-up" class="icon"></i>Seller Dashboard
+      </a>
+      {% else %}
+      <div class="divider"></div>
+      <a href="{{ url_for('seller.become_seller') }}" class="sidebar-link"
+         style="color:#a78bfa;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.15)">
+        <i data-feather="zap" class="icon"></i>Start Selling
+      </a>
+      {% endif %}
+
+      {% if current_role in ('admin','moderator') %}
+      <div class="sidebar-section mt-4">Admin</div>
+      <a href="{{ url_for('admin.dashboard') }}" class="sidebar-link" style="color:#F59E0B">
+        <i data-feather="shield" class="icon"></i>Admin Panel
+      </a>
+      {% endif %}
+    </nav>
+  </aside>
+
+  <!-- ── Main content ───────────────────────────────────── -->
+  <main style="flex:1;padding:1.75rem;overflow-x:hidden;min-width:0">
+    {% block page_content %}{% endblock %}
+  </main>
+</div>
+{% endblock %}

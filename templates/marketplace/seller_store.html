@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}{{ profile.store_name or seller.username }} — MercX Digital{% endblock %}
+{% block content %}
+<!-- Banner -->
+<div style="height:220px;position:relative;overflow:hidden;background:linear-gradient(135deg,#1A0B38,#0D1F3C)">
+  {% if profile.store_banner_url %}
+  <img src="{{ profile.store_banner_url }}" style="width:100%;height:100%;object-fit:cover;opacity:.7" alt="">
+  {% endif %}
+  <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(8,11,20,.9),transparent)"></div>
+</div>
+
+<div style="max-width:1200px;margin:0 auto;padding:0 1.25rem">
+  <!-- Seller info card -->
+  <div class="card -mt-12 mb-8 relative z-10" style="display:flex;align-items:flex-start;gap:1.5rem;flex-wrap:wrap">
+    {% if profile.avatar_url %}
+    <img src="{{ profile.avatar_url }}" class="w-20 h-20 rounded-2xl object-cover border-4 flex-shrink-0"
+         style="border-color:var(--bg-card)" alt="">
+    {% else %}
+    <div class="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl font-bold text-white"
+         style="background:linear-gradient(135deg,#7C3AED,#06B6D4)">
+      {{ (seller.username or 'S')[0].upper() }}
+    </div>
+    {% endif %}
+    <div style="flex:1;min-width:0">
+      <div class="flex items-center gap-3 flex-wrap mb-1">
+        <h1 class="font-display text-2xl font-bold">{{ profile.store_name or seller.username }}</h1>
+        {% if profile.seller_verified %}
+        <span class="badge badge-accent"><i data-feather="check-circle" style="width:11px;height:11px"></i> Verified</span>
+        {% endif %}
+      </div>
+      <p style="color:var(--text-muted);font-size:.9rem;line-height:1.6;max-width:600px">{{ profile.store_description or '' }}</p>
+      <div class="flex items-center gap-5 mt-3 flex-wrap">
+        <div style="font-size:.85rem;color:var(--text-muted)">
+          <span style="color:var(--gold)">★</span> <strong style="color:var(--text)">{{ '%.1f'|format(profile.seller_rating|float) }}</strong>
+        </div>
+        <div style="font-size:.85rem;color:var(--text-muted)"><strong style="color:var(--text)">{{ profile.total_sales or 0 }}</strong> sales</div>
+        <div style="font-size:.85rem;color:var(--text-muted)"><strong style="color:var(--text)">{{ listings|length }}</strong> products</div>
+        <div style="font-size:.85rem;color:var(--text-muted)">Member since {{ seller.created_at[:7] }}</div>
+      </div>
+    </div>
+    {% if current_user_id and current_user_id != seller.id %}
+    <a href="{{ url_for('dashboard.messages') }}" class="btn btn-outline btn-sm flex-shrink-0">
+      <i data-feather="message-circle" style="width:14px;height:14px"></i> Message
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Products -->
+  {% if listings %}
+  <div class="mb-10">
+    <h2 class="font-display text-xl font-bold mb-5">Products by {{ profile.store_name or seller.username }}</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {% for listing in listings %}
+      <a href="{{ url_for('marketplace.listing_detail', slug=listing.slug) }}" class="product-card reveal" style="text-decoration:none">
+        {% if listing.preview_images %}
+          <img src="{{ listing.preview_images[0] }}" class="product-card__img" loading="lazy" alt="">
+        {% else %}
+          <div class="product-card__img-placeholder"><i data-feather="package" style="width:32px;height:32px;opacity:.3"></i></div>
+        {% endif %}
+        <div class="product-card__body">
+          <div class="product-card__title">{{ listing.title }}</div>
+          <div class="product-card__rating"><span style="color:#F59E0B">★</span> {{ '%.1f'|format(listing.rating|float) }}</div>
+          <span class="product-card__price">${{ '%.2f'|format(listing.price|float) }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Reviews -->
+  {% if reviews %}
+  <div class="mb-10">
+    <h2 class="font-display text-xl font-bold mb-5">Customer Reviews</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {% for r in reviews %}
+      <div class="card">
+        <div class="flex items-center gap-2 mb-2">
+          <div style="display:flex;gap:.1rem">{% for i in range(1,6) %}<span style="font-size:.85rem;color:{{ '#F59E0B' if i<=r.rating else 'var(--bg-elevated)' }}">★</span>{% endfor %}</div>
+          <span style="font-size:.78rem;color:var(--text-dim)">{{ r.created_at[:10] }}</span>
+        </div>
+        <p style="font-size:.88rem;color:var(--text-muted);line-height:1.6">{{ r.review_text or '' }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

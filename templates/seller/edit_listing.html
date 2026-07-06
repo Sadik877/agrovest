@@ -1,0 +1,135 @@
+{% extends 'seller/base.html' %}
+{% block title %}Edit Product — MercX Digital{% endblock %}
+{% block page_content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="{{ url_for('seller.inventory') }}" class="btn btn-ghost btn-sm p-2">
+    <i data-feather="arrow-left" style="width:16px;height:16px"></i>
+  </a>
+  <h1 class="font-display text-2xl font-bold">Edit Product</h1>
+  {% if listing.status == 'rejected' %}
+  <span class="badge badge-danger ml-2">Rejected: {{ listing.reject_reason or '' }}</span>
+  {% endif %}
+</div>
+<form method="POST" action="{{ url_for('seller.edit_listing', listing_id=listing.id) }}" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div class="lg:col-span-2 space-y-5">
+      <div class="card">
+        <h3 class="font-display font-bold mb-4">Basic Information</h3>
+        <div class="form-group">
+          <label class="form-label">Title *</label>
+          <input type="text" name="title" class="input" value="{{ listing.title }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select name="category_id" class="input">
+            <option value="">— Select —</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}" {% if cat.id == listing.category_id %}selected{% endif %}>{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Short Description</label>
+          <textarea name="short_description" class="input" rows="2">{{ listing.short_description or '' }}</textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Full Description *</label>
+          <textarea name="description" class="input" rows="8" required>{{ listing.description }}</textarea>
+        </div>
+      </div>
+      <!-- Current images -->
+      {% if images %}
+      <div class="card">
+        <h3 class="font-display font-bold mb-3">Current Images</h3>
+        <div class="flex gap-3 flex-wrap mb-4">
+          {% for img in images %}
+          <div class="relative">
+            <img src="{{ img.url }}" class="w-24 h-20 object-cover rounded-lg" alt="">
+            {% if img.is_primary %}<span class="badge badge-primary" style="position:absolute;top:4px;left:4px;font-size:.6rem">Main</span>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <label class="form-label">Add More Images</label>
+        <label class="upload-zone" style="padding:1.5rem">
+          <i data-feather="plus" style="width:24px;height:24px;color:var(--text-dim)"></i>
+          <div style="font-size:.82rem;color:var(--text-muted);margin-top:.3rem">PNG, JPG, WEBP</div>
+          <input type="file" name="new_images" accept="image/*" multiple>
+        </label>
+      </div>
+      {% endif %}
+      <!-- New file upload -->
+      <div class="card">
+        <h3 class="font-display font-bold mb-2">Upload New Version</h3>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1rem">Upload a new file to replace the current product file.</p>
+        <label class="upload-zone" style="padding:1.5rem">
+          <i data-feather="upload" style="width:24px;height:24px;color:var(--text-dim)"></i>
+          <div style="font-size:.82rem;color:var(--text-muted);margin-top:.3rem">Any file format · Max 50 MB</div>
+          <input type="file" name="product_file">
+        </label>
+      </div>
+    </div>
+    <!-- Right -->
+    <div class="space-y-5">
+      <div class="card">
+        <h3 class="font-display font-bold mb-4">Pricing</h3>
+        <div class="form-group">
+          <label class="form-label">Price *</label>
+          <div style="position:relative">
+            <span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);font-weight:600;color:var(--text-muted)">$</span>
+            <input type="number" name="price" class="input" style="padding-left:1.8rem" value="{{ listing.price }}" step="0.01" min="0" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Compare Price</label>
+          <div style="position:relative">
+            <span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);font-weight:600;color:var(--text-muted)">$</span>
+            <input type="number" name="compare_price" class="input" style="padding-left:1.8rem" value="{{ listing.compare_price or '' }}" step="0.01" min="0">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">License</label>
+          <select name="license_type" class="input">
+            {% for lt in ['personal','commercial','extended','saas','unlimited'] %}
+            <option value="{{ lt }}" {% if lt == listing.license_type %}selected{% endif %}>{{ lt|title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="font-display font-bold mb-4">Details</h3>
+        <div class="form-group">
+          <label class="form-label">Version</label>
+          <input type="text" name="version" class="input" value="{{ listing.version or '1.0' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Demo URL</label>
+          <input type="url" name="demo_url" class="input" value="{{ listing.demo_url or '' }}" placeholder="https://demo.example.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Docs URL</label>
+          <input type="url" name="documentation_url" class="input" value="{{ listing.documentation_url or '' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Delivery</label>
+          <select name="delivery_type" class="input">
+            <option value="instant" {% if listing.delivery_type=='instant' %}selected{% endif %}>Instant</option>
+            <option value="manual"  {% if listing.delivery_type=='manual'  %}selected{% endif %}>Manual</option>
+          </select>
+        </div>
+        <label class="flex items-center gap-3 mb-2 cursor-pointer">
+          <input type="checkbox" name="updates_included" value="on" {% if listing.updates_included %}checked{% endif %} class="w-4 h-4" style="accent-color:var(--primary)">
+          <span style="font-size:.85rem">Free updates</span>
+        </label>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Tags</label>
+          <input type="text" name="tags" class="input" value="{{ listing.tags|join(', ') if listing.tags else '' }}" placeholder="tag1, tag2">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary w-full justify-center btn-lg">
+        <i data-feather="save" style="width:17px;height:17px"></i> Save & Resubmit
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

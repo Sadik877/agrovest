@@ -1,0 +1,79 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Downloads — MercX Digital{% endblock %}
+{% block page_content %}
+<div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+  <div>
+    <h1 class="font-display text-2xl font-bold">My Downloads</h1>
+    <p style="color:var(--text-muted);font-size:.88rem">{{ total }} purchase{{ 's' if total != 1 }} · digital files ready to download</p>
+  </div>
+</div>
+{% if orders %}
+  {% for order in orders %}
+  <div class="card mb-4 reveal">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div>
+        <span class="font-mono text-sm font-semibold" style="color:var(--primary-light)">{{ order.order_number }}</span>
+        <span class="ml-3" style="font-size:.8rem;color:var(--text-muted)">{{ order.created_at[:10] }}</span>
+      </div>
+      <span class="badge badge-success">Completed</span>
+    </div>
+    {% for item in order.items %}
+    <div class="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl mb-2"
+         style="background:var(--bg-surface);border:1px solid var(--border)">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
+             style="background:rgba(124,58,237,.12);color:var(--primary-light)">
+          <i data-feather="package" style="width:20px;height:20px"></i>
+        </div>
+        <div>
+          <div class="font-semibold font-display text-sm">{{ item.title }}</div>
+          <div style="font-size:.78rem;color:var(--text-muted)">
+            {{ item.license_type|default('Personal',true)|title }} License ·
+            {{ item.download_count or 0 }}/{{ item.max_downloads or 5 }} downloads used
+          </div>
+          {% if item.download_expires_at %}
+          <div style="font-size:.75rem;color:var(--warning)">
+            <i data-feather="clock" style="width:11px;height:11px;display:inline"></i>
+            Expires {{ item.download_expires_at[:10] }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        {% if item.delivery_status == 'delivered' and item.download_url %}
+          {% if (item.download_count or 0) < (item.max_downloads or 5) %}
+          <a href="{{ url_for('dashboard.download_item', order_item_id=item.id) }}"
+             class="btn btn-primary btn-sm">
+            <i data-feather="download" style="width:14px;height:14px"></i> Download
+          </a>
+          {% else %}
+          <span class="badge badge-warning">Limit reached</span>
+          {% endif %}
+        {% elif item.delivery_status == 'pending' %}
+          <span class="badge badge-warning"><i data-feather="clock" style="width:11px;height:11px"></i> Pending delivery</span>
+        {% endif %}
+        <span class="font-semibold" style="color:var(--primary-light)">${{ '%.2f'|format(item.unit_price|float) }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  {% if pages > 1 %}
+  <div class="flex justify-center mt-4">
+    <div class="pagination">
+      {% for p in range(1, pages+1) %}
+      <a href="{{ url_for('dashboard.purchases', page=p) }}"
+         class="page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+{% else %}
+<div class="card" style="text-align:center;padding:4rem">
+  <i data-feather="download-cloud" style="width:48px;height:48px;color:var(--text-dim);margin-bottom:1rem"></i>
+  <h3 class="font-display text-xl font-bold mb-2">No downloads yet</h3>
+  <p class="mb-4" style="color:var(--text-muted)">Purchase digital products to find your downloads here.</p>
+  <a href="{{ url_for('marketplace.index') }}" class="btn btn-primary">Browse Marketplace</a>
+</div>
+{% endif %}
+{% endblock %}

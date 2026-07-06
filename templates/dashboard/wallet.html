@@ -1,0 +1,143 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Wallet — MercX Digital{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-6">My Wallet</h1>
+
+<!-- Balance card -->
+<div class="wallet-card mb-6 reveal">
+  <p style="font-size:.78rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.4rem;font-family:'Space Grotesk',sans-serif;position:relative;z-index:1">Available Balance</p>
+  <div class="wallet-balance mb-5" style="position:relative;z-index:1">${{ '%.2f'|format(user.balance|float if user else 0) }}</div>
+  <div class="flex gap-3 flex-wrap" style="position:relative;z-index:1">
+    <button onclick="document.getElementById('deposit-modal').classList.remove('hidden')"
+            class="btn btn-sm" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff">
+      <i data-feather="plus-circle" style="width:14px;height:14px"></i> Add Funds
+    </button>
+    <button onclick="document.getElementById('withdraw-modal').classList.remove('hidden')"
+            class="btn btn-sm" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.8)">
+      <i data-feather="trending-down" style="width:14px;height:14px"></i> Withdraw
+    </button>
+  </div>
+</div>
+
+<!-- Pending notices -->
+{% if pending_deposits %}
+<div class="flex items-center gap-3 p-4 rounded-xl mb-4 reveal"
+     style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2)">
+  <i data-feather="clock" style="width:16px;height:16px;color:#F59E0B;flex-shrink:0"></i>
+  <span style="font-size:.88rem;color:#FCD34D">{{ pending_deposits|length }} deposit request(s) pending admin review.</span>
+</div>
+{% endif %}
+{% if pending_withdrawals %}
+<div class="flex items-center gap-3 p-4 rounded-xl mb-4 reveal"
+     style="background:rgba(6,182,212,.08);border:1px solid rgba(6,182,212,.2)">
+  <i data-feather="clock" style="width:16px;height:16px;color:#06B6D4;flex-shrink:0"></i>
+  <span style="font-size:.88rem;color:#67e8f9">{{ pending_withdrawals|length }} withdrawal request(s) processing.</span>
+</div>
+{% endif %}
+
+<!-- Transaction history -->
+<div class="card reveal">
+  <h2 class="font-display text-lg font-bold mb-5">Transaction History</h2>
+  {% if transactions %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th><th>Balance</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for tx in transactions %}
+      {% set is_credit = tx.type in ('deposit','sale','refund','referral','bonus','transfer_in') %}
+      <tr>
+        <td style="color:var(--text-muted);font-size:.82rem;white-space:nowrap">{{ tx.created_at[:16].replace('T',' ') }}</td>
+        <td style="font-size:.88rem;max-width:200px" class="truncate-2">{{ tx.description or tx.type|title }}</td>
+        <td><span class="badge badge-{{ 'success' if is_credit else 'danger' }}">{{ tx.type }}</span></td>
+        <td class="font-semibold font-mono" style="color:{{ '#10B981' if is_credit else '#EF4444' }}">
+          {{ '+' if is_credit else '-' }}${{ '%.2f'|format(tx.amount|float) }}
+        </td>
+        <td class="font-mono" style="font-size:.85rem;color:var(--text-muted)">${{ '%.2f'|format(tx.balance_after|float) }}</td>
+        <td><span class="badge badge-{{ 'success' if tx.status=='completed' else ('warning' if tx.status=='pending' else 'danger') }}">{{ tx.status }}</span></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:3rem">
+    <i data-feather="activity" style="width:40px;height:40px;color:var(--text-dim);margin-bottom:1rem"></i>
+    <p style="color:var(--text-muted)">No transactions yet.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Deposit Modal -->
+<div id="deposit-modal" class="modal-backdrop hidden">
+  <div class="modal">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="font-display text-xl font-bold">Add Funds</h3>
+      <button onclick="document.getElementById('deposit-modal').classList.add('hidden')" class="btn btn-ghost btn-sm p-2">
+        <i data-feather="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('dashboard.wallet_deposit') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Amount (min. ${{ min_deposit }})</label>
+        <div style="position:relative">
+          <span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);font-weight:600">$</span>
+          <input type="number" name="amount" class="input" style="padding-left:1.8rem"
+                 placeholder="50.00" min="{{ min_deposit }}" step="0.01" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Payment Method</label>
+        <select name="method" class="input">
+          {% if stripe_pk %}<option value="stripe">Credit / Debit Card (Stripe)</option>{% endif %}
+          {% if paystack_pk %}<option value="paystack">Paystack</option>{% endif %}
+          {% if flw_pk %}<option value="flutterwave">Flutterwave</option>{% endif %}
+          <option value="bank_transfer">Bank Transfer</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Payment Reference (optional)</label>
+        <input type="text" name="reference" class="input" placeholder="Transaction ID or reference">
+        <p class="form-hint">For bank transfers, enter the transaction reference for faster verification.</p>
+      </div>
+      <button type="submit" class="btn btn-primary w-full justify-center">Submit Deposit Request</button>
+    </form>
+  </div>
+</div>
+
+<!-- Withdraw Modal -->
+<div id="withdraw-modal" class="modal-backdrop hidden">
+  <div class="modal">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="font-display text-xl font-bold">Withdraw Funds</h3>
+      <button onclick="document.getElementById('withdraw-modal').classList.add('hidden')" class="btn btn-ghost btn-sm p-2">
+        <i data-feather="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('dashboard.wallet_withdraw') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Amount (min. ${{ min_withdrawal }}, max. ${{ max_withdrawal }})</label>
+        <div style="position:relative">
+          <span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--text-muted);font-weight:600">$</span>
+          <input type="number" name="amount" class="input" style="padding-left:1.8rem"
+                 placeholder="100.00" min="{{ min_withdrawal }}" max="{{ max_withdrawal }}" step="0.01" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Withdrawal Method</label>
+        <select name="method" class="input">
+          <option value="bank_transfer">Bank Transfer</option>
+          <option value="paypal">PayPal</option>
+          <option value="crypto">Cryptocurrency</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Payout Details</label>
+        <textarea name="details" class="input" placeholder="Bank account number, PayPal email, or crypto address" rows="3"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary w-full justify-center">Request Withdrawal</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

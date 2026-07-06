@@ -1,0 +1,85 @@
+{% extends 'seller/base.html' %}
+{% block title %}Seller Orders — MercX Digital{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-5">Incoming Orders</h1>
+
+<div class="tabs mb-5">
+  {% for s, label in [('','All'),('pending','Pending'),('processing','Processing'),('completed','Completed'),('cancelled','Cancelled')] %}
+  <a href="{{ url_for('seller.orders', status=s) }}" class="tab {% if status == s %}active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  {% if orders %}
+  <div class="table-wrap" style="border:none">
+    <table class="table">
+      <thead><tr><th>Order #</th><th>Buyer</th><th>Products</th><th>Total</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+      {% for o in orders %}
+      {% set sc = {'completed':'success','pending':'warning','processing':'accent','cancelled':'danger','refunded':'neutral'} %}
+      <tr>
+        <td><span class="font-mono text-sm" style="color:var(--primary-light)">{{ o.order_number }}</span></td>
+        <td style="font-size:.85rem">{{ o.buyer.username if o.buyer else '—' }}</td>
+        <td>
+          {% for item in o.items %}
+          <div style="font-size:.82rem;color:var(--text-muted)" class="truncate" style="max-width:160px">{{ item.title }}</div>
+          {% endfor %}
+        </td>
+        <td class="font-semibold" style="color:var(--success)">${{ '%.2f'|format(o.total|float) }}</td>
+        <td style="color:var(--text-muted);font-size:.82rem">{{ o.created_at[:10] }}</td>
+        <td><span class="badge badge-{{ sc.get(o.status,'neutral') }}">{{ o.status }}</span></td>
+        <td>
+          {% for item in o.items %}
+          {% if item.delivery_status == 'pending' %}
+          <button onclick="document.getElementById('deliver-{{ item.id }}').classList.remove('hidden')"
+                  class="btn btn-primary btn-sm">
+            <i data-feather="send" style="width:13px;height:13px"></i> Deliver
+          </button>
+          {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      {% for item in o.items %}
+      {% if item.delivery_status == 'pending' %}
+      <tr id="deliver-{{ item.id }}" class="hidden" style="background:rgba(124,58,237,.05)">
+        <td colspan="7" style="padding:1rem">
+          <form method="POST" action="{{ url_for('seller.deliver_order', order_id=o.id) }}" class="flex flex-col gap-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="item_id" value="{{ item.id }}">
+            <label class="form-label">Delivery Content for "{{ item.title }}"</label>
+            <textarea name="delivery_content" class="input" rows="4" required
+                      placeholder="Paste the download link, license key, or any content the buyer should receive…"></textarea>
+            <div class="flex gap-3">
+              <button type="submit" class="btn btn-primary btn-sm">
+                <i data-feather="check" style="width:14px;height:14px"></i> Send Delivery
+              </button>
+              <button type="button" onclick="document.getElementById('deliver-{{ item.id }}').classList.add('hidden')"
+                      class="btn btn-ghost btn-sm">Cancel</button>
+            </div>
+          </form>
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <div class="flex justify-center p-4">
+    <div class="pagination">
+      {% for p in range(1, pages+1) %}
+      <a href="{{ url_for('seller.orders', status=status, page=p) }}"
+         class="page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <div style="text-align:center;padding:4rem">
+    <i data-feather="shopping-cart" style="width:44px;height:44px;color:var(--text-dim);margin-bottom:1rem"></i>
+    <p style="color:var(--text-muted)">No orders yet. Keep promoting your products!</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Order Confirmed — MercX Digital{% endblock %}
+{% block content %}
+<div style="max-width:680px;margin:0 auto;padding:3rem 1.25rem;text-align:center">
+  <div class="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6"
+       style="background:linear-gradient(135deg,rgba(16,185,129,.2),rgba(6,182,212,.2));border:1px solid rgba(16,185,129,.3)">
+    <i data-feather="check-circle" style="width:40px;height:40px;color:var(--success)"></i>
+  </div>
+
+  <h1 class="font-display text-3xl font-bold mb-3">Order Confirmed! 🎉</h1>
+  <p style="color:var(--text-muted);font-size:1rem;margin-bottom:1.5rem">
+    Thank you for your purchase. Your digital products are ready.
+  </p>
+
+  <div class="card mb-5 text-left">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim)">Order Number</div>
+        <div class="font-mono font-bold text-lg" style="color:var(--primary-light)">{{ order.order_number }}</div>
+      </div>
+      <span class="badge badge-success text-sm">{{ order.status|title }}</span>
+    </div>
+
+    {% for item in items %}
+    <div class="flex items-center justify-between gap-4 py-3" style="border-top:1px solid var(--border)">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+             style="background:rgba(124,58,237,.12);color:var(--primary-light)">
+          <i data-feather="package" style="width:18px;height:18px"></i>
+        </div>
+        <div>
+          <div class="font-semibold text-sm">{{ item.title }}</div>
+          <div style="font-size:.75rem;color:var(--text-muted)">
+            {{ item.delivery_status|title }} ·
+            {{ item.download_count or 0 }}/{{ item.max_downloads or 5 }} downloads
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="font-semibold">${{ '%.2f'|format(item.unit_price|float) }}</span>
+        {% if item.delivery_status == 'delivered' and item.download_url %}
+        <a href="{{ url_for('dashboard.download_item', order_item_id=item.id) }}"
+           class="btn btn-primary btn-sm">
+          <i data-feather="download" style="width:13px;height:13px"></i> Download
+        </a>
+        {% else %}
+        <span class="badge badge-warning">Delivery pending</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+
+    <div class="flex justify-between pt-4 font-bold" style="border-top:1px solid var(--border)">
+      <span>Total Paid</span>
+      <span style="color:var(--primary-light)">${{ '%.2f'|format(order.total|float) }}</span>
+    </div>
+  </div>
+
+  <div class="flex gap-4 justify-center flex-wrap">
+    <a href="{{ url_for('dashboard.purchases') }}" class="btn btn-primary btn-lg">
+      <i data-feather="download-cloud" style="width:17px;height:17px"></i> View All Downloads
+    </a>
+    <a href="{{ url_for('marketplace.index') }}" class="btn btn-ghost btn-lg">
+      Continue Shopping
+    </a>
+  </div>
+
+  <div class="flex items-center justify-center gap-2 mt-6" style="font-size:.8rem;color:var(--text-dim)">
+    <i data-feather="mail" style="width:13px;height:13px"></i>
+    A confirmation email has been sent to your email address.
+  </div>
+</div>
+{% endblock %}

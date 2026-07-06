@@ -1,0 +1,33 @@
+{% extends 'admin/base.html' %}
+{% block title %}Audit Logs — Admin{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-5">Audit Logs <span style="color:var(--text-muted);font-weight:400;font-size:1rem">({{ total }})</span></h1>
+<form action="{{ url_for('admin.logs') }}" method="GET" class="mb-5">
+  <input type="text" name="action" class="input" style="width:260px" placeholder="Filter by action…" value="{{ action_f }}">
+</form>
+<div class="card" style="padding:0;overflow:hidden">
+  <table class="table">
+    <thead><tr><th>User</th><th>Action</th><th>Resource</th><th>IP</th><th>Date</th></tr></thead>
+    <tbody>
+    {% for l in logs %}
+    <tr>
+      <td style="font-size:.85rem">{{ l.user.username if l.get('user') else 'System' }}</td>
+      <td><span class="badge badge-neutral">{{ l.action }}</span></td>
+      <td style="font-size:.8rem;color:var(--text-muted)">{{ l.resource_type or '—' }}</td>
+      <td style="font-size:.78rem;color:var(--text-dim);font-family:monospace">{{ l.ip_address or '—' }}</td>
+      <td style="font-size:.8rem;color:var(--text-muted)">{{ l.created_at[:19].replace('T',' ') }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if pages > 1 %}
+  <div class="flex justify-center p-4">
+    <div class="pagination">
+      {% for p in range(1, pages+1) %}
+      <a href="{{ url_for('admin.logs', action=action_f, page=p) }}" class="page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

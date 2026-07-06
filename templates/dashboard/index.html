@@ -1,0 +1,109 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Dashboard — MercX Digital{% endblock %}
+{% block page_content %}
+<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+  <div>
+    <h1 class="font-display text-2xl font-bold">Welcome back, {{ current_username }} 👋</h1>
+    <p style="color:var(--text-muted);font-size:.9rem">Here's what's happening with your account.</p>
+  </div>
+  <a href="{{ url_for('marketplace.index') }}" class="btn btn-primary btn-sm">
+    <i data-feather="shopping-bag" style="width:15px;height:15px"></i> Browse Products
+  </a>
+</div>
+
+<!-- Balance card -->
+<div class="wallet-card mb-6 reveal">
+  <p style="font-size:.82rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;font-family:'Space Grotesk',sans-serif">Wallet Balance</p>
+  <div class="wallet-balance mb-4">${{ '%.2f'|format(current_balance|float) }}</div>
+  <div class="flex gap-3 flex-wrap relative z-10">
+    <a href="{{ url_for('dashboard.wallet') }}" class="btn btn-sm" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff">
+      <i data-feather="plus" style="width:14px;height:14px"></i> Add Funds
+    </a>
+    <a href="{{ url_for('dashboard.wallet') }}" class="btn btn-sm" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.8)">
+      <i data-feather="trending-down" style="width:14px;height:14px"></i> Withdraw
+    </a>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  {% set stats = [
+    ('shopping-bag', 'Total Spent',    '$'~'%.2f'|format(total_spent|float),   '#7C3AED', 'rgba(124,58,237,.12)'),
+    ('download',     'Downloads',      purchases|length,                         '#06B6D4', 'rgba(6,182,212,.12)'),
+    ('heart',        'Wishlist',       wishlist_count,                           '#EF4444', 'rgba(239,68,68,.12)'),
+    ('trending-up',  'Total Earned',   '$'~'%.2f'|format(total_earned|float),   '#10B981', 'rgba(16,185,129,.12)'),
+  ] %}
+  {% for icon, label, val, color, bg in stats %}
+  <div class="stat-card reveal">
+    <div class="stat-icon" style="background:{{ bg }};color:{{ color }}">
+      <i data-feather="{{ icon }}" style="width:22px;height:22px"></i>
+    </div>
+    <div>
+      <div class="stat-value">{{ val }}</div>
+      <div class="stat-label">{{ label }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Recent purchases -->
+<div class="card reveal mb-6">
+  <div class="flex items-center justify-between mb-5">
+    <h2 class="font-display text-lg font-bold">Recent Purchases</h2>
+    <a href="{{ url_for('dashboard.purchases') }}" class="btn btn-ghost btn-sm">View All</a>
+  </div>
+  {% if purchases %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr>
+        <th>Order</th><th>Date</th><th>Total</th><th>Status</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for order in purchases %}
+      <tr>
+        <td><span class="font-mono text-sm" style="color:var(--primary-light)">{{ order.order_number }}</span></td>
+        <td style="color:var(--text-muted);font-size:.85rem">{{ order.created_at[:10] }}</td>
+        <td class="font-semibold">${{ '%.2f'|format(order.total|float) }}</td>
+        <td>
+          {% set sc = {'completed':'success','pending':'warning','cancelled':'danger','refunded':'neutral'} %}
+          <span class="badge badge-{{ sc.get(order.status,'neutral') }}">{{ order.status }}</span>
+        </td>
+        <td><a href="{{ url_for('dashboard.purchases') }}" class="btn btn-ghost btn-sm">View</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:3rem 1rem">
+    <i data-feather="shopping-bag" style="width:40px;height:40px;color:var(--text-dim);margin-bottom:1rem"></i>
+    <p style="color:var(--text-muted)">No purchases yet.</p>
+    <a href="{{ url_for('marketplace.index') }}" class="btn btn-primary btn-sm mt-3">Browse Products</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if sales %}
+<div class="card reveal">
+  <div class="flex items-center justify-between mb-5">
+    <h2 class="font-display text-lg font-bold">Recent Sales</h2>
+    <a href="{{ url_for('seller.orders') }}" class="btn btn-ghost btn-sm">View All</a>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Order</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for order in sales %}
+      <tr>
+        <td><span class="font-mono text-sm" style="color:var(--accent)">{{ order.order_number }}</span></td>
+        <td style="color:var(--text-muted);font-size:.85rem">{{ order.created_at[:10] }}</td>
+        <td class="font-semibold" style="color:var(--success)">${{ '%.2f'|format(order.total|float) }}</td>
+        <td><span class="badge badge-{{ 'success' if order.status=='completed' else 'warning' }}">{{ order.status }}</span></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

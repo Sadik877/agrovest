@@ -1,211 +1,27 @@
-{% extends "admin/base.html" %}
-{% block admin_title %}Settings{% endblock %}
-
-{% block admin_content %}
-<div class="mb-6">
-  <h1 class="font-display font-bold text-lg text-gray-900">Site Settings</h1>
-  <p class="text-gray-500 text-sm">Everything here is database-driven — no redeploy needed to change it.</p>
-</div>
-
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% for category, message in messages %}
-  <div class="mb-5 px-4 py-3 rounded-xl text-sm font-medium
-    {% if category == 'success' %}bg-emerald-50 text-emerald-700 border border-emerald-200
-    {% else %}bg-red-50 text-red-700 border border-red-200{% endif %}">
-    {{ message }}
-  </div>
-  {% endfor %}
-{% endwith %}
-
-<form method="POST" action="{{ url_for('admin_settings') }}" class="space-y-5">
+{% extends 'admin/base.html' %}
+{% block title %}Site Settings — Admin{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-6">Site Settings</h1>
+<form method="POST" action="{{ url_for('admin.settings') }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-  <div class="grid lg:grid-cols-2 gap-5">
-
-    <!-- Site Identity -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-        <div class="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center">
-          <i data-lucide="badge" class="w-4 h-4 text-gray-600"></i>
-        </div>
-        <h2 class="font-semibold text-gray-900 text-sm">Site Identity</h2>
-      </div>
-      <div class="p-6 space-y-4">
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1.5">Site Name</label>
-          <input type="text" name="site_name" value="{{ settings.site_name }}"
-                 class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-        </div>
-        <div class="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1.5">Logo URL</label>
-            <input type="text" name="logo_url" value="{{ settings.logo_url }}" placeholder="/static/images/logo.png"
-                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1.5">Favicon URL</label>
-            <input type="text" name="favicon_url" value="{{ settings.favicon_url }}" placeholder="/static/images/favicon.ico"
-                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-          </div>
-        </div>
-      </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+    {% for key, s in settings.items() %}
+    <div class="card">
+      <label class="form-label">{{ s.description or key }}</label>
+      {% if s.type == 'boolean' %}
+      <select name="{{ key }}" class="input">
+        <option value="true" {% if s.value == 'true' %}selected{% endif %}>Enabled</option>
+        <option value="false" {% if s.value == 'false' %}selected{% endif %}>Disabled</option>
+      </select>
+      {% else %}
+      <input type="text" name="{{ key }}" class="input" value="{{ s.value }}">
+      {% endif %}
+      <p style="font-size:.72rem;color:var(--text-dim);margin-top:.4rem;font-family:monospace">{{ key }}</p>
     </div>
-
-    <!-- Contact & Social -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-        <div class="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center">
-          <i data-lucide="at-sign" class="w-4 h-4 text-gray-600"></i>
-        </div>
-        <h2 class="font-semibold text-gray-900 text-sm">Contact & Social</h2>
-      </div>
-      <div class="p-6 space-y-4">
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1.5">Support Email</label>
-          <input type="email" name="support_email" value="{{ settings.support_email }}"
-                 class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1.5">Office Address</label>
-          <input type="text" name="office_address" value="{{ settings.office_address }}" placeholder="12 Agric Investment Plaza, Victoria Island, Lagos"
-                 class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-        </div>
-        <div class="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1.5">WhatsApp Link</label>
-            <input type="text" name="whatsapp_link" value="{{ settings.whatsapp_link }}" placeholder="https://wa.me/234..."
-                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1.5">Telegram Link</label>
-            <input type="text" name="telegram_link" value="{{ settings.telegram_link }}" placeholder="https://t.me/..."
-                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1.5">Facebook Link</label>
-            <input type="text" name="facebook_link" value="{{ settings.facebook_link }}" placeholder="https://facebook.com/..."
-                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1.5">Instagram Link</label>
-            <input type="text" name="instagram_link" value="{{ settings.instagram_link }}" placeholder="https://instagram.com/..."
-                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-          </div>
-          <div class="sm:col-span-2">
-            <label class="block text-xs font-semibold text-gray-700 mb-1.5">Twitter / X Link</label>
-            <input type="text" name="twitter_link" value="{{ settings.twitter_link }}" placeholder="https://x.com/..."
-                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Financial Settings -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-        <div class="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center">
-          <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
-        </div>
-        <h2 class="font-semibold text-gray-900 text-sm">Financial Settings</h2>
-      </div>
-      <div class="p-6 space-y-4">
-        <div class="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1.5">Currency Code</label>
-            <input type="text" name="currency_code" value="{{ settings.currency_code }}" maxlength="6"
-                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1.5">Currency Symbol</label>
-            <input type="text" name="currency_symbol" value="{{ settings.currency_symbol }}" maxlength="4"
-                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-          </div>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1.5">Referral Commission (%)</label>
-          <input type="number" step="0.01" min="0" max="100" name="referral_percent" value="{{ settings.referral_percent }}"
-                 class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-          <p class="text-xs text-gray-400 mt-1">Paid to the referrer when their invitee activates an investment.</p>
-        </div>
-        <div class="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1.5">Minimum Withdrawal</label>
-            <input type="number" step="1" min="0" name="min_withdrawal" value="{{ settings.min_withdrawal }}"
-                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1.5">Maximum Withdrawal</label>
-            <input type="number" step="1" min="0" name="max_withdrawal" value="{{ settings.max_withdrawal }}"
-                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Localization & SEO -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-        <div class="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center">
-          <i data-lucide="globe" class="w-4 h-4 text-gray-600"></i>
-        </div>
-        <h2 class="font-semibold text-gray-900 text-sm">Localization & SEO</h2>
-      </div>
-      <div class="p-6 space-y-4">
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1.5">Timezone</label>
-          <input type="text" name="timezone" value="{{ settings.timezone }}" placeholder="Africa/Lagos"
-                 class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-          <p class="text-xs text-gray-400 mt-1">IANA timezone name — controls how dates/times display sitewide.</p>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1.5">Default SEO Title</label>
-          <input type="text" name="seo_title" value="{{ settings.seo_title }}"
-                 class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1.5">Default SEO Description</label>
-          <textarea name="seo_description" rows="2"
-                    class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500 resize-none">{{ settings.seo_description }}</textarea>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1.5">OG Share Image URL</label>
-          <input type="text" name="og_image_url" value="{{ settings.og_image_url }}"
-                 class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
-        </div>
-      </div>
-    </div>
+    {% endfor %}
   </div>
-
-  <button type="submit"
-          class="w-full lg:w-auto flex items-center justify-center gap-2 bg-forest-950 hover:bg-forest-800 text-white font-bold px-8 py-3.5 rounded-xl text-sm shadow-lg">
-    <i data-lucide="save" class="w-4 h-4"></i> Save All Settings
+  <button type="submit" class="btn btn-primary btn-lg mt-6">
+    <i data-feather="save" style="width:17px;height:17px"></i> Save All Settings
   </button>
 </form>
-
-<!-- Maintenance Mode (reuses the existing toggle) -->
-<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-5">
-  <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-    <div class="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center">
-      <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600"></i>
-    </div>
-    <h2 class="font-semibold text-gray-900 text-sm">Maintenance Mode</h2>
-  </div>
-  <div class="p-6 flex items-center justify-between gap-4">
-    <div>
-      <p class="text-sm font-semibold text-gray-800">
-        Site is currently {{ 'in MAINTENANCE mode' if maintenance_mode else 'LIVE' }}
-      </p>
-      <p class="text-xs text-gray-400 mt-0.5">Takes the entire site down for non-admins — separate from the Payment Settings pause.</p>
-    </div>
-    <form method="POST" action="{{ url_for('admin_toggle_maintenance') }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit"
-              class="flex items-center gap-2 font-semibold text-sm px-5 py-2.5 rounded-xl transition-colors
-              {% if maintenance_mode %}bg-emerald-50 hover:bg-emerald-100 text-emerald-700{% else %}bg-red-50 hover:bg-red-100 text-red-700{% endif %}">
-        <i data-lucide="{{ 'play' if maintenance_mode else 'pause' }}" class="w-4 h-4"></i>
-        {{ 'Turn OFF Maintenance' if maintenance_mode else 'Turn ON Maintenance' }}
-      </button>
-    </form>
-  </div>
-</div>
 {% endblock %}

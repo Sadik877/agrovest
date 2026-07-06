@@ -1,0 +1,47 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Wishlist — MercX Digital{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-6">My Wishlist</h1>
+{% if listings %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+  {% for listing in listings %}
+  <div class="product-card reveal">
+    <a href="{{ url_for('marketplace.listing_detail', slug=listing.slug) }}" style="text-decoration:none">
+      {% if listing.preview_images %}
+        <img src="{{ listing.preview_images[0] }}" class="product-card__img" loading="lazy" alt="{{ listing.title }}">
+      {% else %}
+        <div class="product-card__img-placeholder">
+          <i data-feather="image" style="width:32px;height:32px;opacity:.3"></i>
+        </div>
+      {% endif %}
+      <div class="product-card__body">
+        <div class="product-card__title">{{ listing.title }}</div>
+        <div class="product-card__rating">
+          <span style="color:#F59E0B">★</span>
+          {{ '%.1f'|format(listing.rating|float) }}
+        </div>
+        <span class="product-card__price">${{ '%.2f'|format(listing.price|float) }}</span>
+      </div>
+    </a>
+    <div class="product-card__footer">
+      <a href="{{ url_for('marketplace.cart_add', listing_id=listing.id) }}"
+         onclick="event.preventDefault();fetch(this.href,{method:'POST',headers:{'X-CSRFToken':MercX.getCsrf()}}).then(()=>MercX.toast.success('Added to cart!','')).then(MercX.refreshCartBadge)"
+         class="btn btn-primary btn-sm flex-1 justify-center">
+        <i data-feather="shopping-cart" style="width:14px;height:14px"></i> Add to Cart
+      </a>
+      <button data-wishlist="{{ listing.id }}" class="btn btn-ghost btn-sm active" style="color:#EF4444">
+        <i data-feather="heart" style="width:14px;height:14px;fill:#EF4444;stroke:#EF4444"></i>
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:4rem">
+  <i data-feather="heart" style="width:48px;height:48px;color:var(--text-dim);margin-bottom:1rem"></i>
+  <h3 class="font-display text-xl font-bold mb-2">Your wishlist is empty</h3>
+  <p class="mb-4" style="color:var(--text-muted)">Save products you love for later.</p>
+  <a href="{{ url_for('marketplace.index') }}" class="btn btn-primary">Browse Products</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,163 @@
+{% extends 'seller/base.html' %}
+{% block title %}Create Product — MercX Digital{% endblock %}
+{% block page_content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="{{ url_for('seller.inventory') }}" class="btn btn-ghost btn-sm p-2">
+    <i data-feather="arrow-left" style="width:16px;height:16px"></i>
+  </a>
+  <h1 class="font-display text-2xl font-bold">Create New Product</h1>
+</div>
+
+<form method="POST" action="{{ url_for('seller.create_listing') }}" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+    <!-- Left column: main details -->
+    <div class="lg:col-span-2 space-y-5">
+      <!-- Basic Info -->
+      <div class="card">
+        <h3 class="font-display font-bold mb-4">Basic Information</h3>
+        <div class="form-group">
+          <label class="form-label">Product Title <span style="color:var(--danger)">*</span></label>
+          <input type="text" name="title" class="input" placeholder="e.g. Premium SaaS Dashboard UI Kit" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select name="category_id" class="input">
+            <option value="">— Select Category —</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Short Description <span style="color:var(--text-dim)">(shown in cards)</span></label>
+          <textarea name="short_description" class="input" rows="2" maxlength="500"
+                    placeholder="One or two sentences summarising your product…"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Full Description <span style="color:var(--danger)">*</span></label>
+          <textarea name="description" class="input" rows="8"
+                    placeholder="Describe what's included, use cases, requirements, and anything buyers should know…" required></textarea>
+        </div>
+      </div>
+
+      <!-- Media -->
+      <div class="card">
+        <h3 class="font-display font-bold mb-2">Product Images</h3>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1rem">Upload up to 6 screenshots or previews. First image is the thumbnail.</p>
+        <label class="upload-zone">
+          <i data-feather="image" style="width:32px;height:32px;color:var(--text-dim);margin-bottom:.75rem"></i>
+          <div class="font-semibold" style="color:var(--text)">Drop images here or click to browse</div>
+          <div style="font-size:.8rem;color:var(--text-muted);margin-top:.3rem">PNG, JPG, WEBP · Max 5 MB each</div>
+          <input type="file" name="images" accept="image/*" multiple>
+        </label>
+      </div>
+
+      <!-- Digital File -->
+      <div class="card">
+        <h3 class="font-display font-bold mb-2">Product File</h3>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1rem">Upload the actual file buyers will download after purchase.</p>
+        <label class="upload-zone">
+          <i data-feather="file" style="width:32px;height:32px;color:var(--text-dim);margin-bottom:.75rem"></i>
+          <div class="font-semibold" style="color:var(--text)">Drop your file here or click to browse</div>
+          <div style="font-size:.8rem;color:var(--text-muted);margin-top:.3rem">ZIP, PDF, Figma, Sketch, XD, PSD, or any format · Max 50 MB</div>
+          <input type="file" name="product_file">
+        </label>
+      </div>
+    </div>
+
+    <!-- Right column: pricing & settings -->
+    <div class="space-y-5">
+      <!-- Pricing -->
+      <div class="card">
+        <h3 class="font-display font-bold mb-4">Pricing</h3>
+        <div class="form-group">
+          <label class="form-label">Price <span style="color:var(--danger)">*</span></label>
+          <div style="position:relative">
+            <span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);font-weight:600;color:var(--text-muted)">$</span>
+            <input type="number" name="price" class="input" style="padding-left:1.8rem"
+                   placeholder="29.00" min="0" step="0.01" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Compare-at Price <span style="color:var(--text-dim)">(original/crossed-out)</span></label>
+          <div style="position:relative">
+            <span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);font-weight:600;color:var(--text-muted)">$</span>
+            <input type="number" name="compare_price" class="input" style="padding-left:1.8rem"
+                   placeholder="59.00" min="0" step="0.01">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">License Type</label>
+          <select name="license_type" class="input">
+            <option value="personal">Personal</option>
+            <option value="commercial">Commercial</option>
+            <option value="extended">Extended</option>
+            <option value="saas">SaaS</option>
+            <option value="unlimited">Unlimited</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Product Details -->
+      <div class="card">
+        <h3 class="font-display font-bold mb-4">Product Details</h3>
+        <div class="form-group">
+          <label class="form-label">Version</label>
+          <input type="text" name="version" class="input" placeholder="1.0.0" value="1.0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">File Formats</label>
+          <div class="grid grid-cols-2 gap-2">
+            {% for fmt in ['ZIP','Figma','Sketch','XD','PDF','PSD','AI','HTML','React','Vue','Flutter'] %}
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="file_format" value="{{ fmt }}" class="w-3.5 h-3.5" style="accent-color:var(--primary)">
+              <span style="font-size:.82rem;color:var(--text-muted)">{{ fmt }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Demo URL</label>
+          <input type="url" name="demo_url" class="input" placeholder="https://demo.example.com">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Documentation URL</label>
+          <input type="url" name="documentation_url" class="input" placeholder="https://docs.example.com">
+        </div>
+      </div>
+
+      <!-- Delivery & Support -->
+      <div class="card">
+        <h3 class="font-display font-bold mb-4">Delivery & Support</h3>
+        <div class="form-group">
+          <label class="form-label">Delivery Type</label>
+          <select name="delivery_type" class="input">
+            <option value="instant">Instant (auto-deliver file on purchase)</option>
+            <option value="manual">Manual (you send content after purchase)</option>
+          </select>
+        </div>
+        <label class="flex items-center gap-3 mb-3 cursor-pointer">
+          <input type="checkbox" name="updates_included" value="on" checked class="w-4 h-4" style="accent-color:var(--primary)">
+          <span style="font-size:.88rem">Free future updates included</span>
+        </label>
+        <label class="flex items-center gap-3 mb-3 cursor-pointer">
+          <input type="checkbox" name="support_included" id="support-check" value="on" class="w-4 h-4" style="accent-color:var(--primary)">
+          <span style="font-size:.88rem">Support included</span>
+        </label>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Tags <span style="color:var(--text-dim)">(comma separated)</span></label>
+          <input type="text" name="tags" class="input" placeholder="dashboard, ui-kit, tailwind, react">
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-full justify-center btn-lg">
+        <i data-feather="upload-cloud" style="width:18px;height:18px"></i>
+        Submit for Review
+      </button>
+      <p style="font-size:.78rem;color:var(--text-dim);text-align:center">Listings are reviewed within 24 hours</p>
+    </div>
+  </div>
+</form>
+{% endblock %}

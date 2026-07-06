@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Verify Your Email — MercX Digital{% endblock %}
+{% block content %}
+<div class="min-h-screen flex items-center justify-center py-12 px-4">
+  <div style="width:100%;max-width:480px;text-align:center">
+    <div class="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6"
+         style="background:linear-gradient(135deg,rgba(124,58,237,.2),rgba(6,182,212,.2));border:1px solid rgba(124,58,237,.3)">
+      <i data-feather="mail" style="width:36px;height:36px;color:#a78bfa"></i>
+    </div>
+    <h1 class="font-display text-3xl font-bold mb-4">Check your inbox</h1>
+    <p class="mb-8 mx-auto" style="color:var(--text-muted);font-size:.95rem;line-height:1.7;max-width:380px">
+      We've sent a verification link to your email address. Click the link to activate your account.
+    </p>
+    <div class="card mb-6" style="text-align:left">
+      {% for tip in ["Check your spam/junk folder if you don't see it","The link expires in 24 hours","Make sure your email address is correct"] %}
+      <div class="flex items-center gap-3 {% if not loop.last %}mb-3{% endif %}">
+        <i data-feather="check-circle" style="width:16px;height:16px;color:var(--success);flex-shrink:0"></i>
+        <span style="font-size:.88rem;color:var(--text-muted)">{{ tip }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% if current_user_id %}
+    <a href="{{ url_for('auth.resend_verification') }}" class="btn btn-outline">
+      <i data-feather="refresh-cw" style="width:16px;height:16px"></i> Resend verification email
+    </a>
+    {% endif %}
+    <p class="mt-6" style="font-size:.85rem;color:var(--text-dim)">
+      Wrong account? <a href="{{ url_for('auth.logout') }}" style="color:var(--primary-light)">Log out</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

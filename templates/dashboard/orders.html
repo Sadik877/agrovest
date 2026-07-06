@@ -1,0 +1,60 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}My Orders — MercX Digital{% endblock %}
+{% block page_content %}
+<div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+  <h1 class="font-display text-2xl font-bold">My Orders</h1>
+</div>
+<!-- Status tabs -->
+<div class="tabs mb-6">
+  {% for s in ['','pending','processing','completed','cancelled','refunded'] %}
+  <a href="{{ url_for('dashboard.orders', status=s) }}"
+     class="tab {% if status == s %}active{% endif %}">
+    {{ s.title() or 'All' }}
+  </a>
+  {% endfor %}
+</div>
+<div class="card">
+  {% if orders %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Order #</th><th>Date</th><th>Items</th><th>Total</th><th>Method</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for o in orders %}
+      {% set sc = {'completed':'success','pending':'warning','processing':'accent','cancelled':'danger','refunded':'neutral','disputed':'danger'} %}
+      <tr>
+        <td><span class="font-mono text-sm" style="color:var(--primary-light)">{{ o.order_number }}</span></td>
+        <td style="color:var(--text-muted);font-size:.83rem">{{ o.created_at[:10] }}</td>
+        <td style="color:var(--text-muted)">—</td>
+        <td class="font-semibold">${{ '%.2f'|format(o.total|float) }}</td>
+        <td style="font-size:.83rem;color:var(--text-muted)">{{ o.payment_method or '—' }}</td>
+        <td><span class="badge badge-{{ sc.get(o.status,'neutral') }}">{{ o.status }}</span></td>
+        <td>
+          {% if o.status == 'completed' %}
+          <a href="{{ url_for('dashboard.purchases') }}" class="btn btn-ghost btn-sm">Download</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <!-- Pagination -->
+  {% if pages > 1 %}
+  <div class="flex justify-center mt-6">
+    <div class="pagination">
+      {% for p in range(1, pages+1) %}
+      <a href="{{ url_for('dashboard.orders', status=status, page=p) }}"
+         class="page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <div style="text-align:center;padding:3rem">
+    <i data-feather="package" style="width:44px;height:44px;color:var(--text-dim);margin-bottom:1rem"></i>
+    <p style="color:var(--text-muted);margin-bottom:1rem">No orders found.</p>
+    <a href="{{ url_for('marketplace.index') }}" class="btn btn-primary btn-sm">Browse Products</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

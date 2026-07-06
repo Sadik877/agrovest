@@ -1,0 +1,98 @@
+{% extends 'admin/base.html' %}
+{% block title %}Listings — Admin{% endblock %}
+{% block page_content %}
+<div class="flex flex-wrap items-center justify-between gap-4 mb-5">
+  <h1 class="font-display text-2xl font-bold">Listings <span style="color:var(--text-muted);font-weight:400;font-size:1rem">({{ total }})</span></h1>
+</div>
+
+<div class="flex flex-wrap gap-3 mb-5">
+  <div class="tabs" style="border:none;margin:0">
+    {% for s, label in [('pending','⏳ Pending'),('active','✅ Active'),('rejected','❌ Rejected'),('','All')] %}
+    <a href="{{ url_for('admin.listings', status=s) }}" class="tab {% if status == s %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <form action="{{ url_for('admin.listings') }}" method="GET" class="flex gap-2 ml-auto">
+    <input type="hidden" name="status" value="{{ status }}">
+    <input type="text" name="q" class="input" style="width:200px" placeholder="Search…" value="{{ search }}">
+    <button type="submit" class="btn btn-ghost btn-sm"><i data-feather="search" style="width:14px;height:14px"></i></button>
+  </form>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  {% if listings %}
+  <div class="table-wrap" style="border:none">
+    <table class="table">
+      <thead><tr><th>Product</th><th>Seller</th><th>Price</th><th>Sales</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for l in listings %}
+      {% set sc = {'active':'success','pending':'warning','rejected':'danger','paused':'neutral','deleted':'danger'} %}
+      <tr>
+        <td>
+          <div style="max-width:200px">
+            <div class="font-semibold text-sm truncate" style="color:var(--text)">{{ l.title }}</div>
+            <div style="font-size:.73rem;color:var(--text-dim)">{{ l.created_at[:10] }}</div>
+            {% if l.is_featured %}<span class="badge badge-warning" style="font-size:.65rem">Featured</span>{% endif %}
+          </div>
+        </td>
+        <td style="color:var(--text-muted);font-size:.85rem">{{ l.seller.username if l.seller else '—' }}</td>
+        <td class="font-semibold">${{ '%.2f'|format(l.price|float) }}</td>
+        <td style="color:var(--text-muted)">{{ l.sales_count or 0 }}</td>
+        <td><span class="badge badge-{{ sc.get(l.status,'neutral') }}">{{ l.status }}</span></td>
+        <td>
+          <div class="flex gap-1 flex-wrap">
+            {% if l.status == 'pending' %}
+            <form method="POST" action="{{ url_for('admin.approve_listing', listing_id=l.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm" style="background:rgba(16,185,129,.15);color:#6ee7b7;border:1px solid rgba(16,185,129,.3)">
+                <i data-feather="check" style="width:13px;height:13px"></i> Approve
+              </button>
+            </form>
+            <button onclick="document.getElementById('reject-{{ l.id }}').classList.toggle('hidden')"
+                    class="btn btn-sm" style="background:rgba(239,68,68,.12);color:#FCA5A5;border:1px solid rgba(239,68,68,.3)">
+              <i data-feather="x" style="width:13px;height:13px"></i> Reject
+            </button>
+            {% endif %}
+            <form method="POST" action="{{ url_for('admin.feature_listing', listing_id=l.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-ghost btn-sm p-2" title="{{ 'Unfeature' if l.is_featured else 'Feature' }}">
+                <i data-feather="star" style="width:13px;height:13px;{{ 'fill:#F59E0B;stroke:#F59E0B' if l.is_featured else '' }}"></i>
+              </button>
+            </form>
+            {% if l.status == 'active' %}
+            <a href="{{ url_for('marketplace.listing_detail', slug=l.slug) }}" target="_blank" class="btn btn-ghost btn-sm p-2">
+              <i data-feather="external-link" style="width:13px;height:13px"></i>
+            </a>
+            {% endif %}
+          </div>
+          <!-- Reject form (hidden) -->
+          <div id="reject-{{ l.id }}" class="hidden mt-2">
+            <form method="POST" action="{{ url_for('admin.reject_listing', listing_id=l.id) }}" class="flex gap-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="text" name="reason" class="input" style="flex:1" placeholder="Rejection reason…" required>
+              <button type="submit" class="btn btn-danger btn-sm">Send</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <div class="flex justify-center p-4">
+    <div class="pagination">
+      {% for p in range(1, pages+1) %}
+      <a href="{{ url_for('admin.listings', status=status, q=search, page=p) }}"
+         class="page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <div style="text-align:center;padding:3rem">
+    <i data-feather="package" style="width:40px;height:40px;color:var(--text-dim);margin-bottom:1rem"></i>
+    <p style="color:var(--text-muted)">No listings found.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

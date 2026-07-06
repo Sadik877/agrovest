@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Search: {{ q }} — MercX Digital{% endblock %}
+{% block content %}
+<div style="max-width:1400px;margin:0 auto;padding:2rem 1.25rem">
+  <div class="mb-6">
+    <h1 class="font-display text-2xl font-bold mb-1">
+      {% if q %}Results for "{{ q }}"{% else %}Search Products{% endif %}
+    </h1>
+    <p style="color:var(--text-muted);font-size:.88rem">{{ total }} product{{ 's' if total != 1 }} found</p>
+  </div>
+
+  <!-- Search bar -->
+  <form action="{{ url_for('main.search') }}" method="GET" class="flex gap-3 mb-6 flex-wrap">
+    <div style="position:relative;flex:1;min-width:240px">
+      <i data-feather="search" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-muted)"></i>
+      <input type="text" name="q" class="input" style="padding-left:2.6rem" value="{{ q }}" placeholder="Search digital products…">
+    </div>
+    <select name="category" class="input" style="width:auto">
+      <option value="">All Categories</option>
+      {% for cat in categories %}
+      <option value="{{ cat.id }}" {% if category == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+      {% endfor %}
+    </select>
+    <select name="sort" class="input" style="width:auto">
+      {% for val, label in [('relevance','Most Relevant'),('popular','Popular'),('newest','Newest'),('price_low','Price ↑'),('price_high','Price ↓'),('rating','Rating')] %}
+      <option value="{{ val }}" {% if sort == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary"><i data-feather="search" style="width:15px;height:15px"></i> Search</button>
+  </form>
+
+  {% if results %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    {% for listing in results %}
+    <a href="{{ url_for('marketplace.listing_detail', slug=listing.slug) }}" class="product-card reveal" style="text-decoration:none">
+      {% if listing.preview_images %}
+        <img src="{{ listing.preview_images[0] }}" class="product-card__img" loading="lazy" alt="">
+      {% else %}
+        <div class="product-card__img-placeholder"><i data-feather="package" style="width:32px;height:32px;opacity:.3"></i></div>
+      {% endif %}
+      <div class="product-card__body">
+        <div class="product-card__title">{{ listing.title }}</div>
+        <div class="product-card__rating"><span style="color:#F59E0B">★</span> {{ '%.1f'|format(listing.rating|float) }}</div>
+        <span class="product-card__price">${{ '%.2f'|format(listing.price|float) }}</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% if pages > 1 %}
+  <div class="flex justify-center mt-8">
+    <div class="pagination">
+      {% for p in range(1, pages+1) %}
+      <a href="{{ url_for('main.search', q=q, page=p, sort=sort, category=category) }}"
+         class="page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <div style="text-align:center;padding:5rem">
+    <i data-feather="search" style="width:48px;height:48px;color:var(--text-dim);margin-bottom:1rem"></i>
+    <h3 class="font-display text-xl font-bold mb-2">No results found</h3>
+    <p style="color:var(--text-muted)">Try different keywords or browse our categories.</p>
+    <a href="{{ url_for('marketplace.index') }}" class="btn btn-primary mt-4">Browse All Products</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

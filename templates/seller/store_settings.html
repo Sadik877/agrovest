@@ -1,0 +1,87 @@
+{% extends 'seller/base.html' %}
+{% block title %}Store Settings — MercX Digital{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-6">Store Settings</h1>
+
+<form method="POST" action="{{ url_for('seller.store_settings') }}" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div class="lg:col-span-2 space-y-5">
+
+      <!-- Store Banner -->
+      <div class="card">
+        <h3 class="font-display font-bold mb-3">Store Banner</h3>
+        {% if profile and profile.store_banner_url %}
+        <img src="{{ profile.store_banner_url }}" class="w-full h-32 object-cover rounded-xl mb-3" alt="Banner">
+        {% endif %}
+        <label class="upload-zone" style="padding:1.5rem">
+          <i data-feather="image" style="width:28px;height:28px;color:var(--text-dim)"></i>
+          <div style="font-size:.85rem;color:var(--text-muted);margin-top:.5rem">Upload store banner · 1400×400px recommended</div>
+          <input type="file" name="banner" accept="image/*">
+        </label>
+      </div>
+
+      <!-- Store Info -->
+      <div class="card">
+        <h3 class="font-display font-bold mb-4">Store Information</h3>
+        <div class="form-group">
+          <label class="form-label">Store Name *</label>
+          <input type="text" name="store_name" class="input" value="{{ profile.store_name or '' if profile else '' }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Store Description</label>
+          <textarea name="store_description" class="input" rows="4" placeholder="Tell buyers about your store and what you create…">{{ profile.store_description or '' if profile else '' }}</textarea>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="form-group">
+            <label class="form-label">Website</label>
+            <input type="url" name="website" class="input" value="{{ profile.website or '' if profile else '' }}" placeholder="https://yoursite.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Twitter / X</label>
+            <input type="text" name="twitter" class="input" value="{{ profile.twitter or '' if profile else '' }}" placeholder="@handle">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">GitHub</label>
+            <input type="text" name="github" class="input" value="{{ profile.github or '' if profile else '' }}" placeholder="username">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Store stats -->
+    <div>
+      <div class="card mb-4">
+        <h3 class="font-display font-bold mb-4">Store Stats</h3>
+        {% for label, val in [
+          ('Total Sales',    profile.total_sales if profile else 0),
+          ('Total Revenue',  '$'~'%.2f'|format((profile.total_revenue|float if profile else 0))),
+          ('Store Rating',   '%.1f'|format((profile.seller_rating|float if profile else 0))~' ★'),
+          ('Verified',       '✅ Yes' if (profile and profile.seller_verified) else '⏳ Pending'),
+        ] %}
+        <div class="flex justify-between py-3" style="border-bottom:1px solid var(--border)">
+          <span style="font-size:.85rem;color:var(--text-muted)">{{ label }}</span>
+          <span class="font-semibold text-sm">{{ val }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if profile and profile.store_slug %}
+      <div class="card mb-4">
+        <h3 class="font-display font-bold mb-2">Public Store URL</h3>
+        <div class="flex gap-2">
+          <input type="text" class="input text-xs" value="/marketplace/store/{{ profile.store_slug }}" readonly style="font-family:monospace">
+          <button type="button" class="btn btn-ghost btn-sm" data-copy="{{ url_for('marketplace.seller_store', store_slug=profile.store_slug, _external=True) }}">
+            <i data-feather="copy" style="width:14px;height:14px"></i>
+          </button>
+        </div>
+      </div>
+      {% endif %}
+
+      <button type="submit" class="btn btn-primary w-full justify-center">
+        <i data-feather="save" style="width:16px;height:16px"></i> Save Store Settings
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block title %}Become a Seller — MercX Digital{% endblock %}
+{% block content %}
+<div class="min-h-screen flex items-center justify-center py-16 px-4"
+     style="background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(124,58,237,.1),transparent 70%)">
+  <div style="max-width:640px;width:100%">
+    <div class="text-center mb-10">
+      <div class="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6"
+           style="background:linear-gradient(135deg,#7C3AED,#06B6D4)">
+        <i data-feather="trending-up" style="width:36px;height:36px;color:#fff"></i>
+      </div>
+      <h1 class="font-display text-4xl font-bold mb-4">Start Selling on MercX</h1>
+      <p style="color:var(--text-muted);font-size:1.05rem;line-height:1.7;max-width:480px;margin:0 auto">
+        Turn your digital creations into income. No upfront fees — we only earn when you do.
+      </p>
+    </div>
+    <!-- Benefits -->
+    <div class="grid grid-cols-3 gap-4 mb-10">
+      {% for icon, label, desc in [('dollar-sign','10% Commission','We take 10%, you keep 90%'),('zap','Instant Delivery','Automated file delivery'),('bar-chart-2','Analytics','Track sales and traffic')] %}
+      <div class="card text-center">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3" style="background:rgba(124,58,237,.15);color:var(--primary-light)">
+          <i data-feather="{{ icon }}" style="width:18px;height:18px"></i>
+        </div>
+        <div class="font-display font-semibold text-sm mb-1">{{ label }}</div>
+        <div style="font-size:.78rem;color:var(--text-muted)">{{ desc }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <!-- Form -->
+    {% if current_user_id %}
+    <div class="card">
+      <h2 class="font-display text-xl font-bold mb-5">Create Your Store</h2>
+      <form method="POST" action="{{ url_for('dashboard.become_seller') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+          <label class="form-label">Store Name <span style="color:var(--danger)">*</span></label>
+          <input type="text" name="store_name" class="input input-lg" placeholder="My Digital Studio" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Store Description</label>
+          <textarea name="store_description" class="input" rows="3"
+                    placeholder="Tell buyers what you create and why they should buy from you…"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg w-full justify-center">
+          <i data-feather="rocket" style="width:18px;height:18px"></i> Launch My Store
+        </button>
+      </form>
+    </div>
+    {% else %}
+    <div class="card text-center">
+      <p class="mb-4" style="color:var(--text-muted)">Create a free account to start selling.</p>
+      <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg">Create Seller Account</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

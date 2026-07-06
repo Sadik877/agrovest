@@ -1,0 +1,80 @@
+{% extends 'admin/base.html' %}
+{% block title %}Wallet / Payments — Admin{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-5">Wallet & Payments <span style="color:var(--text-muted);font-weight:400;font-size:1rem">({{ total }})</span></h1>
+
+<div class="flex flex-wrap gap-3 mb-5">
+  <div class="tabs" style="border:none;margin:0">
+    {% for s, label in [('pending','⏳ Pending'),('completed','✅ Completed'),('cancelled','❌ Cancelled'),('','All')] %}
+    <a href="{{ url_for('admin.wallet', status=s, type=type_filter) }}" class="tab {% if status_f == s %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <select onchange="location.href='{{ url_for('admin.wallet') }}?status={{ status_f }}&type='+this.value" class="input" style="width:auto">
+    <option value="">All Types</option>
+    {% for t in ['deposit','withdrawal','purchase','sale','refund'] %}
+    <option value="{{ t }}" {% if type_filter == t %}selected{% endif %}>{{ t|title }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  {% if transactions %}
+  <div class="table-wrap" style="border:none">
+    <table class="table">
+      <thead><tr><th>User</th><th>Type</th><th>Amount</th><th>Method</th><th>Reference</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+      {% for tx in transactions %}
+      {% set is_credit = tx.type in ('deposit','sale','refund','referral','bonus') %}
+      <tr>
+        <td>
+          <div class="font-semibold text-sm">{{ tx.user.username if tx.user else '—' }}</div>
+          <div style="font-size:.72rem;color:var(--text-dim)">{{ tx.user.email if tx.user else '' }}</div>
+        </td>
+        <td><span class="badge badge-{{ 'success' if is_credit else 'danger' }}">{{ tx.type }}</span></td>
+        <td class="font-semibold font-mono">${{ '%.2f'|format(tx.amount|float) }}</td>
+        <td style="font-size:.82rem;color:var(--text-muted)">{{ tx.payment_method or '—' }}</td>
+        <td style="font-size:.75rem;color:var(--text-dim);font-family:monospace">{{ tx.reference or '—' }}</td>
+        <td style="font-size:.8rem;color:var(--text-muted)">{{ tx.created_at[:16].replace('T',' ') }}</td>
+        <td><span class="badge badge-{{ 'success' if tx.status=='completed' else ('warning' if tx.status=='pending' else 'danger') }}">{{ tx.status }}</span></td>
+        <td>
+          {% if tx.status == 'pending' %}
+          <div class="flex gap-1">
+            <form method="POST" action="{{ url_for('admin.approve_wallet_tx', tx_id=tx.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm" style="background:rgba(16,185,129,.15);color:#6ee7b7;border:1px solid rgba(16,185,129,.3)">
+                <i data-feather="check" style="width:13px;height:13px"></i>
+              </button>
+            </form>
+            <button onclick="document.getElementById('rej-{{ tx.id }}').classList.toggle('hidden')"
+                    class="btn btn-sm" style="background:rgba(239,68,68,.12);color:#FCA5A5;border:1px solid rgba(239,68,68,.3)">
+              <i data-feather="x" style="width:13px;height:13px"></i>
+            </button>
+          </div>
+          <div id="rej-{{ tx.id }}" class="hidden mt-2">
+            <form method="POST" action="{{ url_for('admin.reject_wallet_tx', tx_id=tx.id) }}" class="flex gap-2">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="text" name="note" class="input" style="width:140px" placeholder="Reason">
+              <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+            </form>
+          </div>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <div class="flex justify-center p-4">
+    <div class="pagination">
+      {% for p in range(1, pages+1) %}
+      <a href="{{ url_for('admin.wallet', status=status_f, type=type_filter, page=p) }}" class="page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <div style="text-align:center;padding:3rem"><p style="color:var(--text-muted)">No transactions found.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends 'admin/base.html' %}
+{% block title %}Support Tickets — Admin{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-5">Support Tickets</h1>
+<div class="tabs mb-5">
+  {% for s, label in [('open','Open'),('in_progress','In Progress'),('resolved','Resolved'),('closed','Closed')] %}
+  <a href="{{ url_for('admin.support', status=s) }}" class="tab {% if status == s %}active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+<div class="card" style="padding:0;overflow:hidden">
+  {% if tickets %}
+  <table class="table">
+    <thead><tr><th>Ticket</th><th>Subject</th><th>User</th><th>Priority</th><th>Status</th><th>Date</th></tr></thead>
+    <tbody>
+    {% for t in tickets %}
+    <tr>
+      <td class="font-mono text-xs" style="color:var(--primary-light)">{{ t.ticket_number }}</td>
+      <td class="text-sm">{{ t.subject }}</td>
+      <td style="font-size:.85rem">{{ t.user.username if t.user else '—' }}</td>
+      <td><span class="badge badge-{{ 'danger' if t.priority=='urgent' else ('warning' if t.priority=='high' else 'neutral') }}">{{ t.priority }}</span></td>
+      <td><span class="badge badge-{{ 'success' if t.status=='resolved' else 'warning' }}">{{ t.status }}</span></td>
+      <td style="font-size:.8rem;color:var(--text-muted)">{{ t.created_at[:10] }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:3rem"><p style="color:var(--text-muted)">No tickets.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

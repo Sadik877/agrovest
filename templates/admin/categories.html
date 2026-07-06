@@ -1,0 +1,47 @@
+{% extends 'admin/base.html' %}
+{% block title %}Categories — Admin{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-6">Categories</h1>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+  <div class="lg:col-span-2">
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="table">
+        <thead><tr><th>Category</th><th>Listings</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {% for cat in categories %}
+        <tr>
+          <td>
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:{{ cat.color }}22;color:{{ cat.color }}">
+                <i data-feather="{{ cat.icon or 'package' }}" style="width:14px;height:14px"></i>
+              </div>
+              <span class="font-semibold text-sm">{{ cat.name }}</span>
+            </div>
+          </td>
+          <td style="color:var(--text-muted)">{{ cat.listing_count or 0 }}</td>
+          <td><span class="badge badge-{{ 'success' if cat.is_active else 'neutral' }}">{{ 'Active' if cat.is_active else 'Inactive' }}</span></td>
+          <td>
+            <form method="POST" action="{{ url_for('admin.delete_category', cat_id=cat.id) }}" data-confirm="Delete '{{ cat.name }}'?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-ghost btn-sm p-2" style="color:var(--danger)"><i data-feather="trash-2" style="width:14px;height:14px"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <h3 class="font-display font-bold mb-4">Add Category</h3>
+    <form method="POST" action="{{ url_for('admin.categories') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group"><label class="form-label">Name</label><input type="text" name="name" class="input" required></div>
+      <div class="form-group"><label class="form-label">Description</label><textarea name="description" class="input" rows="2"></textarea></div>
+      <div class="form-group"><label class="form-label">Icon (Feather icon name)</label><input type="text" name="icon" class="input" placeholder="package" value="package"></div>
+      <div class="form-group"><label class="form-label">Color</label><input type="color" name="color" class="input" value="#7C3AED" style="height:42px"></div>
+      <button type="submit" class="btn btn-primary w-full justify-center">Add Category</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

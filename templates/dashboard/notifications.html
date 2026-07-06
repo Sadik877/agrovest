@@ -1,0 +1,60 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Notifications — MercX Digital{% endblock %}
+{% block page_content %}
+<div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+  <div>
+    <h1 class="font-display text-2xl font-bold">Notifications</h1>
+    {% if unread %}<p style="color:var(--text-muted);font-size:.88rem">{{ unread }} unread</p>{% endif %}
+  </div>
+  {% if unread %}
+  <button onclick="MercX.markAllNotifsRead().then(()=>location.reload())" class="btn btn-ghost btn-sm">
+    <i data-feather="check-square" style="width:15px;height:15px"></i> Mark all read
+  </button>
+  {% endif %}
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  {% if notifications %}
+    {% for n in notifications %}
+    {% set icon_map = {'order_delivered':'package','new_order':'shopping-cart','deposit_approved':'trending-up','withdrawal_approved':'trending-down','listing_approved':'check-circle','listing_rejected':'x-circle','message':'message-circle','referral':'gift','verified':'shield','tx_rejected':'x-circle'} %}
+    {% set color_map = {'order_delivered':'var(--success)','new_order':'var(--primary-light)','deposit_approved':'var(--success)','withdrawal_approved':'var(--accent)','listing_approved':'var(--success)','listing_rejected':'var(--danger)','message':'var(--accent)','referral':'var(--gold)','verified':'var(--success)','tx_rejected':'var(--danger)'} %}
+    <div class="flex items-start gap-4 p-4 border-b transition-colors"
+         style="border-color:var(--border);background:{{ 'rgba(124,58,237,.04)' if not n.is_read else 'transparent' }}"
+         onclick="MercX.markNotifRead('{{ n.id }}');this.style.background='transparent'">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+           style="background:{{ color_map.get(n.type,'var(--primary)') }}22;color:{{ color_map.get(n.type,'var(--primary-light)') }}">
+        <i data-feather="{{ icon_map.get(n.type, n.icon or 'bell') }}" style="width:18px;height:18px"></i>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="flex items-start justify-between gap-2">
+          <p class="font-semibold text-sm" style="color:var(--text)">{{ n.title }}</p>
+          {% if not n.is_read %}
+          <div class="w-2 h-2 rounded-full flex-shrink-0 mt-1" style="background:var(--primary)"></div>
+          {% endif %}
+        </div>
+        <p style="font-size:.83rem;color:var(--text-muted);margin-top:.2rem;line-height:1.5">{{ n.message }}</p>
+        <p style="font-size:.75rem;color:var(--text-dim);margin-top:.35rem">{{ n.created_at[:16].replace('T',' ') }}</p>
+      </div>
+      {% if n.link %}
+      <a href="{{ n.link }}" class="btn btn-ghost btn-sm flex-shrink-0" onclick="event.stopPropagation()">View</a>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% if pages > 1 %}
+    <div class="flex justify-center p-4">
+      <div class="pagination">
+        {% for p in range(1, pages+1) %}
+        <a href="{{ url_for('dashboard.notifications', page=p) }}"
+           class="page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  {% else %}
+  <div style="text-align:center;padding:4rem">
+    <i data-feather="bell-off" style="width:44px;height:44px;color:var(--text-dim);margin-bottom:1rem"></i>
+    <p style="color:var(--text-muted)">You're all caught up! No notifications.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

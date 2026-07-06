@@ -1,0 +1,350 @@
+{% extends 'base.html' %}
+{% block title %}{{ listing.title }} — MercX Digital{% endblock %}
+{% block meta_description %}{{ listing.short_description or listing.description[:160] }}{% endblock %}
+{% block content %}
+<div style="max-width:1200px;margin:0 auto;padding:2rem 1.25rem">
+
+  <!-- Breadcrumb -->
+  <nav style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;color:var(--text-muted);margin-bottom:1.5rem;flex-wrap:wrap">
+    <a href="{{ url_for('marketplace.index') }}" style="color:var(--text-muted)">Marketplace</a>
+    {% if category %}<span>›</span><a href="{{ url_for('marketplace.index', category=category.slug) }}" style="color:var(--text-muted)">{{ category.name }}</a>{% endif %}
+    <span>›</span><span style="color:var(--text)">{{ listing.title|truncate(40,true,'…') }}</span>
+  </nav>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+    <!-- Left: gallery + description + reviews -->
+    <div class="lg:col-span-2">
+      <!-- Gallery -->
+      {% if images %}
+      <div class="mb-6">
+        <img id="gallery-main" src="{{ images[0].url }}" class="gallery-main" alt="{{ listing.title }}" loading="eager">
+        {% if images|length > 1 %}
+        <div class="gallery-thumbs mt-2">
+          {% for img in images %}
+          <img src="{{ img.url }}" class="gallery-thumb {% if loop.first %}active{% endif %}" alt="" loading="lazy">
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% elif listing.preview_images %}
+      <div class="mb-6">
+        <img id="gallery-main" src="{{ listing.preview_images[0] }}" class="gallery-main" alt="{{ listing.title }}">
+        {% if listing.preview_images|length > 1 %}
+        <div class="gallery-thumbs mt-2">
+          {% for url in listing.preview_images %}
+          <img src="{{ url }}" class="gallery-thumb {% if loop.first %}active{% endif %}" alt="">
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Tabs: Description / Details / Reviews -->
+      <div data-tab-group="listing-tabs" class="card" style="padding:0">
+        <div class="tabs" style="padding:.25rem .75rem 0">
+          <button data-tab="description" class="tab active">Description</button>
+          <button data-tab="details" class="tab">Product Details</button>
+          <button data-tab="reviews" class="tab">Reviews ({{ listing.review_count or 0 }})</button>
+        </div>
+
+        <!-- Description -->
+        <div data-panel="description" style="padding:1.5rem">
+          <div style="color:var(--text-muted);line-height:1.75;font-size:.92rem;white-space:pre-wrap">{{ listing.description }}</div>
+        </div>
+
+        <!-- Details -->
+        <div data-panel="details" style="padding:1.5rem;display:none">
+          <div class="grid grid-cols-2 gap-4">
+            {% for label, val in [
+              ('Version', listing.version or '1.0'),
+              ('License', listing.license_type|default('Personal','true')|title),
+              ('Delivery', listing.delivery_type|default('Instant','true')|title),
+              ('Format', listing.file_format|join(', ') if listing.file_format else '—'),
+              ('Support', (listing.support_duration_days|string~' days') if listing.support_included else 'Not included'),
+              ('Updates', 'Included' if listing.updates_included else 'Not included'),
+            ] %}
+            <div style="padding:.75rem;background:var(--bg-surface);border-radius:10px;border:1px solid var(--border)">
+              <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);font-weight:700;margin-bottom:.3rem">{{ label }}</div>
+              <div style="font-size:.9rem;font-weight:600;color:var(--text)">{{ val }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          {% if listing.demo_url or listing.documentation_url %}
+          <div class="flex gap-3 mt-4 flex-wrap">
+            {% if listing.demo_url %}
+            <a href="{{ listing.demo_url }}" target="_blank" class="btn btn-outline btn-sm">
+              <i data-feather="external-link" style="width:14px;height:14px"></i> Live Demo
+            </a>
+            {% endif %}
+            {% if listing.documentation_url %}
+            <a href="{{ listing.documentation_url }}" target="_blank" class="btn btn-ghost btn-sm">
+              <i data-feather="book-open" style="width:14px;height:14px"></i> Documentation
+            </a>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% if listing.tags %}
+          <div class="mt-4">
+            <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.5rem;font-weight:600">Tags</div>
+            <div class="flex flex-wrap gap-2">
+              {% for tag in listing.tags %}<span class="badge badge-neutral">{{ tag }}</span>{% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Reviews -->
+        <div data-panel="reviews" style="padding:1.5rem;display:none">
+          <!-- Rating breakdown -->
+          {% if listing.review_count > 0 %}
+          <div class="flex items-center gap-6 mb-6 p-4 rounded-xl" style="background:var(--bg-surface)">
+            <div class="text-center">
+              <div class="font-display font-bold" style="font-size:3rem;color:var(--text);line-height:1">{{ '%.1f'|format(listing.rating|float) }}</div>
+              <div class="stars" style="justify-content:center;margin:.3rem 0">
+                {% for i in range(1,6) %}
+                <span class="star {% if i > listing.rating|round|int %}empty{% endif %}">★</span>
+                {% endfor %}
+              </div>
+              <div style="font-size:.78rem;color:var(--text-muted)">{{ listing.review_count }} review{{ 's' if listing.review_count != 1 }}</div>
+            </div>
+            <div style="flex:1">
+              {% for stars in [5,4,3,2,1] %}
+              {% set cnt = rating_counts.get(stars, 0) %}
+              {% set pct = (cnt / listing.review_count * 100)|int if listing.review_count else 0 %}
+              <div class="flex items-center gap-3 mb-1">
+                <span style="font-size:.78rem;color:var(--text-muted);width:12px">{{ stars }}</span>
+                <div class="progress" style="flex:1;height:6px"><div class="progress-bar" style="width:{{ pct }}%;background:var(--gold)"></div></div>
+                <span style="font-size:.75rem;color:var(--text-dim);width:24px">{{ cnt }}</span>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Review list -->
+          {% for review in reviews %}
+          <div class="mb-5 pb-5" style="border-bottom:1px solid var(--border)">
+            <div class="flex items-start gap-3 mb-2">
+              {% if review.avatar %}
+              <img src="{{ review.avatar }}" class="w-9 h-9 rounded-full object-cover flex-shrink-0" alt="">
+              {% else %}
+              <div class="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white"
+                   style="background:linear-gradient(135deg,#7C3AED,#06B6D4)">
+                {{ (review.buyer.username if review.buyer else '?')[0].upper() }}
+              </div>
+              {% endif %}
+              <div style="flex:1">
+                <div class="flex items-center gap-3 flex-wrap">
+                  <span class="font-semibold text-sm">{{ review.buyer.username if review.buyer else 'User' }}</span>
+                  <div style="display:flex;gap:.1rem">{% for i in range(1,6) %}<span style="font-size:.85rem;color:{{ '#F59E0B' if i<=review.rating else 'var(--bg-elevated)' }}">★</span>{% endfor %}</div>
+                  {% if review.is_verified_purchase %}<span class="badge badge-success" style="font-size:.65rem">Verified Purchase</span>{% endif %}
+                </div>
+                <div style="font-size:.75rem;color:var(--text-dim)">{{ review.created_at[:10] }}</div>
+              </div>
+            </div>
+            {% if review.review_text %}<p style="font-size:.88rem;color:var(--text-muted);line-height:1.6">{{ review.review_text }}</p>{% endif %}
+            {% if review.seller_reply %}
+            <div class="mt-3 ml-4 p-3 rounded-lg" style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2)">
+              <div style="font-size:.75rem;font-weight:700;color:var(--primary-light);margin-bottom:.25rem">Seller Reply</div>
+              <p style="font-size:.85rem;color:var(--text-muted)">{{ review.seller_reply }}</p>
+            </div>
+            {% endif %}
+            <button onclick="fetch('/api/reviews/{{ review.id }}/helpful',{method:'POST',headers:{'X-CSRFToken':MercX.getCsrf()}}).then(r=>r.json()).then(d=>MercX.toast.success('Marked helpful! ('+d.votes+')'))"
+                    class="btn btn-ghost btn-sm mt-2" style="font-size:.78rem">
+              <i data-feather="thumbs-up" style="width:12px;height:12px"></i> Helpful ({{ review.helpful_votes or 0 }})
+            </button>
+          </div>
+          {% endfor %}
+
+          {% if not reviews %}
+          <p style="text-align:center;color:var(--text-muted);padding:2rem">No reviews yet. Be the first to review!</p>
+          {% endif %}
+
+          <!-- Add review form -->
+          {% if current_user_id and already_bought %}
+          <div class="mt-5 pt-5" style="border-top:1px solid var(--border)">
+            <h4 class="font-display font-bold mb-4">Leave a Review</h4>
+            <form method="POST" action="{{ url_for('marketplace.add_review', listing_id=listing.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="form-group">
+                <label class="form-label">Rating</label>
+                <div class="star-input">
+                  {% for i in range(5,0,-1) %}
+                  <input type="radio" name="rating" id="star{{ i }}" value="{{ i }}" {% if user_review and user_review.rating == i %}checked{% endif %}>
+                  <label for="star{{ i }}">★</label>
+                  {% endfor %}
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Review</label>
+                <textarea name="review_text" class="input" rows="3" placeholder="Share your experience with this product…">{{ user_review.review_text if user_review else '' }}</textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-sm">
+                {{ 'Update Review' if user_review else 'Submit Review' }}
+              </button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: price card + seller info -->
+    <div>
+      <div class="card" style="position:sticky;top:80px">
+        <!-- Price -->
+        <div class="mb-4">
+          <div class="flex items-baseline gap-3 mb-1">
+            <span class="font-display font-bold" style="font-size:2rem;color:var(--primary-light)">${{ '%.2f'|format(listing.price|float) }}</span>
+            {% if listing.compare_price %}
+            <span style="text-decoration:line-through;color:var(--text-dim);font-size:1.1rem">${{ '%.2f'|format(listing.compare_price|float) }}</span>
+            <span class="badge badge-discount">{{ ((1-listing.price|float/listing.compare_price|float)*100)|int }}% OFF</span>
+            {% endif %}
+          </div>
+          <div class="flex items-center gap-2">
+            <div style="display:flex;gap:.1rem">
+              {% for i in range(1,6) %}<span style="color:{{ '#F59E0B' if i<=listing.rating|round|int else 'var(--bg-elevated)' }}">★</span>{% endfor %}
+            </div>
+            <span style="font-size:.82rem;color:var(--text-muted)">{{ listing.review_count or 0 }} reviews · {{ listing.sales_count or 0 }} sold</span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        {% if already_bought %}
+        <a href="{{ url_for('dashboard.purchases') }}" class="btn btn-success w-full justify-center mb-2">
+          <i data-feather="download" style="width:16px;height:16px"></i> Download (Already Owned)
+        </a>
+        {% elif current_user_id %}
+        {% if in_cart %}
+        <a href="{{ url_for('marketplace.cart') }}" class="btn btn-primary w-full justify-center mb-2 btn-lg">
+          <i data-feather="shopping-cart" style="width:16px;height:16px"></i> View in Cart
+        </a>
+        {% else %}
+        <form method="POST" action="{{ url_for('marketplace.cart_add', listing_id=listing.id) }}" class="mb-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-primary w-full justify-center btn-lg">
+            <i data-feather="shopping-cart" style="width:16px;height:16px"></i> Add to Cart
+          </button>
+        </form>
+        {% endif %}
+        <div class="flex gap-2">
+          <button data-wishlist="{{ listing.id }}"
+                  class="btn btn-ghost flex-1 justify-center {% if in_wishlist %}active{% endif %}"
+                  style="color:{{ '#EF4444' if in_wishlist else 'var(--text-muted)' }}">
+            <i data-feather="heart" style="width:15px;height:15px{% if in_wishlist %};fill:#EF4444;stroke:#EF4444{% endif %}"></i>
+            {{ 'Wishlisted' if in_wishlist else 'Wishlist' }}
+          </button>
+          <button onclick="navigator.share({title:'{{ listing.title }}',url:window.location.href}).catch(()=>{})"
+                  class="btn btn-ghost p-3">
+            <i data-feather="share-2" style="width:15px;height:15px"></i>
+          </button>
+        </div>
+        {% else %}
+        <a href="{{ url_for('auth.login', next=request.path) }}" class="btn btn-primary w-full justify-center btn-lg mb-2">
+          <i data-feather="log-in" style="width:16px;height:16px"></i> Log In to Purchase
+        </a>
+        {% endif %}
+
+        <!-- Trust badges -->
+        <div class="mt-4 pt-4" style="border-top:1px solid var(--border)">
+          {% for icon, text in [('shield','Secure checkout'),('download','Instant delivery'),('refresh-cw','Lifetime updates' if listing.updates_included else 'Single download'),('headphones','Support included' if listing.support_included else 'Community support')] %}
+          <div class="flex items-center gap-2 mb-2">
+            <i data-feather="{{ icon }}" style="width:14px;height:14px;color:var(--success);flex-shrink:0"></i>
+            <span style="font-size:.8rem;color:var(--text-muted)">{{ text }}</span>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Seller -->
+        {% if seller and profile %}
+        <div class="mt-4 pt-4" style="border-top:1px solid var(--border)">
+          <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-bottom:.75rem;font-weight:700">Sold by</div>
+          <a href="{{ url_for('marketplace.seller_store', store_slug=profile.store_slug) if profile.store_slug else '#' }}"
+             class="flex items-center gap-3" style="text-decoration:none">
+            {% if profile.avatar_url %}
+            <img src="{{ profile.avatar_url }}" class="w-10 h-10 rounded-full object-cover flex-shrink:0" alt="">
+            {% else %}
+            <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white text-sm"
+                 style="background:linear-gradient(135deg,#7C3AED,#06B6D4)">
+              {{ (seller.username or 'S')[0].upper() }}
+            </div>
+            {% endif %}
+            <div>
+              <div class="font-semibold text-sm" style="color:var(--text)">
+                {{ profile.store_name or seller.username }}
+                {% if profile.seller_verified %}
+                <i data-feather="check-circle" style="width:12px;height:12px;color:var(--accent);display:inline"></i>
+                {% endif %}
+              </div>
+              <div style="font-size:.75rem;color:var(--text-muted)">{{ profile.total_sales or 0 }} sales · ★ {{ '%.1f'|format(profile.seller_rating|float) }}</div>
+            </div>
+          </a>
+          {% if current_user_id and current_user_id != seller.id %}
+          <a href="{{ url_for('dashboard.messages') }}" class="btn btn-ghost btn-sm w-full justify-center mt-3">
+            <i data-feather="message-circle" style="width:14px;height:14px"></i> Message Seller
+          </a>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Report -->
+        {% if current_user_id %}
+        <button onclick="document.getElementById('report-modal').classList.remove('hidden')"
+                class="mt-3 text-xs w-full" style="background:none;border:none;color:var(--text-dim);cursor:pointer">
+          <i data-feather="flag" style="width:11px;height:11px;display:inline;margin-right:3px"></i> Report this listing
+        </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Related products -->
+  {% if related %}
+  <div class="mt-10">
+    <h3 class="font-display text-xl font-bold mb-5">Similar Products</h3>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {% for r in related %}
+      <a href="{{ url_for('marketplace.listing_detail', slug=r.slug) }}" class="product-card" style="text-decoration:none">
+        {% if r.preview_images %}<img src="{{ r.preview_images[0] }}" class="product-card__img" loading="lazy" alt="">
+        {% else %}<div class="product-card__img-placeholder"><i data-feather="package" style="width:28px;height:28px;opacity:.3"></i></div>{% endif %}
+        <div class="product-card__body">
+          <div class="product-card__title">{{ r.title }}</div>
+          <span class="product-card__price">${{ '%.2f'|format(r.price|float) }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Report Modal -->
+<div id="report-modal" class="modal-backdrop hidden">
+  <div class="modal">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-display font-bold text-lg">Report Listing</h3>
+      <button onclick="document.getElementById('report-modal').classList.add('hidden')" class="btn btn-ghost btn-sm p-2">
+        <i data-feather="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('marketplace.report_listing', listing_id=listing.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Reason</label>
+        <select name="reason" class="input" required>
+          <option value="">Select a reason…</option>
+          {% for r in ['Misleading description','Duplicate listing','Copyright infringement','Broken/incomplete file','Spam','Other'] %}
+          <option value="{{ r }}">{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Additional Details</label>
+        <textarea name="description" class="input" rows="3" placeholder="Describe the issue…"></textarea>
+      </div>
+      <button type="submit" class="btn btn-danger w-full justify-center">Submit Report</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

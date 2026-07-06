@@ -1,0 +1,81 @@
+{% extends 'seller/base.html' %}
+{% block title %}Analytics — MercX Digital{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-6">Store Analytics</h1>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  {% for val, label, icon, color, bg in [
+    ('$'~'%.2f'|format(total_revenue|float),'Total Revenue',   'dollar-sign','#10B981','rgba(16,185,129,.12)'),
+    (completed_orders,                       'Orders',          'shopping-bag','#7C3AED','rgba(124,58,237,.12)'),
+    (total_views,                            'Product Views',   'eye',         '#06B6D4','rgba(6,182,212,.12)'),
+    (conversion_rate|string~'%',             'Conversion Rate', 'trending-up', '#F59E0B','rgba(245,158,11,.12)'),
+  ] %}
+  <div class="stat-card reveal">
+    <div class="stat-icon" style="background:{{ bg }};color:{{ color }}">
+      <i data-feather="{{ icon }}" style="width:20px;height:20px"></i>
+    </div>
+    <div><div class="stat-value">{{ val }}</div><div class="stat-label">{{ label }}</div></div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+  <div class="card reveal">
+    <h3 class="font-display font-bold mb-4">Monthly Revenue (12 months)</h3>
+    <canvas id="revenue-chart" height="120"></canvas>
+  </div>
+  <div class="card reveal">
+    <h3 class="font-display font-bold mb-4">Top Products</h3>
+    {% if top_listings %}
+    <div class="space-y-3">
+      {% for l in top_listings %}
+      <div class="flex items-center justify-between gap-3">
+        <div style="flex:1;min-width:0">
+          <div class="text-sm font-semibold truncate" style="color:var(--text)">{{ l.title }}</div>
+          <div style="font-size:.75rem;color:var(--text-muted)">{{ l.views or 0 }} views · {{ l.sales_count or 0 }} sales</div>
+          <div class="progress mt-1" style="height:4px">
+            <div class="progress-bar" style="width:{{ [100, (l.sales_count or 0) / ([top_listings[0].sales_count,1]|max) * 100]|min }}%"></div>
+          </div>
+        </div>
+        <div class="text-sm font-bold" style="color:var(--success);flex-shrink:0">
+          ★ {{ '%.1f'|format(l.rating|float) }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted);text-align:center;padding:2rem">No products yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card reveal">
+  <h3 class="font-display font-bold mb-2">Wallet Balance</h3>
+  <div class="font-display text-3xl font-bold mb-2" style="color:var(--success)">${{ '%.2f'|format(balance|float) }}</div>
+  <a href="{{ url_for('dashboard.wallet') }}" class="btn btn-outline btn-sm">Withdraw Funds</a>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+new Chart(document.getElementById('revenue-chart'), {
+  type: 'bar',
+  data: {
+    labels: {{ monthly_labels|tojson }},
+    datasets: [{
+      label: 'Revenue', data: {{ monthly_values|tojson }},
+      backgroundColor: 'rgba(124,58,237,.5)', borderColor: '#7C3AED',
+      borderWidth: 2, borderRadius: 6,
+    }]
+  },
+  options: {
+    responsive: true, plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#94A3B8', font: { size: 11 } } },
+      y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#94A3B8', callback: v => '$'+v } }
+    }
+  }
+});
+</script>
+{% endblock %}

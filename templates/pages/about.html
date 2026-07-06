@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}About — MercX Digital{% endblock %}
+{% block content %}
+<div style="max-width:800px;margin:0 auto;padding:4rem 1.25rem">
+  <h1 class="font-display text-3xl font-bold mb-6">About MercX Digital</h1>
+  <div style="color:var(--text-muted);line-height:1.8;font-size:.95rem" class="space-y-4">
+    <p>MercX Digital is a premium marketplace connecting creators and buyers of digital products — software, templates, UI kits, source code, ebooks, and SaaS tools.</p>
+    <p>Our mission is to make it simple for developers, designers, and digital creators to monetize their work while giving buyers a trusted, secure place to discover high-quality digital goods.</p>
+    <p>Every product on MercX goes through a review process to ensure quality and authenticity. We handle secure payments, instant delivery, and buyer protection so you can focus on creating and building.</p>
+  </div>
+  <div class="grid grid-cols-3 gap-4 mt-10">
+    {% for icon, label in [('shield','Secure Payments'),('zap','Instant Delivery'),('users','Trusted Community')] %}
+    <div class="card text-center">
+      <i data-feather="{{ icon }}" style="width:24px;height:24px;color:var(--primary-light);margin:0 auto 1rem"></i>
+      <div class="font-display font-semibold text-sm">{{ label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

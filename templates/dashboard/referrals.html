@@ -1,0 +1,67 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Referrals — MercX Digital{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-6">Referral Program</h1>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
+  {% for val, label, icon, color in [
+    ('$'~'%.2f'|format(total_earned|float), 'Total Earned',   'dollar-sign','var(--success)'),
+    (referred_users|length,                  'Friends Referred','users',       'var(--primary-light)'),
+    ('$'~'%.2f'|format(bonus|float),         'Bonus Per Referral','gift',     'var(--gold)'),
+  ] %}
+  <div class="stat-card reveal">
+    <div class="stat-icon" style="background:{{ color }}22;color:{{ color }}">
+      <i data-feather="{{ icon }}" style="width:22px;height:22px"></i>
+    </div>
+    <div><div class="stat-value">{{ val }}</div><div class="stat-label">{{ label }}</div></div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Referral link card -->
+<div class="card mb-6 reveal" style="background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(6,182,212,.05));border-color:rgba(124,58,237,.2)">
+  <h3 class="font-display text-lg font-bold mb-2">Your Referral Link</h3>
+  <p class="mb-4" style="color:var(--text-muted);font-size:.88rem">
+    Share this link. When someone registers using it, you earn
+    <strong style="color:var(--gold)">${{ '%.2f'|format(bonus|float) }}</strong> per referral.
+  </p>
+  <div class="flex gap-3 flex-wrap">
+    <input type="text" class="input" value="{{ ref_url }}" readonly id="ref-link"
+           style="flex:1;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:.82rem"
+           onclick="this.select()">
+    <button class="btn btn-primary" data-copy="{{ ref_url }}">
+      <i data-feather="copy" style="width:15px;height:15px"></i> Copy
+    </button>
+  </div>
+  <div class="flex gap-4 mt-4 flex-wrap">
+    <a href="https://twitter.com/intent/tweet?text=Join+MercX+Digital+and+get+a+bonus!&url={{ ref_url|urlencode }}"
+       target="_blank" class="btn btn-ghost btn-sm">
+      <i data-feather="twitter" style="width:14px;height:14px"></i> Share on Twitter
+    </a>
+  </div>
+</div>
+
+<!-- Referred users -->
+<div class="card reveal">
+  <h3 class="font-display text-lg font-bold mb-4">Referred Members</h3>
+  {% if referred_users %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Username</th><th>Joined</th></tr></thead>
+      <tbody>
+      {% for u in referred_users %}
+      <tr>
+        <td class="font-semibold">{{ u.username }}</td>
+        <td style="color:var(--text-muted);font-size:.85rem">{{ u.created_at[:10] }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:2rem">
+    <i data-feather="users" style="width:36px;height:36px;color:var(--text-dim);margin-bottom:.75rem"></i>
+    <p style="color:var(--text-muted);font-size:.88rem">No referrals yet. Share your link to start earning!</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

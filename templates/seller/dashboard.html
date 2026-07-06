@@ -1,0 +1,152 @@
+{% extends 'seller/base.html' %}
+{% block title %}Seller Dashboard — MercX Digital{% endblock %}
+{% block page_content %}
+<div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+  <div>
+    <h1 class="font-display text-2xl font-bold">Seller Dashboard</h1>
+    <p style="color:var(--text-muted);font-size:.88rem">Track your store performance</p>
+  </div>
+  <a href="{{ url_for('seller.create_listing') }}" class="btn btn-primary">
+    <i data-feather="plus" style="width:16px;height:16px"></i> New Product
+  </a>
+</div>
+
+<!-- Stats -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  {% for val, label, icon, color, bg in [
+    ('$'~'%.2f'|format(total_revenue|float), 'Total Revenue',   'dollar-sign',   '#10B981','rgba(16,185,129,.12)'),
+    (total_sales,                             'Completed Sales', 'shopping-cart', '#7C3AED','rgba(124,58,237,.12)'),
+    (active_listings,                         'Active Listings', 'package',       '#06B6D4','rgba(6,182,212,.12)'),
+    (total_views,                             'Total Views',     'eye',           '#F59E0B','rgba(245,158,11,.12)'),
+  ] %}
+  <div class="stat-card reveal">
+    <div class="stat-icon" style="background:{{ bg }};color:{{ color }}">
+      <i data-feather="{{ icon }}" style="width:22px;height:22px"></i>
+    </div>
+    <div>
+      <div class="stat-value">{{ val }}</div>
+      <div class="stat-label">{{ label }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
+  <!-- Revenue chart -->
+  <div class="card lg:col-span-2 reveal">
+    <h3 class="font-display font-bold mb-4">Monthly Revenue</h3>
+    <canvas id="revenue-chart" height="100"></canvas>
+  </div>
+  <!-- Quick stats -->
+  <div class="card reveal">
+    <h3 class="font-display font-bold mb-4">Overview</h3>
+    {% for label, val, color in [
+      ('Pending Approval', pending_approval,  'var(--warning)'),
+      ('Pending Orders',   pending_orders,    'var(--danger)'),
+      ('Wallet Balance',   '$'~'%.2f'|format(balance|float), 'var(--success)'),
+    ] %}
+    <div class="flex items-center justify-between py-3" style="border-bottom:1px solid var(--border)">
+      <span style="font-size:.88rem;color:var(--text-muted)">{{ label }}</span>
+      <span class="font-display font-bold" style="color:{{ color }}">{{ val }}</span>
+    </div>
+    {% endfor %}
+    <a href="{{ url_for('dashboard.wallet') }}" class="btn btn-outline btn-sm w-full justify-center mt-4">
+      <i data-feather="credit-card" style="width:14px;height:14px"></i> Manage Wallet
+    </a>
+  </div>
+</div>
+
+<!-- Pending manual deliveries -->
+{% if manual_pending %}
+<div class="card mb-5 reveal" style="border-color:rgba(239,68,68,.2);background:rgba(239,68,68,.03)">
+  <div class="flex items-center gap-3 mb-4">
+    <i data-feather="alert-circle" style="width:20px;height:20px;color:var(--danger)"></i>
+    <h3 class="font-display font-bold">Pending Manual Deliveries ({{ manual_pending|length }})</h3>
+  </div>
+  {% for row in manual_pending %}
+  <div class="p-4 rounded-xl mb-3" style="background:var(--bg-surface);border:1px solid var(--border)">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <span class="font-mono text-sm" style="color:var(--primary-light)">{{ row.order.order_number }}</span>
+        {% for item in row.items %}
+        <div style="font-size:.85rem;color:var(--text-muted)">{{ item.title }}</div>
+        {% endfor %}
+      </div>
+      {% for item in row.items %}
+      <form method="POST" action="{{ url_for('seller.deliver_order', order_id=row.order.id) }}" class="flex gap-2 flex-wrap">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="item_id" value="{{ item.id }}">
+        <textarea name="delivery_content" class="input" placeholder="Paste your delivery content, license key, or download link…" rows="2" required style="min-width:280px"></textarea>
+        <button type="submit" class="btn btn-success btn-sm">
+          <i data-feather="send" style="width:14px;height:14px"></i> Deliver
+        </button>
+      </form>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Recent orders -->
+<div class="card reveal">
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="font-display font-bold">Recent Orders</h3>
+    <a href="{{ url_for('seller.orders') }}" class="btn btn-ghost btn-sm">View All</a>
+  </div>
+  {% if recent_orders %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Order #</th><th>Date</th><th>Total</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for o in recent_orders %}
+      {% set sc = {'completed':'success','pending':'warning','processing':'accent','cancelled':'danger','refunded':'neutral'} %}
+      <tr>
+        <td><span class="font-mono text-sm" style="color:var(--primary-light)">{{ o.order_number }}</span></td>
+        <td style="color:var(--text-muted);font-size:.83rem">{{ o.created_at[:10] }}</td>
+        <td class="font-semibold" style="color:var(--success)">${{ '%.2f'|format(o.total|float) }}</td>
+        <td><span class="badge badge-{{ sc.get(o.status,'neutral') }}">{{ o.status }}</span></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p style="color:var(--text-muted);text-align:center;padding:2rem">No orders yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const ctx = document.getElementById('revenue-chart');
+if (ctx) {
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: {{ monthly_labels|tojson }},
+      datasets: [{
+        label: 'Revenue ($)',
+        data: {{ monthly_values|tojson }},
+        borderColor: '#7C3AED',
+        backgroundColor: 'rgba(124,58,237,.1)',
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#7C3AED',
+        pointRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#94A3B8' } },
+        y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#94A3B8', callback: v => '$'+v } }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

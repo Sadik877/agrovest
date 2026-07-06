@@ -1,0 +1,153 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Settings — MercX Digital{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-6">Account Settings</h1>
+
+<div data-tab-group="settings">
+  <!-- Tabs -->
+  <div class="tabs">
+    {% for tab, label, icon in [('profile','Profile','user'),('password','Password','lock'),('notifications','Notifications','bell'),('seller','Seller','trending-up')] %}
+    <button data-tab="{{ tab }}" class="tab {% if loop.first %}active{% endif %}">
+      <i data-feather="{{ icon }}" style="width:14px;height:14px"></i> {{ label }}
+    </button>
+    {% endfor %}
+  </div>
+
+  <!-- Profile tab -->
+  <div data-panel="profile" class="card">
+    <!-- Avatar -->
+    <div class="flex items-center gap-5 mb-6 pb-6" style="border-bottom:1px solid var(--border)">
+      {% if profile and profile.avatar_url %}
+        <img id="avatar-preview" src="{{ profile.avatar_url }}" class="w-20 h-20 rounded-2xl object-cover" alt="">
+      {% else %}
+        <div id="avatar-preview" class="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold text-white"
+             style="background:linear-gradient(135deg,#7C3AED,#06B6D4)">
+          {{ (current_username or 'U')[0].upper() }}
+        </div>
+      {% endif %}
+      <div>
+        <form method="POST" action="{{ url_for('dashboard.settings') }}" enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="avatar">
+          <label class="btn btn-outline btn-sm cursor-pointer">
+            <i data-feather="upload" style="width:14px;height:14px"></i> Change Photo
+            <input type="file" name="avatar" accept="image/*" class="hidden" onchange="this.form.submit()" data-image-preview="avatar-preview">
+          </label>
+        </form>
+        <p style="font-size:.78rem;color:var(--text-dim);margin-top:.5rem">PNG, JPG, WEBP · Max 5 MB</p>
+      </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('dashboard.settings') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="profile">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input type="text" name="full_name" class="input" value="{{ profile.full_name or '' if profile else '' }}" placeholder="Your name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input type="tel" name="phone" class="input" value="{{ profile.phone or '' if profile else '' }}" placeholder="+1 555 000 0000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Country</label>
+          <input type="text" name="country" class="input" value="{{ profile.country or '' if profile else '' }}" placeholder="United States">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Website</label>
+          <input type="url" name="website" class="input" value="{{ profile.website or '' if profile else '' }}" placeholder="https://yoursite.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Twitter / X</label>
+          <input type="text" name="twitter" class="input" value="{{ profile.twitter or '' if profile else '' }}" placeholder="@username">
+        </div>
+        <div class="form-group">
+          <label class="form-label">GitHub</label>
+          <input type="text" name="github" class="input" value="{{ profile.github or '' if profile else '' }}" placeholder="username">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Bio</label>
+        <textarea name="bio" class="input" rows="3" placeholder="Tell the community about yourself…">{{ profile.bio or '' if profile else '' }}</textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">Save Profile</button>
+    </form>
+  </div>
+
+  <!-- Password tab -->
+  <div data-panel="password" class="card hidden">
+    <form method="POST" action="{{ url_for('dashboard.settings') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="password">
+      <div class="form-group">
+        <label class="form-label">Current Password</label>
+        <input type="password" name="current_password" class="input" placeholder="Current password" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">New Password</label>
+        <input type="password" name="new_password" class="input" placeholder="Minimum 8 characters" minlength="8" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirm New Password</label>
+        <input type="password" name="confirm_password" class="input" placeholder="Repeat new password" minlength="8" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Change Password</button>
+    </form>
+  </div>
+
+  <!-- Notifications tab -->
+  <div data-panel="notifications" class="card hidden">
+    <form method="POST" action="{{ url_for('dashboard.settings') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="notifications">
+      {% for field, label, desc in [
+        ('notif_email','Email Notifications','Receive order updates, sales alerts, and important messages via email'),
+        ('notif_inapp','In-App Notifications','Show notification badges and alerts within the dashboard'),
+      ] %}
+      <label class="flex items-start gap-4 p-4 rounded-xl mb-3 cursor-pointer" style="background:var(--bg-surface);border:1px solid var(--border)">
+        <div style="padding-top:.1rem">
+          <input type="checkbox" name="{{ field }}" value="on"
+                 {% if (profile.notifications_email if field == 'notif_email' else profile.notifications_inapp) %}checked{% endif %}
+                 class="w-4 h-4 rounded" style="accent-color:var(--primary)">
+        </div>
+        <div>
+          <div class="font-semibold text-sm font-display" style="color:var(--text)">{{ label }}</div>
+          <div style="font-size:.82rem;color:var(--text-muted)">{{ desc }}</div>
+        </div>
+      </label>
+      {% endfor %}
+      <button type="submit" class="btn btn-primary mt-2">Save Preferences</button>
+    </form>
+  </div>
+
+  <!-- Seller tab -->
+  <div data-panel="seller" class="card hidden">
+    {% if current_role in ('seller','admin') %}
+    <div class="flex items-center gap-3 p-4 rounded-xl mb-4" style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2)">
+      <i data-feather="check-circle" style="width:20px;height:20px;color:var(--success);flex-shrink:0"></i>
+      <div>
+        <div class="font-semibold text-sm" style="color:#6ee7b7">Seller account active</div>
+        <div style="font-size:.82rem;color:var(--text-muted)">You can manage your store from the Seller Dashboard.</div>
+      </div>
+      <a href="{{ url_for('seller.dashboard') }}" class="btn btn-sm btn-success ml-auto flex-shrink-0">Go to Seller Dashboard</a>
+    </div>
+    {% else %}
+    <h3 class="font-display text-lg font-bold mb-2">Start Selling on MercX</h3>
+    <p class="mb-5" style="color:var(--text-muted);font-size:.9rem;line-height:1.6">Set up your seller account to list products and earn money from your digital creations.</p>
+    <form method="POST" action="{{ url_for('dashboard.become_seller') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Store Name</label>
+        <input type="text" name="store_name" class="input" placeholder="Awesome Digital Studio" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Store Description</label>
+        <textarea name="store_description" class="input" rows="3" placeholder="Tell buyers what you create…"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">Create Seller Account</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

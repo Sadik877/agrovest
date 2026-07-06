@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block content %}
+<div style="display:flex;min-height:calc(100vh - 65px)">
+  <!-- Seller Sidebar -->
+  <aside class="sidebar hidden lg:flex flex-col" style="width:256px">
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#7C3AED,#06B6D4)">
+          <i data-feather="zap" style="width:15px;height:15px;color:#fff"></i>
+        </div>
+        <div>
+          <div class="font-display font-bold text-sm" style="color:var(--text)">Seller Hub</div>
+          <div style="font-size:.72rem;color:var(--text-muted)">{{ current_username }}</div>
+        </div>
+      </div>
+    </div>
+    <nav style="padding:.75rem;flex:1;overflow-y:auto">
+      {% set nav = [
+        ('seller.dashboard',       'bar-chart-2', 'Dashboard'),
+        ('seller.create_listing',  'plus-circle', 'Create Product'),
+        ('seller.inventory',       'list',        'My Products'),
+        ('seller.orders',          'shopping-cart','Orders'),
+        ('seller.analytics',       'trending-up', 'Analytics'),
+        ('seller.store_settings',  'settings',    'Store Settings'),
+      ] %}
+      {% for endpoint, icon, label in nav %}
+      <a href="{{ url_for(endpoint) }}"
+         class="sidebar-link {% if request.endpoint == endpoint %}active{% endif %}">
+        <i data-feather="{{ icon }}" class="icon"></i>{{ label }}
+      </a>
+      {% endfor %}
+      <div class="divider"></div>
+      <a href="{{ url_for('dashboard.messages') }}" class="sidebar-link">
+        <i data-feather="message-circle" class="icon"></i>Messages
+      </a>
+      <div class="sidebar-section mt-2">Switch</div>
+      <a href="{{ url_for('dashboard.index') }}" class="sidebar-link">
+        <i data-feather="layout" class="icon"></i>Buyer Dashboard
+      </a>
+      <a href="{{ url_for('marketplace.index') }}" class="sidebar-link">
+        <i data-feather="globe" class="icon"></i>Marketplace
+      </a>
+      {% if current_role in ('admin','moderator') %}
+      <div class="sidebar-section mt-2">Admin</div>
+      <a href="{{ url_for('admin.dashboard') }}" class="sidebar-link" style="color:#F59E0B">
+        <i data-feather="shield" class="icon"></i>Admin Panel
+      </a>
+      {% endif %}
+    </nav>
+  </aside>
+  <!-- Main -->
+  <main style="flex:1;padding:1.75rem;overflow-x:hidden;min-width:0">
+    {% block page_content %}{% endblock %}
+  </main>
+</div>
+{% endblock %}

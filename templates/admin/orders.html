@@ -1,0 +1,69 @@
+{% extends 'admin/base.html' %}
+{% block title %}Orders — Admin{% endblock %}
+{% block page_content %}
+<div class="flex flex-wrap items-center justify-between gap-4 mb-5">
+  <h1 class="font-display text-2xl font-bold">Orders <span style="color:var(--text-muted);font-weight:400;font-size:1rem">({{ total }})</span></h1>
+</div>
+<div class="flex flex-wrap gap-3 mb-5">
+  <div class="tabs" style="border:none;margin:0">
+    {% for s, label in [('','All'),('pending','Pending'),('processing','Processing'),('completed','Completed'),('disputed','Disputed'),('refunded','Refunded')] %}
+    <a href="{{ url_for('admin.orders', status=s) }}" class="tab {% if status == s %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <form action="{{ url_for('admin.orders') }}" method="GET" class="flex gap-2 ml-auto">
+    <input type="hidden" name="status" value="{{ status }}">
+    <input type="text" name="q" class="input" style="width:200px" placeholder="Order number…" value="{{ search }}">
+    <button type="submit" class="btn btn-ghost btn-sm"><i data-feather="search" style="width:14px;height:14px"></i></button>
+  </form>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  {% if orders %}
+  <div class="table-wrap" style="border:none">
+    <table class="table">
+      <thead><tr><th>Order #</th><th>Buyer</th><th>Seller</th><th>Total</th><th>Fee</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+      {% for o in orders %}
+      {% set sc = {'completed':'success','pending':'warning','processing':'accent','cancelled':'danger','refunded':'neutral','disputed':'danger'} %}
+      <tr>
+        <td><span class="font-mono text-xs" style="color:var(--primary-light)">{{ o.order_number }}</span></td>
+        <td style="font-size:.85rem">{{ o.buyer.username if o.buyer else '—' }}</td>
+        <td style="font-size:.85rem">{{ o.seller.username if o.seller else '—' }}</td>
+        <td class="font-semibold">${{ '%.2f'|format(o.total|float) }}</td>
+        <td style="color:var(--text-muted);font-size:.82rem">${{ '%.2f'|format(o.platform_fee|float if o.platform_fee else 0) }}</td>
+        <td style="color:var(--text-muted);font-size:.82rem">{{ o.created_at[:10] }}</td>
+        <td><span class="badge badge-{{ sc.get(o.status,'neutral') }}">{{ o.status }}</span></td>
+        <td>
+          {% if o.status == 'completed' %}
+          <button onclick="document.getElementById('refund-{{ o.id }}').classList.toggle('hidden')" class="btn btn-ghost btn-sm">
+            <i data-feather="corner-up-left" style="width:13px;height:13px"></i> Refund
+          </button>
+          <div id="refund-{{ o.id }}" class="hidden mt-2">
+            <form method="POST" action="{{ url_for('admin.refund_order', order_id=o.id) }}" class="flex gap-2 flex-wrap">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="number" name="amount" class="input" style="width:100px" placeholder="Amount" max="{{ o.total }}" step="0.01" required>
+              <input type="text" name="reason" class="input" style="width:160px" placeholder="Reason" required>
+              <button type="submit" class="btn btn-danger btn-sm">Refund</button>
+            </form>
+          </div>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <div class="flex justify-center p-4">
+    <div class="pagination">
+      {% for p in range(1, pages+1) %}
+      <a href="{{ url_for('admin.orders', status=status, q=search, page=p) }}" class="page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <div style="text-align:center;padding:3rem"><p style="color:var(--text-muted)">No orders found.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

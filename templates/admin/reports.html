@@ -1,0 +1,44 @@
+{% extends 'admin/base.html' %}
+{% block title %}Reports — Admin{% endblock %}
+{% block page_content %}
+<h1 class="font-display text-2xl font-bold mb-5">Listing Reports</h1>
+<div class="tabs mb-5">
+  {% for s, label in [('pending','Pending'),('reviewed','Reviewed'),('actioned','Actioned'),('dismissed','Dismissed')] %}
+  <a href="{{ url_for('admin.reports', status=s) }}" class="tab {% if status == s %}active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+<div class="card" style="padding:0;overflow:hidden">
+  {% if reports %}
+  <table class="table">
+    <thead><tr><th>Listing</th><th>Reporter</th><th>Reason</th><th>Details</th><th>Date</th><th>Action</th></tr></thead>
+    <tbody>
+    {% for r in reports %}
+    <tr>
+      <td>{% if r.listing %}<a href="{{ url_for('marketplace.listing_detail', slug=r.listing.slug) }}" target="_blank" style="color:var(--primary-light)">{{ r.listing.title }}</a>{% else %}—{% endif %}</td>
+      <td style="font-size:.85rem">{{ r.reporter.username if r.reporter else '—' }}</td>
+      <td><span class="badge badge-warning">{{ r.reason }}</span></td>
+      <td style="font-size:.82rem;color:var(--text-muted);max-width:200px" class="truncate-2">{{ r.description or '—' }}</td>
+      <td style="font-size:.8rem;color:var(--text-muted)">{{ r.created_at[:10] }}</td>
+      <td>
+        {% if r.status == 'pending' %}
+        <div class="flex gap-1">
+          <form method="POST" action="{{ url_for('admin.action_report', report_id=r.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="actioned">
+            <button class="btn btn-sm" style="background:rgba(239,68,68,.12);color:#FCA5A5">Action</button>
+          </form>
+          <form method="POST" action="{{ url_for('admin.action_report', report_id=r.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="dismissed">
+            <button class="btn btn-ghost btn-sm">Dismiss</button>
+          </form>
+        </div>
+        {% else %}<span class="badge badge-neutral">{{ r.status }}</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:3rem"><p style="color:var(--text-muted)">No reports.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

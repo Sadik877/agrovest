@@ -1,0 +1,108 @@
+{% extends 'seller/base.html' %}
+{% block title %}My Products — MercX Digital{% endblock %}
+{% block page_content %}
+<div class="flex flex-wrap items-center justify-between gap-4 mb-5">
+  <h1 class="font-display text-2xl font-bold">My Products</h1>
+  <a href="{{ url_for('seller.create_listing') }}" class="btn btn-primary btn-sm">
+    <i data-feather="plus" style="width:15px;height:15px"></i> New Product
+  </a>
+</div>
+
+<!-- Filters -->
+<div class="flex flex-wrap gap-3 mb-5">
+  <div class="tabs" style="border:none;margin:0">
+    {% for s, label in [('','All'),('pending','Pending'),('active','Active'),('paused','Paused'),('rejected','Rejected')] %}
+    <a href="{{ url_for('seller.inventory', status=s) }}"
+       class="tab {% if status == s %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <form class="flex gap-2 ml-auto" action="{{ url_for('seller.inventory') }}" method="GET">
+    <input type="hidden" name="status" value="{{ status }}">
+    <input type="text" name="q" class="input" style="width:200px" placeholder="Search…" value="{{ search }}">
+    <button type="submit" class="btn btn-ghost btn-sm"><i data-feather="search" style="width:15px;height:15px"></i></button>
+  </form>
+</div>
+
+<div class="card" style="padding:0;overflow:hidden">
+  {% if listings %}
+  <div class="table-wrap" style="border:none">
+    <table class="table">
+      <thead><tr><th>Product</th><th>Price</th><th>Sales</th><th>Views</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for l in listings %}
+      {% set sc = {'active':'success','pending':'warning','paused':'neutral','rejected':'danger','deleted':'danger'} %}
+      <tr>
+        <td>
+          <div class="flex items-center gap-3">
+            {% if l.preview_images %}
+            <img src="{{ l.preview_images[0] }}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0" alt="">
+            {% else %}
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:var(--bg-surface)">
+              <i data-feather="package" style="width:16px;height:16px;color:var(--text-dim)"></i>
+            </div>
+            {% endif %}
+            <div style="min-width:0">
+              <div class="font-semibold text-sm truncate" style="max-width:200px;color:var(--text)">{{ l.title }}</div>
+              {% if l.is_featured %}<span class="badge badge-warning" style="font-size:.68rem">Featured</span>{% endif %}
+            </div>
+          </div>
+        </td>
+        <td class="font-semibold">${{ '%.2f'|format(l.price|float) }}</td>
+        <td style="color:var(--text-muted)">{{ l.sales_count or 0 }}</td>
+        <td style="color:var(--text-muted)">{{ l.views or 0 }}</td>
+        <td><span class="badge badge-{{ sc.get(l.status,'neutral') }}">{{ l.status }}</span></td>
+        <td>
+          <div class="flex items-center gap-1">
+            <a href="{{ url_for('seller.edit_listing', listing_id=l.id) }}" class="btn btn-ghost btn-sm p-2" title="Edit">
+              <i data-feather="edit-2" style="width:14px;height:14px"></i>
+            </a>
+            {% if l.status == 'active' %}
+            <form method="POST" action="{{ url_for('seller.pause_listing', listing_id=l.id) }}" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-ghost btn-sm p-2" title="Pause"><i data-feather="pause" style="width:14px;height:14px"></i></button>
+            </form>
+            {% elif l.status == 'paused' and l.is_approved %}
+            <form method="POST" action="{{ url_for('seller.activate_listing', listing_id=l.id) }}" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-ghost btn-sm p-2" title="Activate" style="color:var(--success)"><i data-feather="play" style="width:14px;height:14px"></i></button>
+            </form>
+            {% endif %}
+            {% if l.status in ('active','pending') %}
+            <a href="{{ url_for('marketplace.listing_detail', slug=l.slug) }}" class="btn btn-ghost btn-sm p-2" title="View" target="_blank">
+              <i data-feather="external-link" style="width:14px;height:14px"></i>
+            </a>
+            {% endif %}
+            <form method="POST" action="{{ url_for('seller.delete_listing', listing_id=l.id) }}" style="display:inline"
+                  data-confirm="Delete '{{ l.title }}'? This cannot be undone.">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-ghost btn-sm p-2" style="color:var(--danger)" title="Delete">
+                <i data-feather="trash-2" style="width:14px;height:14px"></i>
+              </button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <div class="flex justify-center p-4">
+    <div class="pagination">
+      {% for p in range(1, pages+1) %}
+      <a href="{{ url_for('seller.inventory', status=status, q=search, page=p) }}"
+         class="page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <div style="text-align:center;padding:4rem">
+    <i data-feather="package" style="width:44px;height:44px;color:var(--text-dim);margin-bottom:1rem"></i>
+    <h3 class="font-display text-lg font-bold mb-2">No products yet</h3>
+    <p class="mb-4" style="color:var(--text-muted)">Create your first digital product to start selling.</p>
+    <a href="{{ url_for('seller.create_listing') }}" class="btn btn-primary">Create Product</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

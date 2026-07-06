@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block title %}Checkout — MercX Digital{% endblock %}
+{% block content %}
+<div style="max-width:1000px;margin:0 auto;padding:2rem 1.25rem">
+  <h1 class="font-display text-2xl font-bold mb-6">Checkout</h1>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Payment -->
+    <div class="lg:col-span-2">
+      <form method="POST" action="{{ url_for('marketplace.checkout') }}" id="checkout-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="card mb-5">
+          <h3 class="font-display font-bold mb-4">Payment Method</h3>
+          <div class="space-y-3">
+            <label class="checkout-method">
+              <input type="radio" name="payment_method" value="wallet" checked>
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:rgba(124,58,237,.15);color:var(--primary-light)">
+                <i data-feather="credit-card" style="width:18px;height:18px"></i>
+              </div>
+              <div style="flex:1">
+                <div class="font-semibold text-sm">Wallet Balance</div>
+                <div style="font-size:.8rem;color:var(--text-muted)">Available: <strong style="color:var(--success)">${{ '%.2f'|format(wallet_balance|float) }}</strong></div>
+              </div>
+              {% if wallet_balance < total %}<span class="badge badge-danger">Insufficient</span>{% endif %}
+            </label>
+
+            {% if stripe_pk %}
+            <label class="checkout-method">
+              <input type="radio" name="payment_method" value="stripe">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:rgba(99,102,241,.15);color:#818CF8">
+                <i data-feather="zap" style="width:18px;height:18px"></i>
+              </div>
+              <div><div class="font-semibold text-sm">Card (Stripe)</div><div style="font-size:.8rem;color:var(--text-muted)">Visa, Mastercard, Amex</div></div>
+            </label>
+            {% endif %}
+
+            {% if paystack_pk %}
+            <label class="checkout-method">
+              <input type="radio" name="payment_method" value="paystack">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:rgba(0,202,125,.15);color:#00CA7D">
+                <i data-feather="globe" style="width:18px;height:18px"></i>
+              </div>
+              <div><div class="font-semibold text-sm">Paystack</div><div style="font-size:.8rem;color:var(--text-muted)">Cards, Bank, USSD</div></div>
+            </label>
+            {% endif %}
+
+            {% if flw_pk %}
+            <label class="checkout-method">
+              <input type="radio" name="payment_method" value="flutterwave">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:rgba(243,164,22,.15);color:#F3A416">
+                <i data-feather="activity" style="width:18px;height:18px"></i>
+              </div>
+              <div><div class="font-semibold text-sm">Flutterwave</div><div style="font-size:.8rem;color:var(--text-muted)">Mobile Money, Cards, Bank</div></div>
+            </label>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card mb-5">
+          <h3 class="font-display font-bold mb-3">Order Note <span style="color:var(--text-dim)">(optional)</span></h3>
+          <textarea name="note" class="input" rows="2" placeholder="Any special instructions for the seller…"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-xl w-full justify-center">
+          <i data-feather="lock" style="width:18px;height:18px"></i>
+          Place Order · ${{ '%.2f'|format(total|float) }}
+        </button>
+        <p class="text-center mt-3" style="font-size:.78rem;color:var(--text-dim)">
+          <i data-feather="shield" style="width:11px;height:11px;display:inline"></i>
+          Your payment is secured and encrypted. By placing an order you agree to our Terms of Service.
+        </p>
+      </form>
+    </div>
+
+    <!-- Summary -->
+    <div>
+      <div class="card" style="position:sticky;top:80px">
+        <h3 class="font-display font-bold mb-4">Order Summary</h3>
+        <div class="space-y-3 mb-4">
+          {% for item in cart_items %}
+          <div class="flex items-center gap-3">
+            {% if item.preview_images %}
+            <img src="{{ item.preview_images[0] }}" class="w-10 h-10 object-cover rounded-lg flex-shrink-0" alt="">
+            {% else %}
+            <div class="w-10 h-10 rounded-lg flex-shrink-0" style="background:var(--bg-surface)"></div>
+            {% endif %}
+            <div style="flex:1;min-width:0">
+              <div class="text-sm font-semibold truncate">{{ item.title }}</div>
+              <div style="font-size:.75rem;color:var(--text-muted)">Digital License</div>
+            </div>
+            <span class="font-semibold text-sm">${{ '%.2f'|format(item.price|float) }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:1rem" class="space-y-2">
+          <div class="flex justify-between text-sm"><span style="color:var(--text-muted)">Subtotal</span><span>${{ '%.2f'|format(subtotal|float) }}</span></div>
+          {% if discount > 0 %}
+          <div class="flex justify-between text-sm"><span style="color:var(--success)">Discount ({{ coupon }})</span><span style="color:var(--success)">-${{ '%.2f'|format(discount|float) }}</span></div>
+          {% endif %}
+          <div class="flex justify-between font-bold pt-2" style="border-top:1px solid var(--border)">
+            <span>Total</span>
+            <span style="color:var(--primary-light)">${{ '%.2f'|format(total|float) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

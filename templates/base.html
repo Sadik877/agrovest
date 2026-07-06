@@ -1,209 +1,314 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en" class="dark">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}{{ site_settings.seo_title }}{% endblock %}</title>
-  <meta name="description" content="{% block meta_description %}{{ site_settings.seo_description }}{% endblock %}" />
-  <meta name="csrf-token" content="{{ csrf_token() }}" />
-  <link rel="icon" href="{{ site_settings.favicon_url }}" />
-
-  <link rel="canonical" href="{{ self.og_url() }}" />
-
-  <!-- Open Graph / Facebook, WhatsApp, Telegram, LinkedIn, Discord -->
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="{{ site_settings.site_name }}" />
-  <meta property="og:title" content="{{ self.title() }}" />
-  <meta property="og:description" content="{{ self.meta_description() }}" />
-  <meta property="og:image" content="{% block og_image %}{{ site_settings.og_image_url }}{% endblock %}" />
-  <meta property="og:image:secure_url" content="{{ self.og_image() }}" />
-  <meta property="og:image:alt" content="{{ site_settings.site_name }} logo" />
-  <meta property="og:url" content="{% block og_url %}https://agrovest-ydif.onrender.com{{ request.path }}{% endblock %}" />
-  <meta property="og:locale" content="en_NG" />
-
-  <!-- Twitter / X Card -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="{{ self.title() }}" />
-  <meta name="twitter:description" content="{{ self.meta_description() }}" />
-  <meta name="twitter:image" content="{{ self.og_image() }}" />
-  <meta name="twitter:image:alt" content="{{ site_settings.site_name }} logo" />
-
-  <!-- Tailwind CSS CDN -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <meta name="description" content="{% block meta_description %}MercX Digital — The premium marketplace for software, templates, UI kits, ebooks, and SaaS products.{% endblock %}">
+  <title>{% block title %}MercX Digital Marketplace{% endblock %}</title>
+  <!-- Open Graph -->
+  <meta property="og:title"       content="{% block og_title %}MercX Digital{% endblock %}">
+  <meta property="og:description" content="{% block og_desc %}Buy & Sell Digital Products Securely.{% endblock %}">
+  <meta property="og:type"        content="website">
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           colors: {
-            forest: {
-              50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0',
-              300: '#86efac', 400: '#4ade80', 500: '#22c55e',
-              600: '#16a34a', 700: '#15803d', 800: '#166534',
-              900: '#14532d', 950: '#0A4A2F',
-            },
-            gold: {
-              300: '#fde68a', 400: '#fbbf24', 500: '#C9A84C',
-              600: '#b8860b', 700: '#92660a',
-            },
-            dark: '#0D1B12',
+            primary:   '#7C3AED',
+            'primary-light': '#8B5CF6',
+            accent:    '#06B6D4',
+            'dark':         '#080B14',
+            'dark-card':    '#0F1724',
+            'dark-surface': '#1A2438',
+            success:   '#10B981',
+            warning:   '#F59E0B',
+            danger:    '#EF4444',
+            muted:     '#94A3B8',
           },
           fontFamily: {
-            display: ['Playfair Display', 'serif'],
-            body: ['Inter', 'sans-serif'],
+            display: ['Space Grotesk','sans-serif'],
+            body:    ['Inter','sans-serif'],
+            mono:    ['JetBrains Mono','monospace'],
           },
-          backgroundImage: {
-            'grain': "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E\")",
-          },
-          animation: {
-            'count-up': 'countUp 2s ease-out forwards',
-            'fade-in': 'fadeIn 0.6s ease-out forwards',
-            'slide-up': 'slideUp 0.5s ease-out forwards',
-            'pulse-slow': 'pulse 3s infinite',
-          },
-          keyframes: {
-            countUp: { from: { opacity: 0, transform: 'translateY(10px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
-            fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } },
-            slideUp: { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
-          }
         }
       }
     }
   </script>
-
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet" />
-
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-    .font-display { font-family: 'Playfair Display', serif; }
-
-    /* Glassmorphism */
-    .glass {
-      background: rgba(255, 255, 255, 0.06);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    .glass-light {
-      background: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.5);
-    }
-
-    /* Grain overlay */
-    .grain::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
-      pointer-events: none;
-    }
-
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #0A4A2F; }
-    ::-webkit-scrollbar-thumb { background: #C9A84C; border-radius: 3px; }
-
-    /* Badge */
-    .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
-    .badge-success { background: #dcfce7; color: #166534; }
-    .badge-warning { background: #fef9c3; color: #854d0e; }
-    .badge-error { background: #fee2e2; color: #991b1b; }
-    .badge-info { background: #dbeafe; color: #1e40af; }
-    .badge-neutral { background: #f3f4f6; color: #374151; }
-
-    /* Animations */
-    .animate-on-scroll { opacity: 0; transform: translateY(30px); transition: opacity 0.6s ease, transform 0.6s ease; }
-    .animate-on-scroll.visible { opacity: 1; transform: translateY(0); }
-
-    /* Decorative hero blob — must be positioned/absolute or it renders as an
-       in-flow solid rectangle instead of a soft floating accent. */
-    .blob {
-      position: absolute;
-      border-radius: 9999px;
-      filter: blur(90px);
-      opacity: 0.45;
-      mix-blend-mode: screen;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* Subtle grain texture laid over hero gradients */
-    .noise-overlay {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 1;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
-    }
-  </style>
-
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Icons -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.29.0/feather.min.js" defer></script>
+  <!-- CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   {% block extra_head %}{% endblock %}
 </head>
-<body class="bg-gray-50 text-gray-900 antialiased">
+<body class="font-body min-h-screen flex flex-col" style="background:var(--bg);color:var(--text)"
+      data-logged-in="{{ 'true' if current_user_id else 'false' }}">
 
-  <!-- ── Flash Messages ── -->
-  {% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-  <div id="flash-container" class="fixed top-4 right-4 z-[999] space-y-2 max-w-sm w-full">
-    {% for category, message in messages %}
-    <div class="flash-msg flex items-start gap-3 p-4 rounded-xl shadow-xl border-l-4 glass-light
-      {% if category == 'success' %}border-green-500 bg-green-50{% elif category == 'error' %}border-red-500 bg-red-50{% elif category == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}
-      animate-slide-up">
-      <span class="text-sm font-medium text-gray-800 flex-1">{{ message }}</span>
-      <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-gray-600 mt-0.5">
-        <i data-lucide="x" class="w-4 h-4"></i>
-      </button>
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- Flash triggers -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div data-flash="{{ msg }}" data-category="{{ cat }}" style="display:none"></div>
+  {% endfor %}
+{% endwith %}
+
+<!-- ── Navbar ───────────────────────────────────────────── -->
+<nav class="navbar">
+  <div style="max-width:1400px;margin:0 auto;padding:0 1.25rem;display:flex;align-items:center;gap:1rem;height:65px">
+
+    <!-- Mobile hamburger -->
+    <button id="mobile-menu-btn" class="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg"
+            style="background:var(--bg-surface);border:1px solid var(--border)" aria-label="Menu">
+      <i data-feather="menu" style="width:18px;height:18px"></i>
+    </button>
+
+    <!-- Logo -->
+    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 flex-shrink-0 font-display font-bold text-lg"
+       style="text-decoration:none">
+      <span style="font-size:1.3rem">⚡</span>
+      <span class="gradient-text">MercX</span>
+      <span style="color:var(--text-muted);font-weight:400;font-size:.85rem" class="hidden sm:inline">Digital</span>
+    </a>
+
+    <!-- Search (desktop) -->
+    <div id="search-wrap" class="hidden lg:block relative flex-1" style="max-width:420px">
+      <div style="position:relative">
+        <i data-feather="search" style="position:absolute;left:.8rem;top:50%;transform:translateY(-50%);color:var(--text-muted);width:16px;height:16px;pointer-events:none"></i>
+        <input id="search-input" type="text" placeholder="Search products…"
+               class="input" style="padding-left:2.5rem;background:var(--bg-surface)"
+               autocomplete="off">
+      </div>
+      <div id="search-dropdown" class="autocomplete-dropdown hidden"></div>
     </div>
-    {% endfor %}
-  </div>
-  <script>
-    setTimeout(() => {
-      document.querySelectorAll('.flash-msg').forEach(el => el.style.opacity = '0');
-      setTimeout(() => document.getElementById('flash-container')?.remove(), 500);
-    }, 5000);
-  </script>
-  {% endif %}
-  {% endwith %}
 
-  <!-- ── Sitewide Announcement Banner ── -->
-  {% if active_notice %}
-  <div id="site-notice" class="relative z-[60]
-    {% if active_notice.color == 'red' %}bg-red-600
-    {% elif active_notice.color == 'amber' %}bg-amber-500
-    {% elif active_notice.color == 'emerald' %}bg-emerald-600
-    {% else %}bg-blue-600{% endif %} text-white">
-    <div class="max-w-7xl mx-auto px-4 py-2.5 flex items-center gap-3">
-      <i data-lucide="{{ active_notice.icon }}" class="w-4 h-4 flex-shrink-0"></i>
-      <p class="text-sm font-medium flex-1 min-w-0">
-        <span class="font-bold">{{ active_notice.label }}:</span> {{ active_notice.message }}
-      </p>
-      <button onclick="document.getElementById('site-notice').remove()" class="text-white/70 hover:text-white flex-shrink-0" aria-label="Dismiss">
-        <i data-lucide="x" class="w-4 h-4"></i>
-      </button>
+    <!-- Nav links (desktop) -->
+    <div class="hidden lg:flex items-center gap-1">
+      <a href="{{ url_for('marketplace.index') }}"
+         class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+         style="color:var(--text-muted)"
+         onmouseover="this.style.color='var(--text)';this.style.background='rgba(255,255,255,.05)'"
+         onmouseout="this.style.color='var(--text-muted)';this.style.background='transparent'">
+        Browse
+      </a>
+      <a href="{{ url_for('marketplace.index') }}?sort=newest"
+         class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+         style="color:var(--text-muted)"
+         onmouseover="this.style.color='var(--text)';this.style.background='rgba(255,255,255,.05)'"
+         onmouseout="this.style.color='var(--text-muted)';this.style.background='transparent'">
+        New
+      </a>
+      {% if current_role in ('seller','admin') %}
+      <a href="{{ url_for('seller.dashboard') }}"
+         class="px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+         style="color:var(--text-muted)"
+         onmouseover="this.style.color='var(--text)';this.style.background='rgba(255,255,255,.05)'"
+         onmouseout="this.style.color='var(--text-muted)';this.style.background='transparent'">
+        Sell
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- Right side -->
+    <div class="flex items-center gap-2 ml-auto">
+
+      <!-- Search (mobile toggle) -->
+      <a href="{{ url_for('main.search') }}" class="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg"
+         style="background:var(--bg-surface);border:1px solid var(--border)">
+        <i data-feather="search" style="width:16px;height:16px;color:var(--text-muted)"></i>
+      </a>
+
+      <!-- Cart -->
+      <a href="{{ url_for('marketplace.cart') }}" class="relative flex items-center justify-center w-9 h-9 rounded-lg"
+         style="background:var(--bg-surface);border:1px solid var(--border)" aria-label="Cart">
+        <i data-feather="shopping-bag" style="width:17px;height:17px;color:var(--text-muted)"></i>
+        <span data-cart-badge class="notif-dot {% if not cart_count %}hidden{% endif %}">{{ cart_count or '' }}</span>
+      </a>
+
+      {% if current_user_id %}
+      <!-- Notifications -->
+      <a href="{{ url_for('dashboard.notifications') }}" class="relative flex items-center justify-center w-9 h-9 rounded-lg"
+         style="background:var(--bg-surface);border:1px solid var(--border)" aria-label="Notifications">
+        <i data-feather="bell" style="width:17px;height:17px;color:var(--text-muted)"></i>
+        <span data-notif-badge class="notif-dot {% if not notif_count %}hidden{% endif %}">{{ notif_count or '' }}</span>
+      </a>
+
+      <!-- User dropdown -->
+      <div class="relative">
+        <button data-dropdown="nav-user-menu"
+                class="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors"
+                style="background:var(--bg-surface);border:1px solid var(--border);font-family:'Space Grotesk',sans-serif">
+          <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+               style="background:linear-gradient(135deg,#7C3AED,#06B6D4)">
+            {{ (current_username or 'U')[0].upper() }}
+          </div>
+          <span class="hidden sm:block text-sm font-medium" style="color:var(--text);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ current_username }}</span>
+          <i data-feather="chevron-down" style="width:14px;height:14px;color:var(--text-muted)"></i>
+        </button>
+        <div id="nav-user-menu" class="dropdown hidden" style="right:0;min-width:220px">
+          <div style="padding:.75rem 1rem 0;border-bottom:1px solid var(--border);margin-bottom:.25rem">
+            <div class="text-sm font-semibold font-display" style="color:var(--text)">{{ current_username }}</div>
+            <div class="text-xs" style="color:var(--text-muted)">{{ 'Seller' if current_role == 'seller' else ('Admin' if current_role in ('admin','moderator') else 'Buyer') }}</div>
+            <div class="text-xs font-semibold mt-1" style="color:#10B981">${{ '%.2f'|format(current_balance) }}</div>
+            <div style="height:.75rem"></div>
+          </div>
+          <a href="{{ url_for('dashboard.index') }}" class="dropdown-item"><i data-feather="layout" style="width:15px;height:15px"></i> Dashboard</a>
+          <a href="{{ url_for('dashboard.purchases') }}" class="dropdown-item"><i data-feather="download" style="width:15px;height:15px"></i> Downloads</a>
+          <a href="{{ url_for('dashboard.wallet') }}" class="dropdown-item"><i data-feather="credit-card" style="width:15px;height:15px"></i> Wallet</a>
+          {% if current_role in ('seller','admin') %}
+          <a href="{{ url_for('seller.dashboard') }}" class="dropdown-item"><i data-feather="store" style="width:15px;height:15px"></i> Seller Dashboard</a>
+          {% endif %}
+          {% if current_role in ('admin','moderator') %}
+          <a href="{{ url_for('admin.dashboard') }}" class="dropdown-item" style="color:#F59E0B"><i data-feather="shield" style="width:15px;height:15px"></i> Admin Panel</a>
+          {% endif %}
+          <div style="border-top:1px solid var(--border);margin:.25rem 0"></div>
+          <a href="{{ url_for('dashboard.settings') }}" class="dropdown-item"><i data-feather="settings" style="width:15px;height:15px"></i> Settings</a>
+          <a href="{{ url_for('auth.logout') }}" class="dropdown-item danger"><i data-feather="log-out" style="width:15px;height:15px"></i> Log Out</a>
+        </div>
+      </div>
+      {% else %}
+      <a href="{{ url_for('auth.login') }}" class="btn btn-ghost btn-sm">Log In</a>
+      <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-sm">Sign Up Free</a>
+      {% endif %}
     </div>
   </div>
-  {% endif %}
+</nav>
 
-  {% block body %}{% endblock %}
+<!-- Mobile overlay -->
+<div id="mobile-overlay" class="hidden fixed inset-0 z-40" style="background:rgba(0,0,0,.7);backdrop-filter:blur(4px)"></div>
 
-  <!-- Lucide init -->
-  <script>lucide.createIcons();</script>
+<!-- Mobile drawer -->
+<aside id="mobile-drawer" class="-translate-x-full fixed top-0 left-0 h-full z-50 transition-transform duration-300 overflow-y-auto" style="width:280px;background:var(--bg-card);border-right:1px solid var(--border)">
+  <div class="flex items-center justify-between p-4" style="border-bottom:1px solid var(--border)">
+    <a href="{{ url_for('main.index') }}" class="font-display font-bold text-lg flex items-center gap-2">
+      <span>⚡</span><span class="gradient-text">MercX Digital</span>
+    </a>
+    <button id="mobile-drawer-close" class="p-2 rounded-lg" style="background:var(--bg-surface)">
+      <i data-feather="x" style="width:18px;height:18px"></i>
+    </button>
+  </div>
 
-  <!-- Scroll Animation -->
-  <script>
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
-    }, { threshold: 0.1 });
-    document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));
-  </script>
+  <!-- Mobile search -->
+  <div class="p-4" style="border-bottom:1px solid var(--border)">
+    <form action="{{ url_for('main.search') }}" method="GET">
+      <div style="position:relative">
+        <i data-feather="search" style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--text-muted)"></i>
+        <input name="q" type="text" placeholder="Search…" class="input" style="padding-left:2.4rem">
+      </div>
+    </form>
+  </div>
 
-  {% block extra_scripts %}{% endblock %}
+  <!-- Mobile nav links -->
+  <nav class="p-3 space-y-1">
+    <a href="{{ url_for('marketplace.index') }}" class="sidebar-link"><i data-feather="grid" class="icon"></i> Browse Marketplace</a>
+    <a href="{{ url_for('marketplace.index') }}?sort=newest" class="sidebar-link"><i data-feather="zap" class="icon"></i> New Arrivals</a>
+    {% if current_user_id %}
+    <div class="sidebar-section mt-3">My Account</div>
+    <a href="{{ url_for('dashboard.index') }}" class="sidebar-link"><i data-feather="layout" class="icon"></i> Dashboard</a>
+    <a href="{{ url_for('dashboard.purchases') }}" class="sidebar-link"><i data-feather="download" class="icon"></i> Downloads</a>
+    <a href="{{ url_for('dashboard.wallet') }}" class="sidebar-link"><i data-feather="credit-card" class="icon"></i> Wallet</a>
+    <a href="{{ url_for('dashboard.messages') }}" class="sidebar-link"><i data-feather="message-circle" class="icon"></i> Messages</a>
+    {% if current_role in ('seller','admin') %}
+    <div class="sidebar-section mt-3">Seller</div>
+    <a href="{{ url_for('seller.dashboard') }}" class="sidebar-link"><i data-feather="bar-chart-2" class="icon"></i> Seller Dashboard</a>
+    <a href="{{ url_for('seller.create_listing') }}" class="sidebar-link"><i data-feather="plus-circle" class="icon"></i> Create Listing</a>
+    {% endif %}
+    <div style="border-top:1px solid var(--border);margin:1rem .75rem"></div>
+    <a href="{{ url_for('auth.logout') }}" class="sidebar-link" style="color:var(--danger)"><i data-feather="log-out" class="icon"></i> Log Out</a>
+    {% else %}
+    <div style="padding:1rem .75rem">
+      <a href="{{ url_for('auth.register') }}" class="btn btn-primary w-full justify-center">Create Free Account</a>
+      <a href="{{ url_for('auth.login') }}" class="btn btn-ghost w-full justify-center mt-2">Log In</a>
+    </div>
+    {% endif %}
+  </nav>
+</aside>
+
+<!-- Email verification notice -->
+{% if current_user_id and not is_verified %}
+<div style="background:linear-gradient(90deg,rgba(245,158,11,.12),rgba(239,68,68,.08));border-bottom:1px solid rgba(245,158,11,.3);padding:.6rem 1.25rem;display:flex;align-items:center;justify-content:center;gap:1rem">
+  <i data-feather="alert-triangle" style="width:15px;height:15px;color:#F59E0B;flex-shrink:0"></i>
+  <span style="font-size:.83rem;color:#FCD34D">Please verify your email address to unlock all features.</span>
+  <a href="{{ url_for('auth.resend_verification') }}" class="btn btn-sm" style="background:rgba(245,158,11,.2);color:#FCD34D;border:1px solid rgba(245,158,11,.3);padding:.25rem .75rem;font-size:.78rem">Resend</a>
+</div>
+{% endif %}
+
+<!-- Main content -->
+<main>{% block content %}{% endblock %}</main>
+
+<!-- ── Footer ────────────────────────────────────────────── -->
+<footer style="background:var(--bg-card);border-top:1px solid var(--border);margin-top:auto">
+  <div style="max-width:1400px;margin:0 auto;padding:3rem 1.5rem 2rem">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-8">
+      <!-- Brand -->
+      <div class="col-span-2 lg:col-span-2">
+        <div class="font-display font-bold text-xl flex items-center gap-2 mb-3">
+          <span>⚡</span><span class="gradient-text">MercX Digital</span>
+        </div>
+        <p style="font-size:.88rem;color:var(--text-muted);line-height:1.7;max-width:280px">
+          The premium marketplace for digital creators. Buy and sell software, templates, UI kits, and more.
+        </p>
+        <div class="flex gap-3 mt-4">
+          {% for icon, link in [('twitter','#'),('github','#'),('disc','#')] %}
+          <a href="{{ link }}" class="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+             style="background:var(--bg-surface);border:1px solid var(--border);color:var(--text-muted)"
+             onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary-light)'"
+             onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'">
+            <i data-feather="{{ icon }}" style="width:15px;height:15px"></i>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      <!-- Marketplace -->
+      <div>
+        <h4 class="font-display font-semibold text-sm mb-4" style="color:var(--text)">Marketplace</h4>
+        <ul class="space-y-2">
+          {% for name, url in [('Browse All',url_for('marketplace.index')),('New Arrivals',url_for('marketplace.index')+'?sort=newest'),('Featured',url_for('marketplace.index')+'?sort=popular'),('Categories',url_for('marketplace.index'))] %}
+          <li><a href="{{ url }}" style="font-size:.85rem;color:var(--text-muted)" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">{{ name }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      <!-- Sellers -->
+      <div>
+        <h4 class="font-display font-semibold text-sm mb-4" style="color:var(--text)">Sellers</h4>
+        <ul class="space-y-2">
+          {% for name, url in [('Start Selling',url_for('seller.become_seller')),('Dashboard',url_for('seller.dashboard') if current_role in ('seller','admin') else '#'),('Analytics','#'),('Pricing','#')] %}
+          <li><a href="{{ url }}" style="font-size:.85rem;color:var(--text-muted)" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">{{ name }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      <!-- Company -->
+      <div>
+        <h4 class="font-display font-semibold text-sm mb-4" style="color:var(--text)">Company</h4>
+        <ul class="space-y-2">
+          {% for name, url in [('About',url_for('main.about')),('Terms',url_for('main.terms')),('Privacy',url_for('main.privacy')),('Contact',url_for('main.contact'))] %}
+          <li><a href="{{ url }}" style="font-size:.85rem;color:var(--text-muted)" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-muted)'">{{ name }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Bottom bar -->
+    <div style="border-top:1px solid var(--border);margin-top:2.5rem;padding-top:1.5rem;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem">
+      <p style="font-size:.82rem;color:var(--text-dim)">© {{ 2024 }} MercX Digital Marketplace. All rights reserved.</p>
+      <div class="flex items-center gap-2" style="font-size:.8rem;color:var(--text-dim)">
+        <i data-feather="shield" style="width:13px;height:13px;color:var(--success)"></i>
+        Secure payments & buyer protection
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.29.0/feather.min.js"></script>
+<script>document.addEventListener('DOMContentLoaded',()=>{ if(window.feather) feather.replace({'stroke-width':1.75}); })</script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block extra_scripts %}{% endblock %}
 </body>
 </html>

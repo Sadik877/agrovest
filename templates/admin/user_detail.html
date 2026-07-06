@@ -1,0 +1,107 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ user.username }} — Admin{% endblock %}
+{% block page_content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="{{ url_for('admin.users') }}" class="btn btn-ghost btn-sm p-2"><i data-feather="arrow-left" style="width:16px;height:16px"></i></a>
+  <h1 class="font-display text-2xl font-bold">{{ user.username }}</h1>
+  <span class="badge badge-{{ 'danger' if user.role=='admin' else ('accent' if user.role=='seller' else 'neutral') }}">{{ user.role }}</span>
+  {% if user.is_banned %}<span class="badge badge-danger">Banned</span>{% endif %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+  <!-- Left: profile -->
+  <div class="card">
+    <h3 class="font-display font-bold mb-4">Profile</h3>
+    {% for label, val in [
+      ('Email', user.email),
+      ('Balance', '$'~'%.2f'|format(user.balance|float)),
+      ('Verified', 'Yes' if user.is_verified else 'No'),
+      ('Joined', user.created_at[:10]),
+      ('Last Login', user.last_login[:16].replace('T',' ') if user.last_login else 'Never'),
+      ('Full Name', profile.full_name if profile else '—'),
+      ('Country', profile.country if profile else '—'),
+    ] %}
+    <div class="flex justify-between py-2" style="border-bottom:1px solid var(--border)">
+      <span style="font-size:.85rem;color:var(--text-muted)">{{ label }}</span>
+      <span class="font-semibold text-sm">{{ val or '—' }}</span>
+    </div>
+    {% endfor %}
+
+    <div class="mt-5 space-y-2">
+      {% if user.is_banned %}
+      <form method="POST" action="{{ url_for('admin.unban_user', user_id=user.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-success w-full justify-center">Unban User</button>
+      </form>
+      {% else %}
+      <form method="POST" action="{{ url_for('admin.ban_user', user_id=user.id) }}" data-confirm="Ban this user?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="text" name="reason" class="input mb-2" placeholder="Ban reason…">
+        <button class="btn btn-danger w-full justify-center">Ban User</button>
+      </form>
+      {% endif %}
+
+      {% if profile and not profile.seller_verified and user.role == 'seller' %}
+      <form method="POST" action="{{ url_for('admin.verify_seller', user_id=user.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-outline w-full justify-center">Verify as Seller</button>
+      </form>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('admin.set_role', user_id=user.id) }}" class="flex gap-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <select name="role" class="input">
+          {% for r in ['buyer','seller','moderator','admin'] %}
+          <option value="{{ r }}" {% if r == user.role %}selected{% endif %}>{{ r|title }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-ghost">Set Role</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right: orders + transactions + listings -->
+  <div class="lg:col-span-2 space-y-5">
+    <div class="card">
+      <h3 class="font-display font-bold mb-4">Recent Orders</h3>
+      {% if orders %}
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Order</th><th>Total</th><th>Status</th></tr></thead>
+        <tbody>{% for o in orders %}
+        <tr><td class="font-mono text-xs">{{ o.order_number }}</td><td>${{ '%.2f'|format(o.total|float) }}</td>
+        <td><span class="badge badge-neutral">{{ o.status }}</span></td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+      {% else %}<p style="color:var(--text-muted);font-size:.85rem">No orders.</p>{% endif %}
+    </div>
+
+    <div class="card">
+      <h3 class="font-display font-bold mb-4">Wallet Transactions</h3>
+      {% if transactions %}
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Type</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody>{% for tx in transactions %}
+        <tr><td><span class="badge badge-neutral">{{ tx.type }}</span></td>
+        <td class="font-mono">${{ '%.2f'|format(tx.amount|float) }}</td>
+        <td><span class="badge badge-{{ 'success' if tx.status=='completed' else 'warning' }}">{{ tx.status }}</span></td>
+        <td style="font-size:.8rem;color:var(--text-muted)">{{ tx.created_at[:10] }}</td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+      {% else %}<p style="color:var(--text-muted);font-size:.85rem">No transactions.</p>{% endif %}
+    </div>
+
+    {% if listings %}
+    <div class="card">
+      <h3 class="font-display font-bold mb-4">Listings</h3>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Title</th><th>Price</th><th>Sales</th><th>Status</th></tr></thead>
+        <tbody>{% for l in listings %}
+        <tr><td class="text-sm">{{ l.title }}</td><td>${{ '%.2f'|format(l.price|float) }}</td>
+        <td>{{ l.sales_count or 0 }}</td><td><span class="badge badge-neutral">{{ l.status }}</span></td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
