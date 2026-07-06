@@ -372,18 +372,7 @@
       {% endfor %}
     </div>
 
-    <p id="txn-empty" class="hidden text-center text-gray-400 text-sm py-6">No transader {{ 'border-gold-400 bg-gradient-to-b from-gold-50 to-white' if loop.index0 == ns.current else 'border-gray-100' }}">
-      <div class="text-3xl mb-2">{{ icon }}</div>
-      <p class="text-xs font-semibold text-gray-800 leading-tight">{{ name }}</p>
-      {% if loop.index0 == ns.current %}
-      <p class="text-[10px] text-gold-600 font-bold mt-1 uppercase tracking-wide">Current</p>
-      {% elif loop.index0 < ns.current %}
-      <p class="text-[10px] text-emerald-600 font-bold mt-1">Unlocked</p>
-      {% else %}
-      <p class="text-[10px] text-gray-400 mt-1">{{ threshold | naira }}+</p>
-      {% endif %}
-    </div>
-    {% endfor %}
+    <p id="txn-empty" class="hidden text-center text-gray-400 text-sm py-6">No transactions in this category yet.</p>
   </div>
 </div>
 
