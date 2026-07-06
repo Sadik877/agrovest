@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Setup Required — AgroVest Pro{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-gray-950 flex items-center justify-center px-4 py-16">
+  <div class="w-full max-w-2xl">
+
+    {% if ok %}
+    <!-- All good -->
+    <div class="bg-green-900/30 border border-green-500 rounded-2xl p-8 text-center">
+      <div class="text-5xl mb-4">✅</div>
+      <h1 class="text-2xl font-bold text-green-400 mb-2">Environment OK</h1>
+      <p class="text-green-300 mb-6">All required environment variables are set correctly.</p>
+      <a href="/" class="bg-green-600 hover:bg-green-700 text-white font-bold px-8 py-3 rounded-xl transition-colors">
+        Go to Site →
+      </a>
+    </div>
+
+    {% else %}
+    <!-- Setup needed -->
+    <div class="text-center mb-8">
+      <div class="text-6xl mb-4">⚙️</div>
+      <h1 class="text-3xl font-bold text-white mb-2">AgroVest Setup Required</h1>
+      <p class="text-gray-400">Your app is deployed but Supabase is not configured yet.</p>
+    </div>
+
+    {% if missing %}
+    <div class="bg-red-900/30 border border-red-500 rounded-2xl p-6 mb-5">
+      <h2 class="text-red-400 font-bold text-lg mb-3">❌ Missing Environment Variables</h2>
+      {% for var in missing %}
+      <div class="flex items-center gap-3 bg-red-950/50 rounded-lg px-4 py-3 mb-2 font-mono">
+        <span class="text-red-300 font-bold">{{ var }}</span>
+        <span class="text-gray-500 text-sm">— not set</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if errors %}
+    <div class="bg-amber-900/30 border border-amber-500 rounded-2xl p-6 mb-5">
+      <h2 class="text-amber-400 font-bold text-lg mb-3">⚠️ Configuration Errors</h2>
+      {% for err in errors %}
+      <p class="text-amber-300 text-sm bg-amber-950/50 rounded-lg px-4 py-3 mb-2 font-mono">{{ err }}</p>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Fix Instructions -->
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 mb-5">
+      <h2 class="text-white font-bold text-lg mb-4">🔧 How to Fix — Step by Step</h2>
+
+      <div class="space-y-5">
+        <div class="flex gap-4">
+          <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">1</div>
+          <div>
+            <p class="text-white font-semibold mb-1">Get your Supabase credentials</p>
+            <p class="text-gray-400 text-sm">Go to <span class="text-blue-400">supabase.com</span> → your project → <strong class="text-white">Settings → API</strong></p>
+            <div class="mt-2 bg-gray-800 rounded-lg p-3 text-xs font-mono">
+              <p class="text-green-400"># Project URL (copy this for SUPABASE_URL)</p>
+              <p class="text-gray-300">https://abcdefghijk.supabase.co</p>
+              <br>
+              <p class="text-green-400"># Service Role Key (copy this for SUPABASE_KEY)</p>
+              <p class="text-gray-300">eyJhbGciOiJIUzI1NiIsInR5c... (very long string)</p>
+            </div>
+            <p class="text-amber-400 text-xs mt-2">⚠️ Use the <strong>Secret key</strong> (new projects) or <strong>service_role</strong> key (legacy projects) — NOT the Publishable/anon key</p>
+          </div>
+        </div>
+
+        <div class="flex gap-4">
+          <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">2</div>
+          <div>
+            <p class="text-white font-semibold mb-1">Add them to Render</p>
+            <p class="text-gray-400 text-sm">Render Dashboard → <strong class="text-white">your service</strong> → <strong class="text-white">Environment</strong> → <strong class="text-white">Add Environment Variable</strong></p>
+            <div class="mt-2 space-y-2">
+              <div class="bg-gray-800 rounded-lg px-4 py-2 flex items-center justify-between">
+                <span class="text-purple-400 font-mono text-sm font-bold">SUPABASE_URL</span>
+                <span class="text-gray-400 text-xs">https://xxxx.supabase.co</span>
+              </div>
+              <div class="bg-gray-800 rounded-lg px-4 py-2 flex items-center justify-between">
+                <span class="text-purple-400 font-mono text-sm font-bold">SUPABASE_KEY</span>
+                <span class="text-gray-400 text-xs">your Secret key (sb_secret_...) or service_role key</span>
+              </div>
+              <div class="bg-gray-800 rounded-lg px-4 py-2 flex items-center justify-between">
+                <span class="text-purple-400 font-mono text-sm font-bold">SECRET_KEY</span>
+                <span class="text-gray-400 text-xs">any long random string</span>
+              </div>
+            </div>
+            <p class="text-gray-500 text-xs mt-3">That's it — Render sets <code class="text-green-400">RENDER=true</code> automatically, so you don't need to add that yourself.</p>
+          </div>
+        </div>
+
+        <div class="flex gap-4">
+          <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">3</div>
+          <div>
+            <p class="text-white font-semibold mb-1">Create the database tables</p>
+            <p class="text-gray-400 text-sm">Supabase Dashboard → <strong class="text-white">SQL Editor</strong> → New query → paste and run the contents of <code class="text-green-400">supabase_setup.sql</code></p>
+          </div>
+        </div>
+
+        <div class="flex gap-4">
+          <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">4</div>
+          <div>
+            <p class="text-white font-semibold mb-1">Redeploy on Render</p>
+            <p class="text-gray-400 text-sm">After saving env vars → click <strong class="text-white">Manual Deploy → Deploy latest commit</strong></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center">
+      <button onclick="window.location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-xl transition-colors">
+        🔄 Check Again After Fixing
+      </button>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

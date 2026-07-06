@@ -1,0 +1,207 @@
+{% extends "dashboard_base.html" %}
+{% block page_title %}Withdraw Funds{% endblock %}
+{% block page_subtitle %}Request a withdrawal to your bank account{% endblock %}
+
+{% block dashboard_content %}
+<div class="max-w-4xl mx-auto grid lg:grid-cols-5 gap-6">
+
+  <!-- Form -->
+  <div class="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+
+    <!-- Header -->
+    <div class="px-6 pt-6 pb-5 border-b border-gray-50">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-forest-950 flex items-center justify-center flex-shrink-0">
+          <i data-lucide="banknote" class="w-5 h-5 text-gold-400"></i>
+        </div>
+        <div>
+          <h2 class="font-bold text-gray-900">Request Withdrawal</h2>
+          <p class="text-xs text-gray-400">Processed within 24 hours, Mon–Sat 9am–5pm</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6">
+      {% if not payments_enabled %}
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
+        <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5"></i>
+        <p class="text-sm font-semibold text-amber-800">Deposits and withdrawals are temporarily unavailable due to maintenance.</p>
+      </div>
+      {% endif %}
+      <!-- Balance card -->
+      <div class="bg-gradient-to-br from-forest-950 to-forest-800 rounded-2xl p-5 mb-6 relative overflow-hidden">
+        <div class="absolute inset-0 opacity-5" style="background-image: radial-gradient(circle at 20% 80%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px); background-size: 40px 40px;"></div>
+        <div class="relative flex items-center justify-between">
+          <div>
+            <p class="text-forest-300 text-xs font-semibold uppercase tracking-widest mb-1">Available Balance</p>
+            <p class="font-display font-black text-3xl text-gold-400">{{ user.balance | naira }}</p>
+          </div>
+          <div class="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
+            <i data-lucide="wallet" class="w-6 h-6 text-gold-400"></i>
+          </div>
+        </div>
+      </div>
+
+      <form method="POST" action="{{ url_for('withdraw') }}" class="space-y-5">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Amount -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Withdrawal Amount</label>
+          <div class="relative">
+            <span class="absolute left-5 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-300 pointer-events-none select-none">₦</span>
+            <input
+              type="number"
+              name="amount"
+              id="amount-input"
+              required
+              min="{{ min_withdrawal | int }}"
+              max="{{ [user.balance, max_withdrawal] | min }}"
+              placeholder="0"
+              oninput="validateAmount(this)"
+              class="w-full border-2 border-gray-200 rounded-2xl pl-12 pr-4 py-4 text-xl font-bold text-gray-900 focus:outline-none focus:border-forest-500 transition-colors placeholder-gray-200"
+            />
+          </div>
+          <div class="flex items-center justify-between mt-1.5">
+            <p class="text-xs text-gray-400">
+              Minimum: {{ min_withdrawal | naira }}
+              {% if withdrawal_fee_percent > 0 %}
+              · {{ withdrawal_fee_percent }}% withdrawal fee applies
+              {% endif %}
+            </p>
+            <p id="amount-error" class="text-xs text-red-500 hidden">Exceeds available balance</p>
+          </div>
+        </div>
+
+        <!-- Bank name -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Bank Name</label>
+          <div class="relative">
+            <select name="bank_name" required
+              class="w-full appearance-none border-2 border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-sm font-medium focus:outline-none focus:border-forest-500 transition-colors bg-white">
+              <option value="">Select your bank...</option>
+              {% for bank in ['Access Bank', 'First Bank', 'GTBank', 'Zenith Bank', 'UBA', 'Fidelity Bank', 'Union Bank', 'Stanbic IBTC', 'Sterling Bank', 'Wema Bank', 'Keystone Bank', 'Polaris Bank', 'Ecobank', 'FCMB', 'Jaiz Bank', 'Opay', 'Palmpay', 'Kuda Bank', 'Moniepoint'] %}
+              <option value="{{ bank }}">{{ bank }}</option>
+              {% endfor %}
+            </select>
+            <svg class="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+        </div>
+
+        <!-- Account number -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Account Number</label>
+          <input
+            type="text"
+            name="account_number"
+            required
+            maxlength="10"
+            pattern="\d{10}"
+            inputmode="numeric"
+            placeholder="10-digit account number"
+            oninput="this.value = this.value.replace(/\D/g, '')"
+            class="w-full border-2 border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-base font-mono font-semibold tracking-wider focus:outline-none focus:border-forest-500 transition-colors placeholder:font-sans placeholder:font-normal placeholder:tracking-normal"
+          />
+        </div>
+
+        <!-- Account name -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Account Name</label>
+          <input
+            type="text"
+            name="account_name"
+            required
+            placeholder="Name on bank account"
+            class="w-full border-2 border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-sm font-medium focus:outline-none focus:border-forest-500 transition-colors"
+          />
+        </div>
+
+        <!-- Notice -->
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <p class="flex items-center gap-2 text-xs font-bold text-amber-800 uppercase tracking-wide mb-2.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            Important Notes
+          </p>
+          <ul class="space-y-1.5">
+            <li class="flex items-start gap-2 text-xs text-amber-900">
+              <span class="w-1 h-1 rounded-full bg-amber-500 mt-1.5 flex-shrink-0"></span>
+              Ensure account details are correct before submitting.
+            </li>
+            <li class="flex items-start gap-2 text-xs text-amber-900">
+              <span class="w-1 h-1 rounded-full bg-amber-500 mt-1.5 flex-shrink-0"></span>
+              Wrong details may lead to failed or delayed transfer.
+            </li>
+            <li class="flex items-start gap-2 text-xs text-amber-900">
+              <span class="w-1 h-1 rounded-full bg-amber-500 mt-1.5 flex-shrink-0"></span>
+              Withdrawals are processed between 9am–5pm, Mon–Sat.
+            </li>
+          </ul>
+        </div>
+
+        <button type="submit" {{ 'disabled' if not payments_enabled else '' }}
+          class="w-full bg-forest-950 hover:bg-forest-800 text-white font-bold py-4 rounded-2xl transition-colors text-base shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          <i data-lucide="send" class="w-4 h-4"></i>
+          Request Withdrawal
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+    <h2 class="font-bold text-gray-900 mb-5">Withdrawal History</h2>
+    {% if withdrawals %}
+    <div class="space-y-3">
+      {% for wd in withdrawals %}
+      <div class="border border-gray-100 rounded-2xl p-4 hover:border-gray-200 transition-colors">
+        <div class="flex items-center justify-between mb-2">
+          <span class="font-bold text-gray-900 text-base">{{ wd.amount | naira }}</span>
+          <span class="{{ wd.status | status_badge }} badge">{{ wd.status.title() }}</span>
+        </div>
+        <div class="flex items-center gap-1.5 text-xs text-gray-600 font-medium mb-0.5">
+          <i data-lucide="landmark" class="w-3 h-3 text-gray-400"></i>
+          {{ wd.bank_name }}
+        </div>
+        <p class="text-xs font-mono text-gray-400 ml-[18px]">{{ wd.account_number }}</p>
+        {% if wd.fee_amount and wd.fee_amount > 0 %}
+        <p class="text-xs text-gray-400 mt-1">Fee: {{ wd.fee_amount | naira }} · Net payout: {{ wd.net_amount | naira }}</p>
+        {% endif %}
+        <p class="text-xs text-gray-300 mt-2">{{ wd.created_at | date_fmt }}</p>
+        {% if wd.admin_note %}
+        <div class="mt-2 pt-2 border-t border-gray-50 flex items-start gap-1.5">
+          <i data-lucide="info" class="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0"></i>
+          <p class="text-xs text-amber-600">{{ wd.admin_note }}</p>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12">
+      <div class="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+        <i data-lucide="inbox" class="w-7 h-7 text-gray-300"></i>
+      </div>
+      <p class="text-gray-400 text-sm">No withdrawals yet</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  const MAX_BALANCE = Math.min({{ user.balance | float }}, {{ max_withdrawal | float }});
+
+  function validateAmount(input) {
+    const val = parseFloat(input.value) || 0;
+    const error = document.getElementById('amount-error');
+    if (val > MAX_BALANCE) {
+      error.classList.remove('hidden');
+      input.classList.add('border-red-400');
+      input.classList.remove('border-gray-200');
+    } else {
+      error.classList.add('hidden');
+      input.classList.remove('border-red-400');
+      input.classList.add('border-gray-200');
+    }
+  }
+</script>
+{% endblock %}

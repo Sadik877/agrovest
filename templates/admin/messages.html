@@ -1,0 +1,68 @@
+{% extends "admin/base.html" %}
+{% block title %}Messages — Admin{% endblock %}
+
+{% block body %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="font-display text-2xl font-bold text-gray-900">Contact Messages</h1>
+    <div class="flex gap-3 text-sm">
+      <span class="bg-forest-950 text-white px-3 py-1.5 rounded-full font-semibold">{{ stats.total_messages }} total</span>
+      <span class="bg-gold-500 text-forest-950 px-3 py-1.5 rounded-full font-semibold">{{ stats.unread_messages }} unread</span>
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    {% for m in messages %}
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 {{ 'border-l-4 border-l-gold-500' if m.status == 'Unread' else '' }}">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+        <div>
+          <p class="font-semibold text-gray-900">{{ m.full_name }}
+            <span class="text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ml-2
+              {{ 'bg-gold-100 text-gold-700' if m.status == 'Unread'
+                 else 'bg-blue-100 text-blue-700' if m.status == 'Read'
+                 else 'bg-green-100 text-green-700' }}">
+              {{ m.status }}
+            </span>
+          </p>
+          <p class="text-sm text-gray-500">{{ m.email }} · {{ m.phone }}</p>
+        </div>
+        <p class="text-xs text-gray-400 whitespace-nowrap">{{ m.created_at }}</p>
+      </div>
+
+      <p class="text-sm font-medium text-forest-700 mb-1">{{ m.subject }}</p>
+      <p class="text-sm text-gray-700 mb-4">{{ m.message }}</p>
+
+      {% if m.attachment_url %}
+      <a href="{{ m.attachment_url }}" target="_blank" class="text-sm text-forest-600 hover:underline mb-4 inline-block">
+        📎 View attachment
+      </a>
+      {% endif %}
+
+      <div class="flex gap-2">
+        {% if m.status == 'Unread' %}
+        <form method="POST" action="{{ url_for('admin_mark_message_read', msg_id=m.id) }}">
+          <button type="submit" class="text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg">
+            Mark as Read
+          </button>
+        </form>
+        {% endif %}
+        {% if m.status != 'Replied' %}
+        <form method="POST" action="{{ url_for('admin_mark_message_replied', msg_id=m.id) }}">
+          <button type="submit" class="text-xs font-semibold bg-forest-950 hover:bg-forest-800 text-white px-3 py-1.5 rounded-lg">
+            Mark as Replied
+          </button>
+        </form>
+        {% endif %}
+        <a href="mailto:{{ m.email }}" class="text-xs font-semibold bg-gold-500 hover:opacity-90 text-forest-950 px-3 py-1.5 rounded-lg">
+          Reply by Email
+        </a>
+      </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center text-gray-400">
+      No contact messages yet.
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

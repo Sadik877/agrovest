@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}{{ site_settings.seo_title }}{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}{{ site_settings.seo_description }}{% endblock %}" />
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
+  <link rel="icon" href="{{ site_settings.favicon_url }}" />
+
+  <link rel="canonical" href="{{ self.og_url() }}" />
+
+  <!-- Open Graph / Facebook, WhatsApp, Telegram, LinkedIn, Discord -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="{{ site_settings.site_name }}" />
+  <meta property="og:title" content="{{ self.title() }}" />
+  <meta property="og:description" content="{{ self.meta_description() }}" />
+  <meta property="og:image" content="{% block og_image %}{{ site_settings.og_image_url }}{% endblock %}" />
+  <meta property="og:image:secure_url" content="{{ self.og_image() }}" />
+  <meta property="og:image:alt" content="{{ site_settings.site_name }} logo" />
+  <meta property="og:url" content="{% block og_url %}https://agrovest-ydif.onrender.com{{ request.path }}{% endblock %}" />
+  <meta property="og:locale" content="en_NG" />
+
+  <!-- Twitter / X Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{{ self.title() }}" />
+  <meta name="twitter:description" content="{{ self.meta_description() }}" />
+  <meta name="twitter:image" content="{{ self.og_image() }}" />
+  <meta name="twitter:image:alt" content="{{ site_settings.site_name }} logo" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            forest: {
+              50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0',
+              300: '#86efac', 400: '#4ade80', 500: '#22c55e',
+              600: '#16a34a', 700: '#15803d', 800: '#166534',
+              900: '#14532d', 950: '#0A4A2F',
+            },
+            gold: {
+              300: '#fde68a', 400: '#fbbf24', 500: '#C9A84C',
+              600: '#b8860b', 700: '#92660a',
+            },
+            dark: '#0D1B12',
+          },
+          fontFamily: {
+            display: ['Playfair Display', 'serif'],
+            body: ['Inter', 'sans-serif'],
+          },
+          backgroundImage: {
+            'grain': "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E\")",
+          },
+          animation: {
+            'count-up': 'countUp 2s ease-out forwards',
+            'fade-in': 'fadeIn 0.6s ease-out forwards',
+            'slide-up': 'slideUp 0.5s ease-out forwards',
+            'pulse-slow': 'pulse 3s infinite',
+          },
+          keyframes: {
+            countUp: { from: { opacity: 0, transform: 'translateY(10px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+            fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } },
+            slideUp: { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-display { font-family: 'Playfair Display', serif; }
+
+    /* Glassmorphism */
+    .glass {
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .glass-light {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+
+    /* Grain overlay */
+    .grain::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0A4A2F; }
+    ::-webkit-scrollbar-thumb { background: #C9A84C; border-radius: 3px; }
+
+    /* Badge */
+    .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-success { background: #dcfce7; color: #166534; }
+    .badge-warning { background: #fef9c3; color: #854d0e; }
+    .badge-error { background: #fee2e2; color: #991b1b; }
+    .badge-info { background: #dbeafe; color: #1e40af; }
+    .badge-neutral { background: #f3f4f6; color: #374151; }
+
+    /* Animations */
+    .animate-on-scroll { opacity: 0; transform: translateY(30px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .animate-on-scroll.visible { opacity: 1; transform: translateY(0); }
+
+    /* Decorative hero blob — must be positioned/absolute or it renders as an
+       in-flow solid rectangle instead of a soft floating accent. */
+    .blob {
+      position: absolute;
+      border-radius: 9999px;
+      filter: blur(90px);
+      opacity: 0.45;
+      mix-blend-mode: screen;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Subtle grain texture laid over hero gradients */
+    .noise-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased">
+
+  <!-- ── Flash Messages ── -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div id="flash-container" class="fixed top-4 right-4 z-[999] space-y-2 max-w-sm w-full">
+    {% for category, message in messages %}
+    <div class="flash-msg flex items-start gap-3 p-4 rounded-xl shadow-xl border-l-4 glass-light
+      {% if category == 'success' %}border-green-500 bg-green-50{% elif category == 'error' %}border-red-500 bg-red-50{% elif category == 'warning' %}border-yellow-500 bg-yellow-50{% else %}border-blue-500 bg-blue-50{% endif %}
+      animate-slide-up">
+      <span class="text-sm font-medium text-gray-800 flex-1">{{ message }}</span>
+      <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-gray-600 mt-0.5">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+  <script>
+    setTimeout(() => {
+      document.querySelectorAll('.flash-msg').forEach(el => el.style.opacity = '0');
+      setTimeout(() => document.getElementById('flash-container')?.remove(), 500);
+    }, 5000);
+  </script>
+  {% endif %}
+  {% endwith %}
+
+  <!-- ── Sitewide Announcement Banner ── -->
+  {% if active_notice %}
+  <div id="site-notice" class="relative z-[60]
+    {% if active_notice.color == 'red' %}bg-red-600
+    {% elif active_notice.color == 'amber' %}bg-amber-500
+    {% elif active_notice.color == 'emerald' %}bg-emerald-600
+    {% else %}bg-blue-600{% endif %} text-white">
+    <div class="max-w-7xl mx-auto px-4 py-2.5 flex items-center gap-3">
+      <i data-lucide="{{ active_notice.icon }}" class="w-4 h-4 flex-shrink-0"></i>
+      <p class="text-sm font-medium flex-1 min-w-0">
+        <span class="font-bold">{{ active_notice.label }}:</span> {{ active_notice.message }}
+      </p>
+      <button onclick="document.getElementById('site-notice').remove()" class="text-white/70 hover:text-white flex-shrink-0" aria-label="Dismiss">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
+  {% block body %}{% endblock %}
+
+  <!-- Lucide init -->
+  <script>lucide.createIcons();</script>
+
+  <!-- Scroll Animation -->
+  <script>
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));
+  </script>
+
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Risk Disclosure — AgroVest Pro{% endblock %}
+{% block meta_description %}Understand the risks associated with agricultural investment on AgroVest Pro before you invest.{% endblock %}
+
+{% block body %}
+{% include "partials/navbar.html" %}
+
+<!-- ── Hero ── -->
+<section class="relative pt-32 pb-16 overflow-hidden" style="background:linear-gradient(145deg,#040d09 0%,#06281c 50%,#0a3d26 100%); isolation:isolate;">
+  <div class="noise-overlay"></div>
+  <div class="absolute inset-0" style="background:radial-gradient(ellipse at 70% 30%,rgba(212,175,55,.12) 0%,transparent 60%);"></div>
+  <div class="blob w-80 h-80 top-[-10%] left-[-8%]" style="background:#10b981;"></div>
+
+  <div class="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 text-center">
+    <span class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest mb-5 px-4 py-2 rounded-full"
+          style="background:rgba(212,175,55,.12); color:#d4af37; border:1px solid rgba(212,175,55,.25);">
+      <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> Please Read Carefully
+    </span>
+    <h1 class="font-display font-bold text-white text-4xl sm:text-5xl leading-tight mb-4">
+      Risk <span style="color:#d4af37;">Disclosure</span>
+    </h1>
+    <p class="text-gray-300 text-lg max-w-2xl mx-auto">
+      Last updated: <span id="risk-updated-date">July 3, 2026</span>. All investors must read and understand this
+      disclosure before committing funds to any AgroVest Pro plan.
+    </p>
+  </div>
+</section>
+
+<!-- ── Content ── -->
+<section class="py-16 bg-gray-50 dark:bg-gray-950">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6">
+    <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-lg border border-white dark:border-white/5 p-6 sm:p-10 space-y-10">
+
+      <!-- Intro callout -->
+      <div class="rounded-xl p-5 flex items-start gap-4" style="background:rgba(217,119,6,.06); border:1px solid rgba(217,119,6,.2);">
+        <i data-lucide="alert-triangle" class="w-5 h-5 flex-shrink-0 mt-0.5" style="color:#d97706;"></i>
+        <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+          Agricultural investment carries real financial risk, including the possible loss of some or all of your
+          principal. Projected returns shown on AgroVest Pro are targets, not guarantees. Do not invest funds you
+          cannot afford to have locked up or, in a worst case, lose entirely.
+        </p>
+      </div>
+
+      <!-- 1 -->
+      <div>
+        <h2 class="font-display font-bold text-gray-900 dark:text-white text-2xl mb-3">1. Nature of Agricultural Risk</h2>
+        <p class="text-gray-600 dark:text-gray-300 leading-relaxed mb-3">
+          Returns on AgroVest Pro plans are generated from underlying farming and agribusiness activity. That
+          activity is inherently exposed to factors outside our control, including but not limited to:
+        </p>
+        <ul class="space-y-2 text-gray-600 dark:text-gray-300 text-sm">
+          <li class="flex items-start gap-2"><i data-lucide="cloud-rain" class="w-4 h-4 mt-0.5 flex-shrink-0" style="color:#059669;"></i> Adverse weather, drought, flooding, and seasonal variability</li>
+          <li class="flex items-start gap-2"><i data-lucide="bug" class="w-4 h-4 mt-0.5 flex-shrink-0" style="color:#059669;"></i> Crop disease, pest infestation, and livestock health events</li>
+          <li class="flex items-start gap-2"><i data-lucide="trending-down" class="w-4 h-4 mt-0.5 flex-shrink-0" style="color:#059669;"></i> Commodity price fluctuations and market demand shifts</li>
+          <li class="flex items-start gap-2"><i data-lucide="truck" class="w-4 h-4 mt-0.5 flex-shrink-0" style="color:#059669;"></i> Supply chain, logistics, and input cost disruptions</li>
+          <li class="flex items-start gap-2"><i data-lucide="landmark" class="w-4 h-4 mt-0.5 flex-shrink-0" style="color:#059669;"></i> Regulatory, land tenure, or policy changes affecting Nigerian agriculture</li>
+        </ul>
+      </div>
+
+      <!-- 2 -->
+      <div>
+        <h2 class="font-display font-bold text-gray-900 dark:text-white text-2xl mb-3">2. Returns Are Not Guaranteed</h2>
+        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
+          The ROI percentage, daily return, and total return figures displayed for each plan are projections based
+          on expected farm performance. They are targets, not contractual guarantees. Past performance of any plan
+          — including any historical payouts shown on this platform — is not a reliable indicator of future results.
+          In an adverse scenario, actual returns may be lower than projected, delayed, or in extreme cases,
+          principal may not be fully recoverable.
+        </p>
+      </div>
+
+      <!-- 3 -->
+      <div>
+        <h2 class="font-display font-bold text-gray-900 dark:text-white text-2xl mb-3">3. Liquidity &amp; Lock-in Risk</h2>
+        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
+          Funds committed to a plan are generally locked for that plan's stated duration. AgroVest Pro is not a
+          savings account or a demand-deposit product — you should not invest funds you may need to access on
+          short notice. Where an early-withdrawal option is offered on a specific plan, it may be subject to
+          fees, reduced returns, or processing delays, as described on that plan's terms.
+        </p>
+      </div>
+
+      <!-- 4 -->
+      <div>
+        <h2 class="font-display font-bold text-gray-900 dark:text-white text-2xl mb-3">4. Platform &amp; Counterparty Risk</h2>
+        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
+          As with any investment platform, there is a risk associated with the platform operator itself —
+          including operational, technological, and counterparty risk. We take reasonable steps to safeguard user
+          funds and data, but no platform can eliminate this category of risk entirely.
+        </p>
+      </div>
+
+      <!-- 5 -->
+      <div>
+        <h2 class="font-display font-bold text-gray-900 dark:text-white text-2xl mb-3">5. No Investment Advice</h2>
+        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
+          Nothing on AgroVest Pro constitutes financial, legal, or tax advice. Plan descriptions, marketing
+          materials, and projected figures are provided for informational purposes only. You are solely
+          responsible for evaluating whether a given plan is suitable for your financial circumstances, and we
+          encourage you to consult an independent licensed financial advisor before investing.
+        </p>
+      </div>
+
+      <!-- 6 -->
+      <div>
+        <h2 class="font-display font-bold text-gray-900 dark:text-white text-2xl mb-3">6. Diversification</h2>
+        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
+          We recommend not concentrating all of your investable funds into a single plan or platform. Spreading
+          risk across multiple asset types is a widely accepted principle of prudent personal finance.
+        </p>
+      </div>
+
+      <!-- 7 -->
+      <div>
+        <h2 class="font-display font-bold text-gray-900 dark:text-white text-2xl mb-3">7. Acknowledgement</h2>
+        <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
+          By creating an account and activating an investment plan on AgroVest Pro, you confirm that you have read,
+          understood, and accepted this Risk Disclosure in full, and that you are investing funds you can
+          reasonably afford to have locked for the plan duration and, in a worst case, to lose.
+        </p>
+      </div>
+
+      <!-- Contact -->
+      <div class="rounded-xl p-5 flex items-start gap-4" style="background:rgba(5,150,105,.05); border:1px solid rgba(5,150,105,.15);">
+        <i data-lucide="mail" class="w-5 h-5 flex-shrink-0 mt-0.5" style="color:#059669;"></i>
+        <p class="text-sm text-gray-600 dark:text-gray-300">
+          Questions about this disclosure? Contact us at
+          <a href="mailto:[support@agrovest.ng]" class="font-semibold underline" style="color:#059669;">[support@agrovest.ng]</a>.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+{% include "partials/footer.html" %}
+{% endblock %}
