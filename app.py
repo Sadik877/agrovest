@@ -8,7 +8,7 @@ import re
 import time
 import uuid
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from flask import (Flask, render_template, request, redirect, url_for,
@@ -1091,6 +1091,41 @@ def get_display_timezone():
             return _tz.utc
 
 
+def get_today_profit_total(user_id):
+    """Sum of daily-profit (ROI) transactions actually credited *today*, in
+    the admin-configured display timezone.
+
+    This replaces the old approach of summing each active investment's
+    `daily_profit` RATE, which showed the day's expected profit before it
+    had actually been credited (e.g. at 7:30 AM, before the ~1 AM UTC cron
+    / next dashboard visit has run). Sourcing this from real `transactions`
+    rows means:
+      - Before today's credit runs: 0 rows found today → ₦0.00, correctly.
+      - Right after the credit runs: that ROI row is included immediately.
+      - Multiple active investments: each credits its own ROI row, so the
+        sum naturally includes all of them.
+      - Midnight rollover: the query window is always "today, local time"
+        so it resets on its own with no extra job needed — nothing is
+        deleted, the transaction rows and notifications are untouched,
+        only what counts as "today" shifts forward.
+    """
+    tz = get_display_timezone()
+    start_of_day_local = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_day_utc = start_of_day_local.astimezone(timezone.utc).isoformat()
+
+    try:
+        rows = sb_all('transactions', filters=[
+            ('user_id', 'eq', user_id),
+            ('transaction_type', 'eq', 'ROI'),
+            ('created_at', 'gte', start_of_day_utc),
+        ])
+    except Exception as e:
+        print(f'get_today_profit_total error for user {user_id}: {e}')
+        return 0.0
+
+    return r2(sum(float(t.get('amount') or 0) for t in rows))
+
+
 # ─────────────────────────────────────────────
 # Env-var health check — shown instead of 500
 # when Supabase credentials are missing/wrong
@@ -1458,13 +1493,15 @@ def dashboard():
         referred_user = sb_one('users', [('id','eq',r['referred_id'])])
         referrals.append({**r, 'full_name': referred_user['full_name'] if referred_user else 'Unknown'})
 
-    # Real "Today's Profit": the sum of each active investment's actual
-    # per-day profit rate (the same daily_profit figure the automatic engine
-    # credits — stored on the investment at creation time, or derived from
-    # profit/expected_return-amount/duration_days for legacy rows via
-    # get_daily_profit_amount()). This is a live figure from the database,
-    # not a placeholder.
-    today_profit = r2(sum(inv['daily_profit'] for inv in active_investments))
+    # Real "Today's Profit": the sum of ROI transactions actually credited
+    # TODAY (in the admin-configured timezone) — not each investment's daily
+    # RATE, which would show the day's expected profit before the daily
+    # profit engine has actually run and credited it. Before that credit
+    # happens today, this correctly shows ₦0.00; after it runs, it reflects
+    # the real amount(s) credited, summed across every investment; it stays
+    # that way until local midnight, when "today" naturally rolls forward
+    # and it resets on its own — no data is deleted.
+    today_profit = get_today_profit_total(user['id'])
     total_invested = float(user.get('total_invested') or 0)
     profit_change_pct = r2((today_profit / total_invested * 100) if total_invested > 0 else 0)
 
