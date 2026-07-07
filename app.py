@@ -1127,6 +1127,54 @@ def get_today_profit_total(user_id):
 
 
 # ─────────────────────────────────────────────
+# Daily Check-in — one row per check-in in `checkins`; streak and
+# "already checked in today" are both derived from the most recent row
+# rather than stored separately, so there's nothing to keep in sync.
+# ─────────────────────────────────────────────
+def get_checkin_reward_amount():
+    try:
+        return max(0.0, float(get_setting('checkin_reward_amount', 50) or 50))
+    except (TypeError, ValueError):
+        return 50.0
+
+
+def get_checkin_status(user_id):
+    """Returns {checked_in_today, current_streak, reward_amount} for display
+    — does not perform a check-in. `current_streak` is the streak the user
+    is currently sitting on: if they checked in today it's that day's streak
+    number; if they checked in yesterday it's still shown (they can extend
+    it today); if it's older than yesterday the streak has lapsed (shown as
+    0 — the next check-in restarts at day 1)."""
+    tz = get_display_timezone()
+    today_local = datetime.now(tz).date()
+    reward = get_checkin_reward_amount()
+    rows = sb_all('checkins', filters=[('user_id', 'eq', user_id)],
+                  order=('created_at', 'desc'), limit=1)
+    if not rows:
+        return {'checked_in_today': False, 'current_streak': 0, 'reward_amount': reward}
+
+    row = rows[0]
+    last_local = datetime.fromisoformat(str(row['created_at']).replace('Z', '+00:00')).astimezone(tz).date()
+    checked_in_today = (last_local == today_local)
+    streak = int(row.get('streak_day') or 0)
+    if not checked_in_today and (today_local - last_local).days > 1:
+        streak = 0  # lapsed — next check-in restarts at day 1
+    return {'checked_in_today': checked_in_today, 'current_streak': streak, 'reward_amount': reward}
+
+
+# ─────────────────────────────────────────────
+# Gift Codes
+# ─────────────────────────────────────────────
+def generate_gift_code():
+    """AGRO-XXXX-XXXX style code, regenerated if it happens to collide."""
+    for _ in range(10):
+        code = 'AGRO-' + secrets.token_hex(2).upper() + '-' + secrets.token_hex(2).upper()
+        if not sb_one('gift_codes', [('code', 'eq', code)]):
+            return code
+    return 'AGRO-' + secrets.token_hex(6).upper()
+
+
+# ─────────────────────────────────────────────
 # Env-var health check — shown instead of 500
 # when Supabase credentials are missing/wrong
 # ─────────────────────────────────────────────
@@ -1522,7 +1570,130 @@ def dashboard():
         referrals=referrals, notifications=notifications,
         today_profit=today_profit, profit_change_pct=profit_change_pct,
         recent_transactions=recent_transactions,
+        checkin_status=get_checkin_status(uid),
         now_utc=datetime.utcnow())
+
+
+@app.route('/checkin', methods=['POST'])
+@login_required
+def daily_checkin():
+    """Credits today's check-in reward once per 24h (calendar day, in the
+    admin-configured timezone) and extends the streak — or restarts it at 1
+    if a day was missed. Everything needed to decide that is derived from
+    the most recent row in `checkins`; nothing is stored on `users`."""
+    user = get_current_user()
+    tz = get_display_timezone()
+    today_local = datetime.now(tz).date()
+
+    last_rows = sb_all('checkins', filters=[('user_id', 'eq', user['id'])],
+                       order=('created_at', 'desc'), limit=1)
+    last_row = last_rows[0] if last_rows else None
+
+    if last_row:
+        last_local = datetime.fromisoformat(str(last_row['created_at']).replace('Z', '+00:00')).astimezone(tz).date()
+        if last_local == today_local:
+            flash("You've already checked in today — come back tomorrow!", 'error')
+            return redirect(url_for('dashboard'))
+        streak = int(last_row.get('streak_day') or 0) + 1 if (today_local - last_local).days == 1 else 1
+    else:
+        streak = 1
+
+    reward = get_checkin_reward_amount()
+
+    credited = sb_adjust_balance(user['id'], balance_delta=reward)
+    if not credited:
+        flash('Check-in failed — please try again.', 'error')
+        return redirect(url_for('dashboard'))
+
+    recorded = sb_insert('checkins', {'user_id': user['id'], 'reward_amount': reward, 'streak_day': streak})
+    if not recorded:
+        rolled_back = sb_adjust_balance(user['id'], balance_delta=-reward)
+        if not rolled_back:
+            print(f'⚠ CRITICAL: checkin rollback failed for user {user["id"]}, '
+                  f'amount {reward} — balance may be incorrect, investigate manually.')
+        flash('Check-in failed — please try again.', 'error')
+        return redirect(url_for('dashboard'))
+
+    notify(user['id'], f'Day {streak} check-in reward: ₦{reward:,.2f} credited to your wallet!', 'success')
+    flash(f'Checked in! Day {streak} streak — ₦{reward:,.2f} credited.', 'success')
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/gift-code/redeem', methods=['POST'])
+@login_required
+def redeem_gift_code():
+    """Validates and redeems a gift code, crediting the reward to the
+    user's wallet. Double-redemption is prevented two ways: an app-level
+    lookup for a friendly error message, and — the real guarantee under a
+    race — the UNIQUE(gift_code_id, user_id) constraint on
+    gift_code_redemptions, which makes a second simultaneous insert fail
+    and get rolled back below."""
+    user = get_current_user()
+    code_input = (request.form.get('code') or '').strip().upper()
+    if not code_input:
+        flash('Please enter a gift code.', 'error')
+        return redirect(url_for('dashboard'))
+
+    gift = sb_one('gift_codes', [('code', 'eq', code_input)])
+    if not gift:
+        flash('Invalid gift code.', 'error')
+        return redirect(url_for('dashboard'))
+    if not gift.get('is_active'):
+        flash('This gift code is no longer active.', 'error')
+        return redirect(url_for('dashboard'))
+
+    expires_at = gift.get('expires_at')
+    if expires_at:
+        try:
+            exp_dt = datetime.fromisoformat(str(expires_at).replace('Z', '+00:00'))
+            if datetime.now(timezone.utc) > exp_dt:
+                flash('This gift code has expired.', 'error')
+                return redirect(url_for('dashboard'))
+        except Exception:
+            pass
+
+    times_used  = int(gift.get('times_used') or 0)
+    usage_limit = int(gift.get('usage_limit') or 0)
+    if times_used >= usage_limit:
+        flash('This gift code has reached its usage limit.', 'error')
+        return redirect(url_for('dashboard'))
+
+    if sb_one('gift_code_redemptions', [('gift_code_id', 'eq', gift['id']), ('user_id', 'eq', user['id'])]):
+        flash("You've already redeemed this gift code.", 'error')
+        return redirect(url_for('dashboard'))
+
+    reward = r2(gift['reward_amount'])
+
+    # Compare-and-swap on times_used — only succeeds if nobody else has
+    # bumped it since we read it, narrowing (not fully eliminating, without
+    # a DB-side lock) the race window on the usage_limit cap.
+    bumped = sb_update('gift_codes', {'times_used': times_used + 1},
+                       [('id', 'eq', gift['id']), ('times_used', 'eq', times_used)])
+    if not bumped:
+        flash('This code was just redeemed by someone else and hit its limit. Please try again.', 'error')
+        return redirect(url_for('dashboard'))
+
+    credited = sb_adjust_balance(user['id'], balance_delta=reward)
+    if not credited:
+        sb_update('gift_codes', {'times_used': times_used}, [('id', 'eq', gift['id'])])
+        flash('Redemption failed — please try again.', 'error')
+        return redirect(url_for('dashboard'))
+
+    recorded = sb_insert('gift_code_redemptions', {
+        'gift_code_id': gift['id'], 'user_id': user['id'], 'amount': reward,
+    })
+    if not recorded:
+        rolled_back = sb_adjust_balance(user['id'], balance_delta=-reward)
+        sb_update('gift_codes', {'times_used': times_used}, [('id', 'eq', gift['id'])])
+        if not rolled_back:
+            print(f'⚠ CRITICAL: gift code rollback failed for user {user["id"]}, '
+                  f'code {code_input}, amount {reward} — balance may be incorrect, investigate manually.')
+        flash('You may have already redeemed this code just now. Please contact support if your balance looks off.', 'error')
+        return redirect(url_for('dashboard'))
+
+    notify(user['id'], f'₦{reward:,.2f} gift code reward credited to your wallet!', 'success')
+    flash(f'Success! ₦{reward:,.2f} has been credited to your wallet.', 'success')
+    return redirect(url_for('dashboard'))
 
 
 @app.route('/dashboard/invest', methods=['GET', 'POST'])
@@ -2211,6 +2382,153 @@ def admin_bank_account_delete(account_id):
 
     flash(f'{account["bank_name"]} account deleted.', 'success')
     return redirect(url_for('admin_payment_settings'))
+
+
+# ═════════════════════════════════════════════
+# ADMIN — Gift Codes
+# ═════════════════════════════════════════════
+@app.route('/admin/gift-codes')
+@admin_required
+def admin_gift_codes():
+    codes = sb_all('gift_codes', order=('created_at', 'desc'))
+    return render_template('admin/gift_codes.html', codes=codes)
+
+
+def _gift_code_from_form(form):
+    """Parse and validate the gift code form. Returns (data_dict, error_str)."""
+    code = (form.get('code') or '').strip().upper() or generate_gift_code()
+    try:
+        reward_amount = float(form.get('reward_amount', 0) or 0)
+    except ValueError:
+        return None, 'Reward amount must be a number.'
+    if reward_amount <= 0:
+        return None, 'Reward amount must be greater than zero.'
+
+    try:
+        usage_limit = int(form.get('usage_limit', 1) or 1)
+    except ValueError:
+        return None, 'Usage limit must be a whole number.'
+    if usage_limit < 1:
+        return None, 'Usage limit must be at least 1.'
+
+    expires_raw = (form.get('expires_at') or '').strip()
+    expires_at = None
+    if expires_raw:
+        try:
+            # <input type="datetime-local"> submits a naive string (no
+            # timezone offset). Treat it as the admin-configured display
+            # timezone — not UTC — so "expires at midnight" means midnight
+            # in the admin's own timezone, then store as UTC like every
+            # other timestamp in this app.
+            naive_dt = datetime.fromisoformat(expires_raw)
+            local_dt = naive_dt.replace(tzinfo=get_display_timezone())
+            expires_at = local_dt.astimezone(timezone.utc).isoformat()
+        except ValueError:
+            return None, 'Expiry date is invalid.'
+
+    return {
+        'code': code, 'reward_amount': r2(reward_amount),
+        'usage_limit': usage_limit, 'expires_at': expires_at,
+    }, None
+
+
+@app.route('/admin/gift-codes/add', methods=['GET', 'POST'])
+@admin_required
+def admin_gift_code_add():
+    if request.method == 'POST':
+        data, error = _gift_code_from_form(request.form)
+        if error:
+            flash(error, 'error')
+            return render_template('admin/gift_code_form.html', code=None, action='add')
+
+        created = sb_insert('gift_codes', data)
+        if not created:
+            flash('That code already exists — try a different one.', 'error')
+            return render_template('admin/gift_code_form.html', code=None, action='add')
+
+        flash(f'Gift code {data["code"]} created!', 'success')
+        return redirect(url_for('admin_gift_codes'))
+
+    return render_template('admin/gift_code_form.html', code=None, action='add', suggested_code=generate_gift_code())
+
+
+@app.route('/admin/gift-codes/<int:code_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_gift_code_edit(code_id):
+    code = sb_one('gift_codes', [('id', 'eq', code_id)])
+    if not code:
+        flash('Gift code not found.', 'error')
+        return redirect(url_for('admin_gift_codes'))
+
+    if request.method == 'POST':
+        data, error = _gift_code_from_form(request.form)
+        if error:
+            flash(error, 'error')
+            return render_template('admin/gift_code_form.html', code=code, action='edit')
+
+        sb_update('gift_codes', data, [('id', 'eq', code_id)])
+        flash(f'Gift code {data["code"]} updated!', 'success')
+        return redirect(url_for('admin_gift_codes'))
+
+    return render_template('admin/gift_code_form.html', code=code, action='edit')
+
+
+@app.route('/admin/gift-codes/<int:code_id>/toggle', methods=['POST'])
+@admin_required
+def admin_gift_code_toggle(code_id):
+    code = sb_one('gift_codes', [('id', 'eq', code_id)])
+    if not code:
+        flash('Gift code not found.', 'error')
+        return redirect(url_for('admin_gift_codes'))
+
+    sb_update('gift_codes', {'is_active': not code.get('is_active')}, [('id', 'eq', code_id)])
+    flash(f'{code["code"]} is now {"active" if not code.get("is_active") else "inactive"}.', 'success')
+    return redirect(url_for('admin_gift_codes'))
+
+
+@app.route('/admin/gift-codes/<int:code_id>/delete', methods=['POST'])
+@admin_required
+def admin_gift_code_delete(code_id):
+    code = sb_one('gift_codes', [('id', 'eq', code_id)])
+    if not code:
+        flash('Gift code not found.', 'error')
+        return redirect(url_for('admin_gift_codes'))
+
+    sb_delete('gift_codes', [('id', 'eq', code_id)])
+    flash(f'Gift code {code["code"]} deleted.', 'success')
+    return redirect(url_for('admin_gift_codes'))
+
+
+# ═════════════════════════════════════════════
+# ADMIN — Daily Check-in monitoring
+# ═════════════════════════════════════════════
+@app.route('/admin/checkins', methods=['GET', 'POST'])
+@admin_required
+def admin_checkins():
+    """Configure the daily reward amount and see recent check-in activity."""
+    if request.method == 'POST':
+        try:
+            amount = max(0.0, float(request.form.get('checkin_reward_amount', 50) or 50))
+            set_setting('checkin_reward_amount', amount)
+            flash('Check-in reward updated.', 'success')
+        except ValueError:
+            flash('Reward amount must be a number.', 'error')
+        return redirect(url_for('admin_checkins'))
+
+    recent = sb_all('checkins', order=('created_at', 'desc'), limit=100)
+    user_ids = list({r['user_id'] for r in recent})
+    users_by_id = {}
+    if user_ids:
+        for u in sb_all('users', filters=[('id', 'in', user_ids)]):
+            users_by_id[u['id']] = u
+    for r in recent:
+        u = users_by_id.get(r['user_id'])
+        r['user_name'] = u['full_name'] if u else 'Unknown user'
+        r['user_email'] = u['email'] if u else ''
+
+    return render_template('admin/checkins.html', checkins=recent,
+                           checkin_reward_amount=get_checkin_reward_amount(),
+                           total_checkins=sb_count('checkins'))
 
 
 @app.route('/admin/announcements', methods=['GET', 'POST'])

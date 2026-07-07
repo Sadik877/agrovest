@@ -174,6 +174,61 @@
   </div>
 </div>
 
+<!-- ── Daily Check-in & Gift Code ── -->
+<div class="grid sm:grid-cols-2 gap-6 mb-6">
+  <!-- Daily Check-in -->
+  <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gold-50 flex items-center justify-center">
+          <i data-lucide="calendar-check" class="w-5 h-5 text-gold-600"></i>
+        </div>
+        <div>
+          <h2 class="font-semibold text-gray-900 text-sm">Daily Check-in</h2>
+          {% if checkin_status.current_streak > 0 %}
+          <p class="text-xs text-gray-400">Day {{ checkin_status.current_streak }} streak</p>
+          {% else %}
+          <p class="text-xs text-gray-400">Start your streak today</p>
+          {% endif %}
+        </div>
+      </div>
+      <span class="text-sm font-bold text-emerald-600">+{{ checkin_status.reward_amount | naira }}</span>
+    </div>
+    <form method="POST" action="{{ url_for('daily_checkin') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" {{ 'disabled' if checkin_status.checked_in_today else '' }}
+        class="w-full flex items-center justify-center gap-2 font-bold text-sm py-3 rounded-xl transition-colors
+        {% if checkin_status.checked_in_today %}bg-gray-50 text-gray-400 cursor-not-allowed
+        {% else %}bg-forest-950 hover:bg-forest-800 text-white shadow-lg{% endif %}">
+        <i data-lucide="{{ 'check-circle' if checkin_status.checked_in_today else 'gift' }}" class="w-4 h-4"></i>
+        {{ 'Checked In Today' if checkin_status.checked_in_today else 'Check In Now' }}
+      </button>
+    </form>
+  </div>
+
+  <!-- Gift Code Redemption -->
+  <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+        <i data-lucide="ticket" class="w-5 h-5 text-emerald-600"></i>
+      </div>
+      <div>
+        <h2 class="font-semibold text-gray-900 text-sm">Redeem Gift Code</h2>
+        <p class="text-xs text-gray-400">Have a code? Enter it below.</p>
+      </div>
+    </div>
+    <form method="POST" action="{{ url_for('redeem_gift_code') }}" class="flex items-center gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="text" name="code" required placeholder="AGRO-XXXX-XXXX"
+             class="flex-1 min-w-0 border border-gray-200 rounded-xl px-4 py-3 text-sm font-mono uppercase focus:outline-none focus:border-forest-500 focus:ring-1 focus:ring-forest-500" />
+      <button type="submit"
+              class="flex-shrink-0 bg-forest-950 hover:bg-forest-800 text-white font-bold text-sm px-5 py-3 rounded-xl shadow-lg transition-colors">
+        Redeem
+      </button>
+    </form>
+  </div>
+</div>
+
 <!-- ── Investor Achievement Badges ── -->
 {% set invested = (user.total_invested or 0) %}
 {% set badge_tiers = [
@@ -207,172 +262,6 @@
       {% endif %}
     </div>
     {% endfor %}
-  </div>
-</div>
-
-<!-- ── Active Investments & Recent Transactions ── -->
-<div class="grid lg:grid-cols-2 gap-6 mb-6">
-  <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-    <div class="flex items-center justify-between mb-5">
-      <h2 class="font-semibold text-gray-900">Active Investments</h2>
-      <a href="{{ url_for('invest') }}" class="text-xs text-forest-600 font-semibold hover:text-forest-800 flex items-center gap-1">
-        <i data-lucide="plus" class="w-3.5 h-3.5"></i> New Investment
-      </a>
-    </div>
-
-    {% if active_investments %}
-    <div class="space-y-3">
-      {% for inv in active_investments %}
-      {% set pct = inv.progress_percent %}
-      <div class="border border-gray-100 rounded-xl p-4 hover:border-forest-300 hover:bg-forest-50/30 transition-colors fade-in">
-        <div class="flex items-center justify-between mb-3">
-          <span class="font-semibold text-gray-900 text-sm">{{ inv.plan_name }}</span>
-          <span class="badge badge-info">Active</span>
-        </div>
-
-        <div class="flex items-center gap-4">
-          <div class="relative w-20 h-20 flex-shrink-0">
-            <svg viewBox="0 0 100 100" class="w-20 h-20 -rotate-90">
-              <circle cx="50" cy="50" r="42" fill="none" stroke="#f0f0f0" stroke-width="9"/>
-              <circle cx="50" cy="50" r="42" fill="none" stroke="url(#circleGrad)" stroke-width="9" stroke-linecap="round"
-                stroke-dasharray="263.9" stroke-dashoffset="263.9" class="circle-progress" data-pct="{{ pct }}"/>
-            </svg>
-            <div class="absolute inset-0 flex items-center justify-center">
-              <span class="text-sm font-bold text-forest-900">{{ pct | round(0, 'floor') | int }}%</span>
-            </div>
-          </div>
-          <div class="flex-1 min-w-0 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-            <div>
-              <p class="text-gray-400 mb-0.5">Invested</p>
-              <p class="font-bold text-gray-900">{{ inv.amount | naira }}</p>
-            </div>
-            <div>
-              <p class="text-gray-400 mb-0.5">Expected</p>
-              <p class="font-bold text-green-600">{{ inv.expected_return | naira }}</p>
-            </div>
-            <div>
-              <p class="text-gray-400 mb-0.5">Profit</p>
-              <p class="font-bold text-gold-600">+{{ inv.profit | naira }}</p>
-            </div>
-            <div>
-              <p class="text-gray-400 mb-0.5">Remaining</p>
-              <p class="font-bold text-gray-700">{{ inv.remaining_days }} day{{ 's' if inv.remaining_days != 1 else '' }}</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-50 text-xs">
-          <span class="text-gray-400">Daily profit</span>
-          <span class="font-semibold text-emerald-600">+{{ inv.daily_profit | naira }}/day</span>
-        </div>
-        <div class="flex items-center justify-between mt-1.5 text-xs">
-          <span class="text-gray-400">Matures</span>
-          <span class="font-semibold text-gray-700">{{ inv.end_date | date_fmt }}</span>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="text-center py-6">
-      <i data-lucide="sprout" class="w-10 h-10 text-gray-200 mx-auto mb-3"></i>
-      <p class="text-gray-400 text-sm">No active investments yet</p>
-    </div>
-
-    {% if plans %}
-    <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3 px-0.5">Popular Plans to Get Started</p>
-    <div class="space-y-2.5 mb-4">
-      {% for plan in plans[:3] %}
-      <a href="{{ url_for('invest') }}" class="fade-in flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-3.5 hover:border-gold-400 hover:bg-forest-50/40 transition-all group">
-        <div class="flex items-center gap-3 min-w-0">
-          {% if plan.image_url %}
-          <img src="{{ plan.image_url }}" alt="{{ plan.name }}" loading="lazy" class="w-11 h-11 rounded-xl object-cover flex-shrink-0 border border-gold-400/30">
-          {% else %}
-          <div class="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0 bg-gold-50 border border-gold-400/20">{{ plan.icon or '🌱' }}</div>
-          {% endif %}
-          <div class="min-w-0">
-            <p class="text-sm font-semibold text-gray-900 truncate">{{ plan.name }}</p>
-            <p class="text-xs text-gray-400">{{ plan.duration_days }} days · ₦{{ '{:,.0f}'.format(plan.price) }}</p>
-          </div>
-        </div>
-        <div class="flex items-center gap-1.5 flex-shrink-0">
-          <span class="text-xs font-bold text-gold-600 bg-gold-50 px-2.5 py-1 rounded-full whitespace-nowrap">+₦{{ '{:,.0f}'.format(plan.profit) }}</span>
-          <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-gray-300 group-hover:text-gold-500 group-hover:translate-x-0.5 transition-all"></i>
-        </div>
-      </a>
-      {% endfor %}
-    </div>
-    <a href="{{ url_for('invest') }}" class="block text-center bg-forest-950 text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-forest-800 transition-colors">Explore All Plans</a>
-    {% else %}
-    <div class="text-center">
-      <a href="{{ url_for('invest') }}" class="inline-block bg-forest-950 text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-forest-800 transition-colors">Start Investing</a>
-    </div>
-    {% endif %}
-    {% endif %}
-  </div>
-
-  <!-- Recent Transactions -->
-  <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-    <div class="flex items-center justify-between mb-5">
-      <h2 class="font-semibold text-gray-900">Recent Transactions</h2>
-    </div>
-
-    <!-- Filter tabs (JS-only, no backend filtering) -->
-    <div class="flex flex-wrap items-center gap-2 mb-4" id="txn-filters">
-      <button data-filter="all" class="txn-filter-btn active text-xs font-semibold px-3 py-1.5 rounded-full bg-forest-950 text-white whitespace-nowrap">All</button>
-      <button data-filter="deposit" class="txn-filter-btn text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">Deposits</button>
-      <button data-filter="withdrawal" class="txn-filter-btn text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">Withdrawals</button>
-      <button data-filter="roi" class="txn-filter-btn text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">ROI</button>
-      <button data-filter="referral" class="txn-filter-btn text-xs font-semibold px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">Referral</button>
-    </div>
-
-    <div class="space-y-3">
-      {% set all_txn = recent_deposits[:3] + recent_withdrawals[:2] %}
-      {% if not recent_deposits and not recent_withdrawals %}
-      <div class="text-center py-8">
-        <i data-lucide="receipt" class="w-10 h-10 text-gray-200 mx-auto mb-3"></i>
-        <p class="text-gray-400 text-sm">No transactions yet</p>
-        <a href="{{ url_for('deposit') }}" class="inline-block mt-3 bg-gold-500 text-forest-950 text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-gold-600 transition-colors">Make First Deposit</a>
-      </div>
-      {% endif %}
-
-      {% for dep in recent_deposits[:4] %}
-      <div class="txn-row flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 last:border-0" data-type="deposit">
-        <div class="flex items-center gap-3 min-w-0">
-          <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-            <i data-lucide="arrow-down-left" class="w-3.5 h-3.5 text-green-600"></i>
-          </div>
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-gray-900 truncate">Deposit</p>
-            <p class="text-xs text-gray-400 truncate">{{ dep.created_at | date_fmt }}</p>
-          </div>
-        </div>
-        <div class="text-right flex-shrink-0">
-          <p class="text-sm font-bold text-green-600 whitespace-nowrap">+{{ dep.amount | naira }}</p>
-          <span class="{{ dep.status | status_badge }} badge whitespace-nowrap">{{ dep.status.title() }}</span>
-        </div>
-      </div>
-      {% endfor %}
-
-      {% for wd in recent_withdrawals[:3] %}
-      <div class="txn-row flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 last:border-0" data-type="withdrawal">
-        <div class="flex items-center gap-3 min-w-0">
-          <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-            <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-red-600"></i>
-          </div>
-          <div class="min-w-0">
-            <p class="text-sm font-medium text-gray-900 truncate">Withdrawal</p>
-            <p class="text-xs text-gray-400 truncate">{{ wd.created_at | date_fmt }}</p>
-          </div>
-        </div>
-        <div class="text-right flex-shrink-0">
-          <p class="text-sm font-bold text-red-600 whitespace-nowrap">-{{ wd.amount | naira }}</p>
-          <span class="{{ wd.status | status_badge }} badge whitespace-nowrap">{{ wd.status.title() }}</span>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-
-    <p id="txn-empty" class="hidden text-center text-gray-400 text-sm py-6">No transactions in this category yet.</p>
   </div>
 </div>
 

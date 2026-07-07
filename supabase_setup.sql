@@ -290,3 +290,50 @@ ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS fee_amount NUMERIC(15,2)
 ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS net_amount NUMERIC(15,2);
 
 SELECT 'Payment settings & bank accounts migration applied successfully!' AS status;
+
+-- ════════════════════════════════════════════
+-- MIGRATION — Gift Codes & Daily Check-in
+-- Safe to re-run. No existing tables/columns touched.
+-- ════════════════════════════════════════════
+
+-- GIFT CODES — admin-managed redemption codes
+CREATE TABLE IF NOT EXISTS public.gift_codes (
+    id             BIGSERIAL PRIMARY KEY,
+    code           TEXT UNIQUE NOT NULL,
+    reward_amount  NUMERIC(15,2) NOT NULL,
+    usage_limit    INTEGER NOT NULL DEFAULT 1,
+    times_used     INTEGER NOT NULL DEFAULT 0,
+    expires_at     TIMESTAMPTZ,
+    is_active      BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.gift_codes DISABLE ROW LEVEL SECURITY;
+
+-- One redemption per user per code — the UNIQUE constraint is the real
+-- guard against double-redeeming (app-level checks are just a fast-fail
+-- for a nicer error message; this is what actually prevents it under a race).
+CREATE TABLE IF NOT EXISTS public.gift_code_redemptions (
+    id             BIGSERIAL PRIMARY KEY,
+    gift_code_id   BIGINT NOT NULL REFERENCES public.gift_codes(id) ON DELETE CASCADE,
+    user_id        BIGINT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    amount         NUMERIC(15,2) NOT NULL,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (gift_code_id, user_id)
+);
+ALTER TABLE public.gift_code_redemptions DISABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_gift_redemptions_user ON public.gift_code_redemptions(user_id);
+
+-- DAILY CHECK-IN — one row per check-in; streak/last-checkin-date are
+-- derived from this table's history rather than adding columns to `users`,
+-- so no existing table structure needs to change.
+CREATE TABLE IF NOT EXISTS public.checkins (
+    id             BIGSERIAL PRIMARY KEY,
+    user_id        BIGINT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    reward_amount  NUMERIC(15,2) NOT NULL,
+    streak_day     INTEGER NOT NULL DEFAULT 1,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.checkins DISABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_checkins_user_date ON public.checkins(user_id, created_at DESC);
+
+SELECT 'Gift Codes & Daily Check-in migration applied successfully!' AS status;
