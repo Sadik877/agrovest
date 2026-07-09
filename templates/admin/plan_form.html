@@ -186,6 +186,36 @@
           </div>
         </div>
 
+        <!-- Investor Quota -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Investor Quota <span class="text-gray-400 font-normal text-xs">(optional)</span></label>
+          <input type="number" name="max_investors" min="0"
+                 value="{{ plan.max_investors if plan and plan.max_investors is not none else '' }}"
+                 placeholder="Leave blank for unlimited"
+                 class="field-input w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20" />
+          <p class="text-xs text-gray-400 mt-1.5">Caps how many investors can join this plan — shows a progress bar and "Limited Slots" / "Sold Out" badges on the plans page.</p>
+        </div>
+
+        <!-- Badges -->
+        <div class="grid sm:grid-cols-2 gap-4">
+          <label class="flex items-center gap-3 bg-gray-50 rounded-xl p-4 border border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors">
+            <input type="checkbox" name="is_popular" {{ 'checked' if plan and plan.is_popular else '' }}
+                   class="w-4 h-4 text-gold-500 rounded border-gray-300" />
+            <div>
+              <p class="text-sm font-semibold text-gray-800">Popular Badge</p>
+              <p class="text-xs text-gray-400">Highlights this plan as a popular choice</p>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 bg-gray-50 rounded-xl p-4 border border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors">
+            <input type="checkbox" name="is_featured" {{ 'checked' if plan and plan.is_featured else '' }}
+                   class="w-4 h-4 text-gold-500 rounded border-gray-300" />
+            <div>
+              <p class="text-sm font-semibold text-gray-800">Featured Badge</p>
+              <p class="text-xs text-gray-400">Gives this plan a standout visual treatment</p>
+            </div>
+          </label>
+        </div>
+
         <!-- Submit -->
         <div class="flex gap-3 pt-2">
           <a href="{{ url_for('admin_plans') }}"
