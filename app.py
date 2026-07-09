@@ -802,6 +802,23 @@ def _enrich_plan(p):
     p['total_return'] = float(p.get('total_return') or 0)
     p['profit'] = r2(p['total_return'] - p['price'])
     p['image_url'] = resolve_plan_image_url(p.get('image_filename'))
+
+    # Investor quota — only queried when a plan actually has one set, so
+    # unlimited plans (max_investors is NULL, the default) cost no extra
+    # query and behave exactly as before this field existed.
+    p['max_investors'] = p.get('max_investors')
+    if p['max_investors'] is not None:
+        p['investor_count'] = sb_count('investments', [('plan_id', 'eq', p['id'])])
+        if p['max_investors'] > 0:
+            p['quota_percent'] = min(100, r2(p['investor_count'] / p['max_investors'] * 100))
+        else:
+            # A deliberate 0-slot quota — always full, avoid dividing by zero.
+            p['quota_percent'] = 100.0
+        p['sold_out'] = p['investor_count'] >= p['max_investors']
+    else:
+        p['investor_count'] = None
+        p['quota_percent'] = None
+        p['sold_out'] = False
     return p
 
 def get_plans(active_only=True):
@@ -1289,11 +1306,23 @@ def index():
     except Exception as e:
         print(f'index() plans error: {e}')
         plans = []
-    return render_template('index.html', stats=stats, plans=plans)
+    return render_template('index.html', stats=stats, plans=plans, referral_percent=get_referral_percent())
 
 @app.route('/about')
 def about():
     return render_template('about.html')
+
+@app.route('/terms')
+def terms():
+    return render_template('terms.html')
+
+@app.route('/privacy')
+def privacy():
+    return render_template('privacy.html')
+
+@app.route('/risk-disclosure')
+def risk_disclosure():
+    return render_template('risk-disclosure.html')
 
 @app.route('/plans')
 def plans():
@@ -1530,6 +1559,11 @@ def dashboard():
         filters=[('user_id','eq',uid)], order=('created_at','desc'), limit=5)
     recent_withdrawals = sb_all('withdrawals',
         filters=[('user_id','eq',uid)], order=('created_at','desc'), limit=5)
+    # Lifetime approved withdrawals total, for the dashboard's "Total
+    # Withdrawals" stat card — a separate aggregate from recent_withdrawals
+    # above (which is capped at 5 rows for the activity list).
+    total_withdrawn = sb_sum('withdrawals', 'amount',
+        [('user_id','eq',uid), ('status','eq','approved')])
     notifications = sb_all('notifications',
         filters=[('user_id','eq',uid)], order=('created_at','desc'), limit=10)
 
@@ -1567,11 +1601,58 @@ def dashboard():
     return render_template('dashboard.html',
         user=user, active_investments=active_investments,
         recent_deposits=recent_deposits, recent_withdrawals=recent_withdrawals,
+        total_withdrawn=total_withdrawn,
         referrals=referrals, notifications=notifications,
         today_profit=today_profit, profit_change_pct=profit_change_pct,
         recent_transactions=recent_transactions,
         checkin_status=get_checkin_status(uid),
+        banners=[],  # Banner Manager (upload/activate/reorder) is Phase 11 —
+                     # slider renders empty-state until that backend exists
         now_utc=datetime.utcnow())
+
+
+@app.route('/transactions')
+@login_required
+def all_transactions_page():
+    """Full transaction history (Phase 7) — unifies deposits, withdrawals,
+    and daily-profit (ROI) credits into one normalized list for a proper
+    searchable/filterable/paginated table. Referral commissions have their
+    own dedicated history on the Referral page (Phase 8) rather than being
+    synthesized into this list, since they aren't recorded as rows in any
+    of these three tables today."""
+    user = get_current_user()
+    uid = user['id']
+
+    deposits = sb_all('deposits', filters=[('user_id', 'eq', uid)], order=('created_at', 'desc'))
+    withdrawals = sb_all('withdrawals', filters=[('user_id', 'eq', uid)], order=('created_at', 'desc'))
+    roi_rows = sb_all('transactions', filters=[('user_id', 'eq', uid)], order=('created_at', 'desc'))
+
+    unified = []
+    for d in deposits:
+        method = (d.get('payment_method') or '').replace('_', ' ').title()
+        unified.append({
+            'type': 'Deposit', 'category': 'deposit', 'amount': float(d.get('amount') or 0), 'sign': '+',
+            'status': d.get('status', 'pending'),
+            'description': f'Deposit via {method}' if method else 'Deposit',
+            'reference': d.get('reference') or '—', 'created_at': d.get('created_at'),
+        })
+    for w in withdrawals:
+        unified.append({
+            'type': 'Withdrawal', 'category': 'withdrawal', 'amount': float(w.get('amount') or 0), 'sign': '-',
+            'status': w.get('status', 'pending'),
+            'description': f"Withdrawal to {w.get('bank_name', '')}".strip(),
+            'reference': w.get('account_number') or '—', 'created_at': w.get('created_at'),
+        })
+    for t in roi_rows:
+        unified.append({
+            'type': t.get('transaction_type', 'ROI'), 'category': 'roi', 'amount': float(t.get('amount') or 0), 'sign': '+',
+            'status': t.get('status', 'Completed'),
+            'description': t.get('description') or f"Daily profit from {t.get('plan_name', 'your investment')}",
+            'reference': '—', 'created_at': t.get('created_at'),
+        })
+
+    unified.sort(key=lambda x: x['created_at'] or '', reverse=True)
+    return render_template('transactions.html', transactions=unified)
 
 
 @app.route('/checkin', methods=['POST'])
@@ -1709,6 +1790,17 @@ def invest():
         if not plan:
             flash('Invalid plan selected.', 'error')
             return redirect(url_for('invest'))
+
+        # Investor quota (optional, admin-set). Best-effort check — not a
+        # hard atomic guarantee like the balance debit below, since this is
+        # a marketing cap rather than a scarce financial resource; a rare
+        # simultaneous last-slot race could let it go one over, which is an
+        # acceptable trade-off for not adding transaction-level locking here.
+        if plan.get('max_investors') is not None:
+            current_count = sb_count('investments', [('plan_id', 'eq', plan_id)])
+            if current_count >= plan['max_investors']:
+                flash('This plan has reached its investor quota and is no longer accepting new investments.', 'error')
+                return redirect(url_for('invest'))
 
         # The investment amount is always the plan's fixed price — users
         # never enter or choose a custom amount.
@@ -2740,7 +2832,20 @@ def _plan_from_form(form, files=None, existing=None):
     features_raw  = form.get('features','').strip()
     sort_order    = form.get('sort_order', 0, type=int)
     is_active     = form.get('is_active') == 'on'
+    is_popular    = form.get('is_popular') == 'on'
+    is_featured   = form.get('is_featured') == 'on'
     remove_image  = form.get('remove_image') == 'on'
+
+    # Investor quota — optional. Blank means unlimited (no quota/progress
+    # bar shown on the plans page at all, matching current behavior exactly
+    # for any plan an admin doesn't set this on).
+    max_investors_raw = form.get('max_investors', '').strip()
+    max_investors = None
+    if max_investors_raw:
+        try:
+            max_investors = max(0, int(max_investors_raw))
+        except ValueError:
+            return None, 'Investor quota must be a whole number.'
 
     if not name:
         return None, 'Plan name is required.'
@@ -2770,6 +2875,8 @@ def _plan_from_form(form, files=None, existing=None):
         'image_filename': image_filename,
         'duration_days': duration_days, 'features': features,
         'sort_order': sort_order, 'is_active': is_active,
+        'is_popular': is_popular, 'is_featured': is_featured,
+        'max_investors': max_investors,
     }, None
 
 

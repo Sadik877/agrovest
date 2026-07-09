@@ -336,4 +336,40 @@ CREATE TABLE IF NOT EXISTS public.checkins (
 ALTER TABLE public.checkins DISABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_checkins_user_date ON public.checkins(user_id, created_at DESC);
 
+-- TRANSACTIONS — records every daily-profit (ROI) credit. This table was
+-- previously only documented as a comment in app.py ("create once in the
+-- SQL editor if not present") rather than included in this migration file,
+-- which is why production was hitting:
+--   "column transactions.transaction_type does not exist"
+-- The CREATE TABLE below is a no-op if the table already exists; the
+-- ALTER TABLE ... ADD COLUMN IF NOT EXISTS lines then backfill any columns
+-- missing from whatever version of the table you already have, without
+-- touching existing rows or other columns.
+CREATE TABLE IF NOT EXISTS public.transactions (
+    id               BIGSERIAL PRIMARY KEY,
+    user_id          BIGINT       NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    investment_id    BIGINT,
+    plan_name        TEXT,
+    amount           NUMERIC(15,2) NOT NULL,
+    transaction_type TEXT         NOT NULL DEFAULT 'ROI',
+    status           TEXT         NOT NULL DEFAULT 'Completed',
+    description      TEXT,
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS investment_id BIGINT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS plan_name TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS transaction_type TEXT NOT NULL DEFAULT 'ROI';
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'Completed';
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.transactions DISABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON public.transactions(user_id, created_at DESC);
+
+-- PLANS — quota + badge fields (Phase 5, Investment Plans redesign).
+-- All nullable/defaulted so existing plans behave exactly as before:
+-- max_investors NULL = unlimited (no quota/progress bar shown), and both
+-- badge flags default to false (no badge shown) until an admin sets them.
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS max_investors INTEGER;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS is_popular BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT FALSE;
+
 SELECT 'Gift Codes & Daily Check-in migration applied successfully!' AS status;
