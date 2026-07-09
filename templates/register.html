@@ -18,64 +18,100 @@
       <p class="text-gray-400 text-sm mt-1">Create your free AgroVest account in 2 minutes</p>
     </div>
 
-    <div class="glass rounded-2xl p-8">
-      <form method="POST" action="{{ url_for('register') }}" class="space-y-5">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="glass rounded-[24px] p-8">
+      <form method="POST" action="{{ url_for('register') }}" class="space-y-5" id="register-form" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+          <!-- Full Name -->
           <div class="sm:col-span-2">
-            <label class="block text-sm font-medium text-gray-200 mb-2">Full Name</label>
             <div class="relative">
-              <i data-lucide="user" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
-              <input type="text" name="full_name" required placeholder="Emeka Okonkwo"
-                class="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
+              <i data-lucide="user" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10"></i>
+              <input type="text" name="full_name" id="full_name" required placeholder=" "
+                class="peer w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
+              <label for="full_name" class="absolute left-11 top-2 text-xs text-gray-400 transition-all duration-200 pointer-events-none
+                     peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm
+                     peer-focus:top-2 peer-focus:text-xs peer-focus:text-gold-400">Full Name</label>
             </div>
+            <p class="field-error hidden text-xs text-red-400 mt-1.5 ml-1">Full name must be at least 3 characters.</p>
           </div>
 
+          <!-- Email -->
           <div class="sm:col-span-2">
-            <label class="block text-sm font-medium text-gray-200 mb-2">Email Address</label>
             <div class="relative">
-              <i data-lucide="mail" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
-              <input type="email" name="email" required placeholder="emeka@example.com"
-                class="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
+              <i data-lucide="mail" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10"></i>
+              <input type="email" name="email" id="email" required placeholder=" "
+                class="peer w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
+              <label for="email" class="absolute left-11 top-2 text-xs text-gray-400 transition-all duration-200 pointer-events-none
+                     peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm
+                     peer-focus:top-2 peer-focus:text-xs peer-focus:text-gold-400">Email Address</label>
             </div>
+            <p class="field-error hidden text-xs text-red-400 mt-1.5 ml-1">Enter a valid email address.</p>
           </div>
 
+          <!-- Phone -->
           <div class="sm:col-span-2">
-            <label class="block text-sm font-medium text-gray-200 mb-2">Phone Number</label>
             <div class="relative">
-              <i data-lucide="phone" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
-              <input type="tel" name="phone" placeholder="0801 234 5678"
-                class="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
+              <i data-lucide="phone" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10"></i>
+              <input type="tel" name="phone" id="phone" placeholder=" "
+                class="peer w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
+              <label for="phone" class="absolute left-11 top-2 text-xs text-gray-400 transition-all duration-200 pointer-events-none
+                     peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm
+                     peer-focus:top-2 peer-focus:text-xs peer-focus:text-gold-400">Phone Number <span class="text-gray-500">(optional)</span></label>
             </div>
+            <p class="field-error hidden text-xs text-red-400 mt-1.5 ml-1">Enter a valid phone number.</p>
           </div>
 
+          <!-- Password -->
           <div>
-            <label class="block text-sm font-medium text-gray-200 mb-2">Password</label>
             <div class="relative">
-              <i data-lucide="lock" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
-              <input type="password" name="password" id="pwd" required placeholder="Min 8 chars"
-                class="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-10 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
-              <button type="button" onclick="togglePwd('pwd')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
+              <i data-lucide="lock" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10"></i>
+              <input type="password" name="password" id="pwd" required placeholder=" "
+                class="peer w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-11 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
+              <label for="pwd" class="absolute left-11 top-2 text-xs text-gray-400 transition-all duration-200 pointer-events-none
+                     peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm
+                     peer-focus:top-2 peer-focus:text-xs peer-focus:text-gold-400">Password</label>
+              <button type="button" onclick="togglePwd('pwd', this)" aria-label="Show password"
+                class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white z-10">
                 <i data-lucide="eye" class="w-4 h-4"></i>
               </button>
             </div>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-200 mb-2">Confirm Password</label>
-            <div class="relative">
-              <i data-lucide="lock" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
-              <input type="password" name="confirm_password" id="cpwd" required placeholder="Repeat password"
-                class="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
+            <!-- Password strength meter -->
+            <div class="flex gap-1 mt-2 px-0.5" id="pwd-strength-bars">
+              <span class="h-1 flex-1 rounded-full bg-white/10 transition-colors" data-bar></span>
+              <span class="h-1 flex-1 rounded-full bg-white/10 transition-colors" data-bar></span>
+              <span class="h-1 flex-1 rounded-full bg-white/10 transition-colors" data-bar></span>
+              <span class="h-1 flex-1 rounded-full bg-white/10 transition-colors" data-bar></span>
             </div>
+            <p class="text-xs text-gray-500 mt-1 ml-1" id="pwd-strength-label">Minimum 8 characters</p>
           </div>
 
-          <div class="sm:col-span-2">
-            <label class="block text-sm font-medium text-gray-200 mb-2">Referral Code <span class="text-gray-500">(optional)</span></label>
+          <!-- Confirm Password -->
+          <div>
             <div class="relative">
-              <i data-lucide="gift" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
-              <input type="text" name="referral_code" value="{{ ref_code }}" placeholder="Enter referral code"
-                class="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors uppercase" />
+              <i data-lucide="lock" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10"></i>
+              <input type="password" name="confirm_password" id="cpwd" required placeholder=" "
+                class="peer w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-11 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
+              <label for="cpwd" class="absolute left-11 top-2 text-xs text-gray-400 transition-all duration-200 pointer-events-none
+                     peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm
+                     peer-focus:top-2 peer-focus:text-xs peer-focus:text-gold-400">Confirm Password</label>
+              <button type="button" onclick="togglePwd('cpwd', this)" aria-label="Show password"
+                class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white z-10">
+                <i data-lucide="eye" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <p class="field-error hidden text-xs text-red-400 mt-1.5 ml-1">Passwords do not match.</p>
+          </div>
+
+          <!-- Referral Code (unchanged: same field name/value, only styling updated) -->
+          <div class="sm:col-span-2">
+            <div class="relative">
+              <i data-lucide="gift" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10"></i>
+              <input type="text" name="referral_code" id="referral_code" value="{{ ref_code }}" placeholder=" "
+                class="peer w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors uppercase" />
+              <label for="referral_code" class="absolute left-11 top-2 text-xs text-gray-400 transition-all duration-200 pointer-events-none
+                     peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm
+                     peer-focus:top-2 peer-focus:text-xs peer-focus:text-gold-400">Referral Code <span class="text-gray-500 normal-case">(optional)</span></label>
             </div>
           </div>
         </div>
@@ -83,14 +119,19 @@
         <div class="flex items-start gap-3">
           <input type="checkbox" id="terms" required class="mt-0.5 w-4 h-4 rounded border-white/20 bg-white/5 text-gold-500" />
           <label for="terms" class="text-xs text-gray-400">
-            I agree to AgroVest's <a href="terms.html" class="text-gold-400 hover:underline">Terms of Service</a>,
-            <a href="privacy.html" class="text-gold-400 hover:underline">Privacy Policy</a>, and acknowledge the
-            <a href="risk-disclosure.html" class="text-gold-400 hover:underline">Investment Risk Disclosure</a>.
+            I agree to AgroVest's <a href="{{ url_for('terms') }}" class="text-gold-400 hover:underline">Terms of Service</a>,
+            <a href="{{ url_for('privacy') }}" class="text-gold-400 hover:underline">Privacy Policy</a>, and acknowledge the
+            <a href="{{ url_for('risk_disclosure') }}" class="text-gold-400 hover:underline">Investment Risk Disclosure</a>.
           </label>
         </div>
 
-        <button type="submit" class="w-full bg-gold-500 hover:bg-gold-600 text-forest-950 font-bold py-3.5 rounded-xl transition-all shadow-lg">
-          Create My Account
+        <button type="submit" id="register-btn"
+          class="w-full bg-gold-500 hover:bg-gold-600 text-forest-950 font-bold py-3.5 rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+          <span id="register-btn-text">Create My Account</span>
+          <svg id="register-spinner" class="hidden animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
         </button>
       </form>
 
@@ -103,9 +144,87 @@
 </div>
 
 <script>
-function togglePwd(id) {
-  const el = document.getElementById(id);
-  el.type = el.type === 'password' ? 'text' : 'password';
+function togglePwd(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  const showing = inp.type === 'text';
+  inp.type = showing ? 'password' : 'text';
+  btn.innerHTML = showing
+    ? '<i data-lucide="eye" class="w-4 h-4"></i>'
+    : '<i data-lucide="eye-off" class="w-4 h-4"></i>';
+  if (window.lucide) lucide.createIcons();
 }
+
+(function () {
+  const form = document.getElementById('register-form');
+  const nameInput = document.getElementById('full_name');
+  const emailInput = document.getElementById('email');
+  const phoneInput = document.getElementById('phone');
+  const pwdInput = document.getElementById('pwd');
+  const cpwdInput = document.getElementById('cpwd');
+  const bars = document.querySelectorAll('#pwd-strength-bars [data-bar]');
+  const strengthLabel = document.getElementById('pwd-strength-label');
+
+  function showError(input, show) {
+    const err = input.closest('div').parentElement.querySelector('.field-error');
+    if (!err) return;
+    err.classList.toggle('hidden', !show);
+    input.classList.toggle('border-red-400', show);
+  }
+  function isValidEmail(v) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v); }
+  function isValidPhone(v) { return v.length === 0 || /^[0-9+\-\s]{7,20}$/.test(v); }
+
+  // Password strength: length + variety of character classes.
+  // Purely a UX hint — the server still only requires 8+ characters
+  // (see the register() route), this doesn't add a new requirement.
+  function scorePassword(pwd) {
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (pwd.length >= 12) score++;
+    if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd) && /[^A-Za-z0-9]/.test(pwd)) score++;
+    return score; // 0-4
+  }
+  const STRENGTH_META = [
+    { label: 'Minimum 8 characters', color: '#4b5563' },
+    { label: 'Weak', color: '#ef4444' },
+    { label: 'Fair', color: '#f59e0b' },
+    { label: 'Good', color: '#22c55e' },
+    { label: 'Strong', color: '#16a34a' },
+  ];
+  pwdInput.addEventListener('input', () => {
+    const score = pwdInput.value.length === 0 ? 0 : scorePassword(pwdInput.value);
+    const meta = STRENGTH_META[score];
+    bars.forEach((bar, i) => { bar.style.background = i < score ? meta.color : 'rgba(255,255,255,0.1)'; });
+    strengthLabel.textContent = pwdInput.value.length === 0 ? 'Minimum 8 characters' : meta.label;
+    strengthLabel.style.color = pwdInput.value.length === 0 ? '#6b7280' : meta.color;
+  });
+
+  nameInput.addEventListener('blur', () => showError(nameInput, nameInput.value.length > 0 && nameInput.value.trim().length < 3));
+  emailInput.addEventListener('blur', () => showError(emailInput, emailInput.value.length > 0 && !isValidEmail(emailInput.value)));
+  phoneInput.addEventListener('blur', () => showError(phoneInput, !isValidPhone(phoneInput.value)));
+  cpwdInput.addEventListener('blur', () => showError(cpwdInput, cpwdInput.value.length > 0 && cpwdInput.value !== pwdInput.value));
+
+  form.addEventListener('submit', function (e) {
+    const nameBad = nameInput.value.trim().length < 3;
+    const emailBad = !isValidEmail(emailInput.value);
+    const phoneBad = !isValidPhone(phoneInput.value);
+    const pwdBad = pwdInput.value.length < 8;
+    const cpwdBad = cpwdInput.value !== pwdInput.value;
+
+    showError(nameInput, nameBad);
+    showError(emailInput, emailBad);
+    showError(phoneInput, phoneBad);
+    showError(cpwdInput, cpwdBad);
+
+    if (nameBad || emailBad || phoneBad || pwdBad || cpwdBad) {
+      e.preventDefault();
+      return;
+    }
+    const btn = document.getElementById('register-btn');
+    document.getElementById('register-btn-text').textContent = 'Creating your account…';
+    document.getElementById('register-spinner').classList.remove('hidden');
+    btn.disabled = true;
+  });
+})();
 </script>
 {% endblock %}

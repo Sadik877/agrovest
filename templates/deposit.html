@@ -102,10 +102,39 @@
   </div>
 
   <!-- Deposit History -->
-  <div class="mt-6 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-    <h2 class="font-semibold text-gray-900 mb-5">Recent Deposits</h2>
+  <div class="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-6 pt-6 pb-4">
+      <h2 class="font-semibold text-gray-900">Recent Deposits</h2>
+    </div>
     {% if deposits %}
-    <div class="space-y-3">
+    <!-- Table view (sm and up) -->
+    <div class="hidden sm:block overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-y border-gray-100 bg-gray-50/60">
+            <th class="text-left font-semibold text-gray-500 text-xs uppercase tracking-wide px-6 py-3">Amount</th>
+            <th class="text-left font-semibold text-gray-500 text-xs uppercase tracking-wide px-6 py-3">Method</th>
+            <th class="text-left font-semibold text-gray-500 text-xs uppercase tracking-wide px-6 py-3">Reference</th>
+            <th class="text-left font-semibold text-gray-500 text-xs uppercase tracking-wide px-6 py-3">Status</th>
+            <th class="text-left font-semibold text-gray-500 text-xs uppercase tracking-wide px-6 py-3">Date</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          {% for dep in deposits %}
+          <tr class="hover:bg-gray-50/50 transition-colors">
+            <td class="px-6 py-4 font-bold text-gray-900">{{ dep.amount | naira }}</td>
+            <td class="px-6 py-4 text-gray-600 text-xs">{{ dep.payment_method.replace('_', ' ').title() }}</td>
+            <td class="px-6 py-4 text-gray-400 text-xs font-mono">{{ dep.reference }}</td>
+            <td class="px-6 py-4"><span class="{{ dep.status | status_badge }} badge">{{ dep.status.title() }}</span></td>
+            <td class="px-6 py-4 text-gray-400 text-xs">{{ dep.created_at | date_fmt }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Card view (mobile only) -->
+    <div class="sm:hidden space-y-3 px-6 pb-6">
       {% for dep in deposits %}
       <div class="border border-gray-100 rounded-xl p-4 flex items-center justify-between">
         <div>
@@ -121,7 +150,7 @@
       {% endfor %}
     </div>
     {% else %}
-    <div class="text-center py-8">
+    <div class="text-center py-8 px-6">
       <i data-lucide="inbox" class="w-10 h-10 text-gray-200 mx-auto mb-3"></i>
       <p class="text-gray-400 text-sm">No deposits yet</p>
     </div>

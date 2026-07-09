@@ -85,12 +85,14 @@
 <div id="dashboard-mobile-safe">
 
 <!-- ── Stat Cards ── -->
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
   {% set stat_cards = [
     ('wallet', 'Wallet Balance', user.balance | naira, 'bg-forest-950 text-white', 'text-gold-400', url_for('deposit'), 'Deposit'),
     ('trending-up', 'Total Invested', user.total_invested | naira, 'bg-blue-600 text-white', 'text-blue-200', url_for('invest'), 'Invest'),
-    ('banknote', 'Total Earnings', user.total_earnings | naira, 'bg-emerald-600 text-white', 'text-emerald-200', url_for('withdraw'), 'Withdraw'),
+    ('banknote', 'Total Profit', user.total_earnings | naira, 'bg-emerald-600 text-white', 'text-emerald-200', url_for('withdraw'), 'Withdraw'),
+    ('layers', 'Active Investments', active_investments | length, 'bg-amber-600 text-white', 'text-amber-200', url_for('invest'), 'View'),
     ('users', 'Referral Earnings', user.referral_earnings | naira, 'bg-purple-600 text-white', 'text-purple-200', '#referrals', 'View'),
+    ('arrow-up-right', 'Total Withdrawals', total_withdrawn | naira, 'bg-rose-600 text-white', 'text-rose-200', url_for('withdraw'), 'Withdraw'),
   ] %}
   {% for icon, label, value, bg, text_col, link, action in stat_cards %}
   <div class="{{ bg }} rounded-2xl p-5 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
@@ -108,6 +110,60 @@
   </div>
   {% endfor %}
 </div>
+
+<!-- ── Announcement Card ── -->
+{% if active_notice %}
+<div class="card-premium p-5 mb-6 flex items-start gap-4
+  {% if active_notice.color == 'red' %}border-red-200 bg-red-50/40
+  {% elif active_notice.color == 'amber' %}border-amber-200 bg-amber-50/40
+  {% elif active_notice.color == 'emerald' %}border-emerald-200 bg-emerald-50/40
+  {% else %}border-blue-200 bg-blue-50/40{% endif %}">
+  <span class="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0
+    {% if active_notice.color == 'red' %}bg-red-100 text-red-600
+    {% elif active_notice.color == 'amber' %}bg-amber-100 text-amber-600
+    {% elif active_notice.color == 'emerald' %}bg-emerald-100 text-emerald-600
+    {% else %}bg-blue-100 text-blue-600{% endif %}">
+    <i data-lucide="{{ active_notice.icon }}" class="w-5 h-5"></i>
+  </span>
+  <div class="min-w-0">
+    <p class="text-xs font-bold uppercase tracking-wide text-gray-500">{{ active_notice.label }}</p>
+    <p class="text-sm text-gray-800 mt-0.5">{{ active_notice.message }}</p>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Promotional Banner Slider ── -->
+{% if banners %}
+<div class="relative rounded-[24px] overflow-hidden mb-6 shadow-lg" id="banner-slider">
+  {% for b in banners %}
+  <a href="{{ b.link_url or '#' }}" class="banner-slide {{ 'block' if loop.first else 'hidden' }}" data-index="{{ loop.index0 }}">
+    <img src="{{ b.image_url }}" alt="{{ b.title or 'Promotion' }}" loading="lazy" class="w-full h-40 sm:h-52 object-cover" />
+  </a>
+  {% endfor %}
+  {% if banners | length > 1 %}
+  <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5" id="banner-dots">
+    {% for b in banners %}
+    <button onclick="goToBanner({{ loop.index0 }})" class="w-1.5 h-1.5 rounded-full {{ 'bg-white' if loop.first else 'bg-white/40' }} transition-colors" data-dot="{{ loop.index0 }}" aria-label="Go to slide {{ loop.index }}"></button>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+<script>
+  (function () {
+    const slides = document.querySelectorAll('#banner-slider .banner-slide');
+    const dots = document.querySelectorAll('#banner-dots [data-dot]');
+    let current = 0;
+    window.goToBanner = function (i) {
+      slides.forEach((s, idx) => s.classList.toggle('hidden', idx !== i));
+      dots.forEach((d, idx) => d.classList.toggle('bg-white', idx === i) & d.classList.toggle('bg-white/40', idx !== i));
+      current = i;
+    };
+    if (slides.length > 1) {
+      setInterval(() => window.goToBanner((current + 1) % slides.length), 5000);
+    }
+  })();
+</script>
+{% endif %}
 
 <!-- ── Daily Profit Card ── -->
 <div class="grid mb-6">

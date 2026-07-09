@@ -149,6 +149,37 @@
 </section>
 
 <!-- ══════════════════════════════════════════
+     WHY CHOOSE AGROVEST
+══════════════════════════════════════════ -->
+<section class="py-20 bg-gray-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="text-center mb-14 animate-on-scroll">
+      <span class="inline-block text-xs font-bold text-gold-600 uppercase tracking-widest mb-3">The AgroVest Difference</span>
+      <h2 class="font-display text-3xl sm:text-4xl font-bold text-gray-900">Why Choose AgroVest</h2>
+      <p class="text-gray-500 mt-3 max-w-xl mx-auto">Built for people who want their money working as hard as the farms it funds.</p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {% set reasons = [
+        ('shield-check', 'Secured Capital', 'Every investment is backed by real, verified agricultural assets — not promises.'),
+        ('zap', 'Daily Payouts', 'Profits are credited to your wallet automatically, every day, with full transaction history.'),
+        ('trending-up', 'Transparent Returns', 'See exactly what you earn and when — no hidden fees, no surprise deductions.'),
+        ('headset', '24/7 Support', 'A real support team, reachable through the channels you already use, whenever you need them.'),
+      ] %}
+      {% for icon, title, desc in reasons %}
+      <div class="card-premium interactive p-6 animate-on-scroll" style="animation-delay: {{ loop.index0 * 0.1 }}s">
+        <div class="w-12 h-12 rounded-2xl bg-forest-50 flex items-center justify-center mb-4">
+          <i data-lucide="{{ icon }}" class="w-6 h-6 text-forest-700"></i>
+        </div>
+        <h3 class="font-display font-bold text-gray-900 mb-1.5">{{ title }}</h3>
+        <p class="text-gray-500 text-sm leading-relaxed">{{ desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
      HOW IT WORKS
 ══════════════════════════════════════════ -->
 <section class="py-20 bg-white">
@@ -367,6 +398,69 @@
         </div>
       </div>
       {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     REFERRAL PROGRAM
+══════════════════════════════════════════ -->
+<section class="py-20 bg-white relative overflow-hidden">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="grid lg:grid-cols-2 gap-12 items-center">
+      <div class="animate-on-scroll">
+        <span class="inline-block text-xs font-bold text-gold-600 uppercase tracking-widest mb-3">Earn Together</span>
+        <h2 class="font-display text-3xl sm:text-4xl font-bold text-gray-900 mb-5">Refer Friends, Earn {{ referral_percent | default(5) | int }}% Commission</h2>
+        <p class="text-gray-500 leading-relaxed mb-8">
+          Share your unique referral link with friends and family. The moment they make their first investment,
+          {{ referral_percent | default(5) | int }}% of that amount lands straight in your wallet — instantly, automatically, no cap on how many people you refer.
+        </p>
+        <div class="grid sm:grid-cols-3 gap-4 mb-8">
+          <div class="card-premium p-5 text-center">
+            <p class="font-display font-black text-2xl text-forest-700">{{ referral_percent | default(5) | int }}%</p>
+            <p class="text-xs text-gray-400 mt-1">Per Referral</p>
+          </div>
+          <div class="card-premium p-5 text-center">
+            <p class="font-display font-black text-2xl text-forest-700">Instant</p>
+            <p class="text-xs text-gray-400 mt-1">Wallet Credit</p>
+          </div>
+          <div class="card-premium p-5 text-center">
+            <p class="font-display font-black text-2xl text-forest-700">∞</p>
+            <p class="text-xs text-gray-400 mt-1">No Referral Cap</p>
+          </div>
+        </div>
+        <a href="{{ url_for('register') }}" class="btn-primary">
+          Start Referring
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <div class="animate-on-scroll" style="animation-delay: 0.15s">
+        <div class="card-premium p-8">
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-11 h-11 rounded-2xl bg-gold-50 flex items-center justify-center">
+              <i data-lucide="gift" class="w-5 h-5 text-gold-600"></i>
+            </div>
+            <p class="font-display font-bold text-gray-900">How It Works</p>
+          </div>
+          <div class="space-y-5">
+            {% set ref_steps = [
+              ('Share your link', 'Every account gets a unique referral code from day one — find it on your dashboard.'),
+              ('Friend signs up & invests', 'They register through your link and activate any investment plan.'),
+              ('You get paid', 'Your commission is credited to your wallet the moment their investment is confirmed.'),
+            ] %}
+            {% for title, desc in ref_steps %}
+            <div class="flex items-start gap-4">
+              <div class="w-8 h-8 rounded-full bg-forest-950 text-gold-400 font-bold text-sm flex items-center justify-center flex-shrink-0">{{ loop.index }}</div>
+              <div>
+                <p class="font-semibold text-gray-900 text-sm">{{ title }}</p>
+                <p class="text-gray-500 text-sm mt-0.5">{{ desc }}</p>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>

@@ -19,32 +19,53 @@
       <p class="text-gray-400 text-sm mt-1">Log in to access your investment dashboard</p>
     </div>
 
-    <div class="glass rounded-2xl p-8">
-      <form method="POST" action="{{ url_for('login') }}" class="space-y-5">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="glass rounded-[24px] p-8">
+      <form method="POST" action="{{ url_for('login') }}" class="space-y-5" id="login-form" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Email — floating label -->
         <div>
-          <label class="block text-sm font-medium text-gray-200 mb-2">Email Address</label>
           <div class="relative">
-            <i data-lucide="mail" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
-            <input type="email" name="email" required placeholder="you@example.com"
-              class="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
+            <i data-lucide="mail" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10"></i>
+            <input type="email" name="email" id="email" required placeholder=" "
+              class="peer w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-4 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
+            <label for="email"
+              class="absolute left-11 top-2 text-xs text-gray-400 transition-all duration-200 pointer-events-none
+                     peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm
+                     peer-focus:top-2 peer-focus:text-xs peer-focus:text-gold-400">
+              Email Address
+            </label>
           </div>
+          <p class="field-error hidden text-xs text-red-400 mt-1.5 ml-1">Enter a valid email address.</p>
         </div>
 
+        <!-- Password — floating label + visibility toggle -->
         <div>
-          <label class="block text-sm font-medium text-gray-200 mb-2">Password</label>
           <div class="relative">
-            <i data-lucide="lock" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
-            <input type="password" name="password" id="password" required placeholder="••••••••"
-              class="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-10 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
-            <button type="button" onclick="togglePwd('password','eyeBtn')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white" id="eyeBtn">
+            <i data-lucide="lock" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10"></i>
+            <input type="password" name="password" id="password" required placeholder=" "
+              class="peer w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-11 pt-6 pb-2 text-white text-sm focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 transition-colors" />
+            <label for="password"
+              class="absolute left-11 top-2 text-xs text-gray-400 transition-all duration-200 pointer-events-none
+                     peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm
+                     peer-focus:top-2 peer-focus:text-xs peer-focus:text-gold-400">
+              Password
+            </label>
+            <button type="button" onclick="togglePwd('password', this)" aria-label="Show password"
+              class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white z-10">
               <i data-lucide="eye" class="w-4 h-4"></i>
             </button>
           </div>
+          <p class="field-error hidden text-xs text-red-400 mt-1.5 ml-1">Password is required.</p>
         </div>
 
-        <button type="submit" class="w-full bg-gold-500 hover:bg-gold-600 text-forest-950 font-bold py-3.5 rounded-xl transition-all shadow-lg hover:shadow-gold-500/30">
-          Log In to Dashboard
+        <button type="submit" id="login-btn"
+          class="w-full bg-gold-500 hover:bg-gold-600 text-forest-950 font-bold py-3.5 rounded-2xl transition-all shadow-lg hover:shadow-gold-500/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+          <span id="login-btn-text">Log In to Dashboard</span>
+          <svg id="login-spinner" class="hidden animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
         </button>
       </form>
 
@@ -61,9 +82,53 @@
 </div>
 
 <script>
-function togglePwd(inputId, btnId) {
+function togglePwd(inputId, btn) {
   const inp = document.getElementById(inputId);
-  inp.type = inp.type === 'password' ? 'text' : 'password';
+  const showing = inp.type === 'text';
+  inp.type = showing ? 'password' : 'text';
+  btn.innerHTML = showing
+    ? '<i data-lucide="eye" class="w-4 h-4"></i>'
+    : '<i data-lucide="eye-off" class="w-4 h-4"></i>';
+  if (window.lucide) lucide.createIcons();
 }
+
+// Lightweight client-side validation + loading button. The server still
+// validates everything independently (see the login() route) — this is
+// purely for immediate feedback, it never blocks a technically-valid submit.
+(function () {
+  const form = document.getElementById('login-form');
+  const emailInput = document.getElementById('email');
+  const pwdInput = document.getElementById('password');
+
+  function showError(input, show) {
+    const err = input.closest('div').parentElement.querySelector('.field-error');
+    if (!err) return;
+    err.classList.toggle('hidden', !show);
+    input.classList.toggle('border-red-400', show);
+  }
+
+  function isValidEmail(v) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v); }
+
+  emailInput.addEventListener('blur', () => showError(emailInput, emailInput.value.length > 0 && !isValidEmail(emailInput.value)));
+  pwdInput.addEventListener('blur', () => showError(pwdInput, pwdInput.value.length === 0));
+
+  form.addEventListener('submit', function (e) {
+    const emailBad = !isValidEmail(emailInput.value);
+    const pwdBad = pwdInput.value.length === 0;
+    showError(emailInput, emailBad);
+    showError(pwdInput, pwdBad);
+    if (emailBad || pwdBad) {
+      e.preventDefault();
+      return;
+    }
+    // Valid — show loading state. The form still submits normally (no
+    // preventDefault here), this just gives immediate visual feedback
+    // while the request is in flight.
+    const btn = document.getElementById('login-btn');
+    document.getElementById('login-btn-text').textContent = 'Logging in…';
+    document.getElementById('login-spinner').classList.remove('hidden');
+    btn.disabled = true;
+  });
+})();
 </script>
 {% endblock %}

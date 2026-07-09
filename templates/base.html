@@ -142,11 +142,111 @@
       z-index: 1;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
     }
+
+    /* ─────────────────────────────────────────────
+       PHASE 1 — Shared design-system components.
+       The palette (forest = emerald/dark-green, gold = highlights),
+       badges, and glass utilities above were already correct — forest-600
+       is exactly #16a34a. These classes give every later phase (Landing,
+       Dashboard, Plans, Admin, etc.) one consistent set of primitives to
+       build on instead of hand-rolled utility soup per page, per the
+       "one consistent design system" requirement.
+       ───────────────────────────────────────────── */
+
+    /* Buttons — 20px radius, soft lift on hover, smooth transition */
+    .btn-primary {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+      color: #fff; font-weight: 700; padding: 0.875rem 1.75rem; border-radius: 20px;
+      box-shadow: 0 4px 14px rgba(22,163,74,0.25);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(22,163,74,0.35); filter: brightness(1.05); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .btn-gold {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      background: linear-gradient(135deg, #C9A84C 0%, #b8860b 100%);
+      color: #0A4A2F; font-weight: 700; padding: 0.875rem 1.75rem; border-radius: 20px;
+      box-shadow: 0 4px 14px rgba(201,168,76,0.3);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    }
+    .btn-gold:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(201,168,76,0.4); filter: brightness(1.05); }
+
+    .btn-secondary {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      background: #fff; color: #15803d; font-weight: 600; padding: 0.875rem 1.75rem;
+      border-radius: 20px; border: 1.5px solid #bbf7d0;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+    .btn-secondary:hover { background: #f0fdf4; border-color: #16a34a; transform: translateY(-1px); }
+
+    /* Cards — 24px radius, soft shadow, gentle hover lift for interactive cards */
+    .card-premium {
+      background: #fff; border-radius: 24px; border: 1px solid #f3f4f6;
+      box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+      transition: box-shadow 0.3s ease, transform 0.3s ease;
+    }
+    .card-premium.interactive:hover {
+      box-shadow: 0 12px 32px rgba(15,23,42,0.08); transform: translateY(-3px);
+    }
+
+    /* Alerts — consistent success/error/info panels (used alongside .badge-*) */
+    .alert { display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem 1.25rem; border-radius: 16px; font-size: 0.875rem; font-weight: 500; }
+    .alert-success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .alert-error   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .alert-warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+    .alert-info    { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+
+    /* Skeleton loading shimmer */
+    .skeleton {
+      background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 37%, #f3f4f6 63%);
+      background-size: 400% 100%; animation: skeleton-shimmer 1.4s ease infinite; border-radius: 12px;
+    }
+    @keyframes skeleton-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+
+    /* Toast notifications — lightweight, JS-driven (see showToast() below),
+       additive to the existing server-rendered flash messages, not a
+       replacement — both continue to work. */
+    #toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 100; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
+    .toast {
+      pointer-events: auto; min-width: 260px; max-width: 360px; padding: 0.875rem 1.25rem;
+      border-radius: 16px; background: #0A4A2F; color: #fff; font-size: 0.875rem; font-weight: 500;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18); display: flex; align-items: center; gap: 0.625rem;
+      animation: toast-in 0.3s ease forwards;
+    }
+    .toast.toast-error { background: #991b1b; }
+    .toast.toast-success { background: #15803d; }
+    .toast.removing { animation: toast-out 0.25s ease forwards; }
+    @keyframes toast-in { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes toast-out { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(40px); } }
   </style>
 
   {% block extra_head %}{% endblock %}
 </head>
 <body class="bg-gray-50 text-gray-900 antialiased">
+  <div id="toast-container"></div>
+  <script>
+    // Lightweight toast utility available sitewide. Existing server-side
+    // flash() messages still render as before (see the flash block below) —
+    // this is purely additive, for future AJAX-driven interactions across
+    // later phases (e.g. mark-as-read, copy-to-clipboard confirmations).
+    function showToast(message, type) {
+      type = type || 'info';
+      var container = document.getElementById('toast-container');
+      if (!container) return;
+      var el = document.createElement('div');
+      el.className = 'toast' + (type === 'error' ? ' toast-error' : type === 'success' ? ' toast-success' : '');
+      el.textContent = message;
+      container.appendChild(el);
+      setTimeout(function () {
+        el.classList.add('removing');
+        setTimeout(function () { el.remove(); }, 250);
+      }, 3500);
+    }
+  </script>
+
 
   <!-- ── Flash Messages ── -->
   {% with messages = get_flashed_messages(with_categories=true) %}

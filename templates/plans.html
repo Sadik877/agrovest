@@ -4,25 +4,15 @@
 
 {% block extra_head %}
 <style>
-  /* ── Mobile safety net ──────────────────────────────────────────────
-     Tailwind's `overflow-hidden` on the hero section only clips that
-     section's own box — it does NOT stop the page itself from becoming
-     horizontally scrollable if any descendant (here: the absolutely
-     positioned decorative .blob, which uses fractional/negative offsets
-     like top-[-10%] / left-[-8%]) computes even a sub-pixel wider than
-     the viewport. When that happens on mobile, the browser allows a
-     horizontal scroll and the user lands on/swipes into blank canvas
-     beyond the real content — this is the same class of bug fixed
-     previously on the dashboard sidebar, and needs the same inline
-     override rather than relying on Tailwind alone. */
   @media (max-width: 767px) {
-    html, body {
-      overflow-x: hidden;
-      max-width: 100vw;
-    }
-    .blob {
-      max-width: 100vw;
-    }
+    html, body { overflow-x: hidden; max-width: 100vw; }
+    .blob { max-width: 100vw; }
+  }
+  .plan-badge {
+    position: absolute; top: 14px; z-index: 10;
+    font-size: 11px; font-weight: 800; letter-spacing: 0.03em;
+    padding: 5px 12px; border-radius: 999px; text-transform: uppercase;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   }
 </style>
 {% endblock %}
@@ -47,144 +37,99 @@
     <p class="text-gray-300 text-lg max-w-2xl mx-auto">
       All plans are backed by verified commercial farms across Nigeria. Transparent returns, real yield.
     </p>
-
-    <!-- Quick jump tabs -->
-    <div class="flex flex-wrap justify-center gap-2 mt-8 max-w-full">
-      {% for plan in plans %}
-      <a href="#{{ plan.slug|default(plan.name|lower|replace(' ', '-'), true) }}"
-         class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all max-w-full"
-         style="background:rgba(255,255,255,.08); color:#cbd5e1; border:1px solid rgba(255,255,255,.1);"
-         onmouseover="this.style.background='rgba(212,175,55,.18)'; this.style.color='#d4af37'; this.style.borderColor='rgba(212,175,55,.35)';"
-         onmouseout="this.style.background='rgba(255,255,255,.08)'; this.style.color='#cbd5e1'; this.style.borderColor='rgba(255,255,255,.1)';">
-        <span>{{ plan.icon|default('🌱', true) }}</span>
-        {{ plan.name }}
-        <span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:rgba(212,175,55,.2);color:#d4af37;">{{ '%.0f'|format((plan.profit / plan.price * 100) if plan.price else 0) }}%</span>
-      </a>
-      {% endfor %}
-    </div>
   </div>
 </section>
 
-<!-- ── Plan Cards ── -->
-<section class="py-16 bg-gray-50 dark:bg-gray-950">
-  <div class="max-w-2xl mx-auto px-4 sm:px-6 space-y-8">
-    {% for plan in plans %}
-    <div id="{{ plan.slug|default(plan.name|lower|replace(' ', '-'), true) }}"
-         class="rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 border border-white dark:border-white/5">
+<!-- ── Plan Cards — Responsive Grid ── -->
+<section class="py-16 bg-gray-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {% for plan in plans %}
+      <div class="card-premium interactive group relative overflow-hidden flex flex-col animate-on-scroll" style="animation-delay: {{ loop.index0 * 0.08 }}s">
 
-      <!-- Dark header -->
-      <div class="relative px-6 py-8 text-center"
-           style="background:linear-gradient(145deg,#0d1b2a 0%,#0a1628 60%,#0f2040 100%);">
-        <div class="absolute inset-x-0 top-0 h-px" style="background:linear-gradient(90deg,transparent,rgba(212,175,55,.7),transparent);"></div>
-
-        <!-- Badge for popular -->
-        {% if loop.index == 3 %}
-        <div class="absolute top-4 right-4 text-xs font-bold px-3 py-1 rounded-full"
-             style="background:rgba(212,175,55,.2); color:#d4af37; border:1px solid rgba(212,175,55,.4);">
-          ⭐ Most Popular
-        </div>
+        <!-- Badges -->
+        {% if plan.sold_out %}
+        <span class="plan-badge right-3.5 bg-gray-700 text-white">Sold Out</span>
+        {% elif plan.max_investors is not none and plan.quota_percent >= 70 %}
+        <span class="plan-badge right-3.5 bg-red-500 text-white">🔥 Limited Slots</span>
+        {% endif %}
+        {% if plan.is_popular %}
+        <span class="plan-badge left-3.5 bg-gold-500 text-forest-950">⭐ Popular</span>
+        {% elif plan.is_featured %}
+        <span class="plan-badge left-3.5 bg-forest-700 text-white">✨ Featured</span>
         {% endif %}
 
-        <!-- Icon / image -->
-        <div class="inline-flex items-center justify-center mb-4">
+        <!-- Image -->
+        <div class="h-44 relative overflow-hidden bg-forest-950 flex-shrink-0">
           {% if plan.image_url %}
-          <img src="{{ plan.image_url }}" alt="{{ plan.name }}" loading="lazy" width="80" height="80"
-               class="w-20 h-20 object-cover rounded-2xl shadow-xl border-2"
-               style="border-color:rgba(212,175,55,.4);" />
+          <img src="{{ plan.image_url }}" alt="{{ plan.name }}" loading="lazy"
+               class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
           {% else %}
-          <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-xl"
-               style="background:rgba(212,175,55,.12); border:2px solid rgba(212,175,55,.3);">
-            {{ plan.icon|default('🌱', true) }}
-          </div>
+          <div class="w-full h-full flex items-center justify-center text-5xl">{{ plan.icon | default('🌱', true) }}</div>
           {% endif %}
+          <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+          <div class="absolute bottom-3 left-4 right-4">
+            <h3 class="font-display font-bold text-white text-xl truncate">{{ plan.name }}</h3>
+          </div>
         </div>
 
-        <h2 class="font-display font-bold text-white text-3xl">{{ plan.name }}</h2>
-        {% if plan.description %}
-        <p class="text-slate-400 text-sm mt-2 max-w-sm mx-auto">{{ plan.description }}</p>
-        {% endif %}
+        <!-- Body -->
+        <div class="p-6 flex-1 flex flex-col">
+          {% if plan.description %}
+          <p class="text-gray-500 text-sm mb-4 line-clamp-2">{{ plan.description }}</p>
+          {% endif %}
 
-        <div class="inline-flex items-center gap-2 mt-4 px-5 py-2 rounded-full text-sm font-bold"
-             style="background:rgba(212,175,55,.15); border:1px solid rgba(212,175,55,.35); color:#d4af37;">
-          <i data-lucide="trending-up" class="w-4 h-4"></i>
-          {{ '%.0f'|format((plan.profit / plan.price * 100) if plan.price else 0) }}% Return on Investment
-        </div>
-      </div>
-
-      <!-- White info rows -->
-      <div class="bg-white dark:bg-gray-900">
-
-        <!-- Plan row -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/5">
-          <span class="text-gray-500 dark:text-gray-400 text-sm">Plan</span>
-          <span class="font-bold text-gray-900 dark:text-white text-sm">{{ plan.name }}</span>
-        </div>
-
-        <!-- Investment Period -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/5">
-          <span class="text-gray-500 dark:text-gray-400 text-sm">Investment Period</span>
-          <span class="font-bold text-gray-900 dark:text-white text-sm">{{ plan.duration_days }} Days</span>
-        </div>
-
-        <!-- Daily Return -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/5">
-          <span class="text-gray-500 dark:text-gray-400 text-sm">Daily Return</span>
-          <span class="font-bold text-sm" style="color:#d97706;">
-            ₦{{ '{:,.2f}'.format(plan.profit / plan.duration_days if plan.duration_days else 0) }}
-          </span>
-        </div>
-
-        <!-- Total Return -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/5">
-          <span class="text-gray-500 dark:text-gray-400 text-sm">Total Return</span>
-          <span class="font-bold text-sm" style="color:#059669;">
-            ₦{{ '{:,.2f}'.format(plan.total_return) }}
-          </span>
-        </div>
-
-        <!-- Price -->
-        <div class="flex items-center justify-between px-6 py-4">
-          <span class="text-gray-500 dark:text-gray-400 text-sm">Price</span>
-          <span class="font-bold text-sm" style="color:#d97706;">
-            ₦{{ '{:,.2f}'.format(plan.price) }}
-          </span>
-        </div>
-
-        <!-- Features (collapsed, premium look) -->
-        {% if plan.features %}
-        <div class="px-6 pb-4">
-          <div class="rounded-xl p-4" style="background:rgba(5,150,105,.05); border:1px solid rgba(5,150,105,.12);">
-            <p class="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider mb-3">What's Included</p>
-            <div class="grid grid-cols-1 gap-2">
-              {% for f in plan.features %}
-              <div class="flex items-center gap-2.5 text-sm text-gray-600 dark:text-gray-300">
-                <div class="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
-                     style="background:rgba(5,150,105,.15);">
-                  <i data-lucide="check" class="w-2.5 h-2.5" style="color:#059669;"></i>
-                </div>
-                {{ f }}
-              </div>
-              {% endfor %}
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="bg-gray-50 rounded-xl p-3">
+              <p class="text-[11px] text-gray-400 uppercase tracking-wide mb-0.5">Investment</p>
+              <p class="font-bold text-gray-900 text-sm">{{ plan.price | naira }}</p>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-3">
+              <p class="text-[11px] text-gray-400 uppercase tracking-wide mb-0.5">Daily Profit</p>
+              <p class="font-bold text-forest-700 text-sm">{{ (plan.profit / plan.duration_days if plan.duration_days else 0) | naira }}</p>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-3">
+              <p class="text-[11px] text-gray-400 uppercase tracking-wide mb-0.5">Duration</p>
+              <p class="font-bold text-gray-900 text-sm">{{ plan.duration_days }} Days</p>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-3">
+              <p class="text-[11px] text-gray-400 uppercase tracking-wide mb-0.5">Total Return</p>
+              <p class="font-bold text-gold-600 text-sm">{{ plan.total_return | naira }}</p>
             </div>
           </div>
-        </div>
-        {% endif %}
 
-        <!-- CTA -->
-        <div class="px-6 pb-6">
-          <form method="POST" action="{{ url_for('invest') }}">
-            <input type="hidden" name="plan_id" value="{{ plan.id }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit"
-                    class="block w-full py-4 rounded-xl font-bold text-base text-white text-center transition-all active:scale-95"
-                    style="background:linear-gradient(135deg,#d97706 0%,#b45309 100%); box-shadow:0 8px 24px -6px rgba(217,119,6,.45); cursor:pointer; border:none;">
-              Get Started — ₦{{ '{:,.0f}'.format(plan.price) }}
+          <!-- Quota / Progress Bar -->
+          {% if plan.max_investors is not none %}
+          <div class="mb-4">
+            <div class="flex items-center justify-between text-xs mb-1.5">
+              <span class="text-gray-500">{{ plan.investor_count }}/{{ plan.max_investors }} slots filled</span>
+              <span class="font-semibold {{ 'text-red-600' if plan.sold_out else 'text-forest-700' }}">{{ plan.quota_percent | int }}%</span>
+            </div>
+            <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div class="h-full rounded-full {{ 'bg-red-500' if plan.sold_out else 'bg-gradient-to-r from-forest-600 to-forest-800' }} transition-all duration-700"
+                   style="width: {{ plan.quota_percent }}%"></div>
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="mt-auto flex gap-2 pt-2">
+            <button type="button" onclick="openPlanModal({{ loop.index0 }})" class="btn-secondary flex-1 !py-2.5 !px-3 text-sm">
+              View Details
             </button>
-          </form>
+            {% if plan.sold_out %}
+            <button type="button" disabled class="flex-1 bg-gray-200 text-gray-400 font-bold rounded-2xl text-sm cursor-not-allowed">Sold Out</button>
+            {% else %}
+            <form method="POST" action="{{ url_for('invest') }}" class="flex-1">
+              <input type="hidden" name="plan_id" value="{{ plan.id }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn-primary w-full !py-2.5 !px-3 text-sm">Invest Now</button>
+            </form>
+            {% endif %}
+          </div>
         </div>
       </div>
+      {% endfor %}
     </div>
-    {% endfor %}
 
     {% if not plans %}
     <div class="text-center py-24 text-gray-400">
@@ -196,18 +141,108 @@
 </section>
 
 <!-- ── Risk Disclaimer ── -->
-<section class="py-8 border-t border-amber-100 dark:border-amber-900/30 bg-amber-50 dark:bg-amber-950/20">
+<section class="py-8 border-t border-amber-100 bg-amber-50">
   <div class="max-w-4xl mx-auto px-4 sm:px-6 flex items-start gap-4">
-    <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"></i>
-    <p class="text-amber-800 dark:text-amber-300 text-sm leading-relaxed">
+    <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5"></i>
+    <p class="text-amber-800 text-sm leading-relaxed">
       <strong class="font-semibold">Risk Disclosure:</strong>
       Agricultural investments carry inherent risks including weather events and market fluctuations.
       Past returns do not guarantee future performance. Only invest amounts you are comfortable keeping
       locked for the plan duration. Please read our full
-      <a href="#" class="underline font-semibold">Risk Disclosure</a> before investing.
+      <a href="{{ url_for('risk_disclosure') }}" class="underline font-semibold">Risk Disclosure</a> before investing.
     </p>
   </div>
 </section>
+
+<!-- ── Plan Details Modal (shared, populated via JS — no duplicate HTML per card) ── -->
+<div id="plan-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+  <div class="bg-white rounded-[24px] w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl">
+    <div class="relative h-40 bg-forest-950">
+      <img id="modal-img" src="" alt="" class="w-full h-full object-cover hidden" />
+      <div id="modal-icon" class="w-full h-full flex items-center justify-center text-5xl"></div>
+      <button onclick="closePlanModal()" class="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+      <div class="absolute bottom-3 left-5">
+        <h3 id="modal-name" class="font-display font-bold text-white text-2xl"></h3>
+      </div>
+    </div>
+    <div class="p-6">
+      <p id="modal-desc" class="text-gray-500 text-sm mb-5"></p>
+      <div class="grid grid-cols-2 gap-3 mb-5">
+        <div class="bg-gray-50 rounded-xl p-3"><p class="text-[11px] text-gray-400 uppercase mb-0.5">Investment</p><p id="modal-price" class="font-bold text-gray-900 text-sm"></p></div>
+        <div class="bg-gray-50 rounded-xl p-3"><p class="text-[11px] text-gray-400 uppercase mb-0.5">Daily Profit</p><p id="modal-daily" class="font-bold text-forest-700 text-sm"></p></div>
+        <div class="bg-gray-50 rounded-xl p-3"><p class="text-[11px] text-gray-400 uppercase mb-0.5">Duration</p><p id="modal-duration" class="font-bold text-gray-900 text-sm"></p></div>
+        <div class="bg-gray-50 rounded-xl p-3"><p class="text-[11px] text-gray-400 uppercase mb-0.5">Total Return</p><p id="modal-return" class="font-bold text-gold-600 text-sm"></p></div>
+      </div>
+      <div id="modal-features" class="space-y-2 mb-6"></div>
+      <form method="POST" action="{{ url_for('invest') }}" id="modal-invest-form">
+        <input type="hidden" name="plan_id" id="modal-plan-id" value="">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" id="modal-invest-btn" class="btn-primary w-full">Invest Now</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Plan data rendered once, server-side, and reused by the shared modal —
+  // avoids duplicating the details markup once per card.
+  const PLAN_DATA = [
+    {% for plan in plans %}
+    {
+      name: {{ plan.name | tojson }},
+      description: {{ (plan.description or '') | tojson }},
+      image_url: {{ (plan.image_url or '') | tojson }},
+      icon: {{ (plan.icon | default('🌱', true)) | tojson }},
+      price: {{ plan.price | tojson }},
+      duration_days: {{ plan.duration_days | tojson }},
+      total_return: {{ plan.total_return | tojson }},
+      daily_profit: {{ (plan.profit / plan.duration_days if plan.duration_days else 0) | tojson }},
+      features: {{ (plan.features or []) | tojson }},
+      id: {{ plan.id | tojson }},
+      sold_out: {{ (plan.sold_out or false) | tojson }},
+    },
+    {% endfor %}
+  ];
+
+  function nairaFmt(v) { return '₦' + Number(v || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  function openPlanModal(idx) {
+    const p = PLAN_DATA[idx];
+    if (!p) return;
+    document.getElementById('modal-name').textContent = p.name;
+    document.getElementById('modal-desc').textContent = p.description || '';
+    document.getElementById('modal-price').textContent = nairaFmt(p.price);
+    document.getElementById('modal-daily').textContent = nairaFmt(p.daily_profit);
+    document.getElementById('modal-duration').textContent = p.duration_days + ' Days';
+    document.getElementById('modal-return').textContent = nairaFmt(p.total_return);
+    document.getElementById('modal-plan-id').value = p.id;
+
+    const img = document.getElementById('modal-img');
+    const iconBox = document.getElementById('modal-icon');
+    if (p.image_url) {
+      img.src = p.image_url; img.classList.remove('hidden'); iconBox.classList.add('hidden');
+    } else {
+      iconBox.textContent = p.icon; iconBox.classList.remove('hidden'); img.classList.add('hidden');
+    }
+
+    const featuresEl = document.getElementById('modal-features');
+    featuresEl.innerHTML = (p.features || []).map(f =>
+      `<div class="flex items-center gap-2.5 text-sm text-gray-600"><i data-lucide="check-circle" class="w-4 h-4 text-forest-600 flex-shrink-0"></i>${f}</div>`
+    ).join('');
+
+    const btn = document.getElementById('modal-invest-btn');
+    btn.disabled = p.sold_out;
+    btn.textContent = p.sold_out ? 'Sold Out' : 'Invest Now';
+    btn.classList.toggle('opacity-50', p.sold_out);
+    btn.classList.toggle('cursor-not-allowed', p.sold_out);
+
+    document.getElementById('plan-modal').classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  }
+  function closePlanModal() { document.getElementById('plan-modal').classList.add('hidden'); }
+</script>
 
 {% include "partials/footer.html" %}
 {% endblock %}

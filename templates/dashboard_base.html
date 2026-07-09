@@ -46,6 +46,9 @@
         <a href="{{ url_for('withdraw') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all {% if request.endpoint == 'withdraw' %}bg-gold-500 text-forest-950{% else %}text-gray-300 hover:bg-white/10 hover:text-white{% endif %}">
           <i data-lucide="banknote" class="w-4 h-4 flex-shrink-0"></i> Withdraw
         </a>
+        <a href="{{ url_for('all_transactions_page') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all {% if request.endpoint == 'all_transactions_page' %}bg-gold-500 text-forest-950{% else %}text-gray-300 hover:bg-white/10 hover:text-white{% endif %}">
+          <i data-lucide="receipt" class="w-4 h-4 flex-shrink-0"></i> Transactions
+        </a>
 
         <div class="pt-4 pb-2">
           <p class="text-xs text-gray-600 uppercase tracking-widest px-3">Account</p>
