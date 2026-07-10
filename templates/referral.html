@@ -1,0 +1,163 @@
+{% extends "dashboard_base.html" %}
+{% block page_title %}Referral Program{% endblock %}
+{% block page_subtitle %}Earn {{ referral_percent | int }}% commission on every friend's investment{% endblock %}
+
+{% block dashboard_content %}
+
+<!-- ── Referral Link Card ── -->
+<div class="bg-gradient-to-br from-forest-950 via-forest-900 to-forest-800 rounded-[24px] p-7 mb-6 relative overflow-hidden shadow-xl">
+  <div class="absolute inset-0 opacity-[0.06]" style="background-image: radial-gradient(circle at 20% 80%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px); background-size: 32px 32px;"></div>
+  <div class="relative">
+    <div class="flex items-center gap-2 mb-4">
+      <div class="w-9 h-9 rounded-xl bg-gold-500/20 flex items-center justify-center">
+        <i data-lucide="gift" class="w-4.5 h-4.5 text-gold-400"></i>
+      </div>
+      <p class="text-gold-400 text-xs font-bold uppercase tracking-widest">Your Referral Link</p>
+    </div>
+
+    <div class="flex flex-col sm:flex-row gap-3">
+      <div class="flex-1 bg-white/10 backdrop-blur-sm rounded-2xl px-5 py-4 font-mono text-sm text-white truncate" id="ref-link">
+        {{ request.host_url }}register?ref={{ user.referral_code }}
+      </div>
+      <button onclick="copyReferralLink()" id="copy-btn"
+        class="btn-gold flex-shrink-0 !py-4 !px-6 flex items-center justify-center gap-2">
+        <i data-lucide="copy" class="w-4 h-4" id="copy-icon"></i>
+        <span id="copy-text">Copy Link</span>
+      </button>
+    </div>
+    <p class="text-forest-300 text-xs mt-3">
+      Your referral code: <span class="font-mono font-bold text-gold-400">{{ user.referral_code }}</span>
+    </p>
+  </div>
+</div>
+
+<!-- ── Referral Statistics ── -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  {% set stats = [
+    ('users', 'Total Referrals', total_referred, 'bg-forest-950', 'text-gold-400'),
+    ('check-circle', 'Active (Invested)', active_referrals, 'bg-emerald-600', 'text-emerald-200'),
+    ('clock', 'Pending', pending_referrals, 'bg-amber-500', 'text-amber-100'),
+    ('banknote', 'Referral Earnings', user.referral_earnings | naira, 'bg-purple-600', 'text-purple-200'),
+  ] %}
+  {% for icon, label, value, bg, text_col in stats %}
+  <div class="{{ bg }} rounded-2xl p-5 relative overflow-hidden group hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
+    <div class="absolute top-0 right-0 w-20 h-20 rounded-full bg-white/5 -translate-y-6 translate-x-6 group-hover:scale-125 transition-transform duration-500"></div>
+    <div class="relative">
+      <span class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center mb-3">
+        <i data-lucide="{{ icon }}" class="w-4.5 h-4.5 {{ text_col }}"></i>
+      </span>
+      <p class="text-white/60 text-xs mb-1 tracking-wide uppercase">{{ label }}</p>
+      <p class="font-display font-bold text-xl text-white tabular-nums">{{ value }}</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ── How It Works (compact) ── -->
+<div class="card-premium p-6 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+  <div class="w-11 h-11 rounded-2xl bg-gold-50 flex items-center justify-center flex-shrink-0">
+    <i data-lucide="info" class="w-5 h-5 text-gold-600"></i>
+  </div>
+  <p class="text-sm text-gray-600">
+    Share your link above. When someone registers through it and activates any investment plan,
+    you instantly earn <strong class="text-gray-900">{{ referral_percent | int }}%</strong> of their investment amount —
+    credited straight to your wallet, with no limit on how many people you refer.
+  </p>
+</div>
+
+<!-- ── Referral History ── -->
+<div class="card-premium overflow-hidden">
+  <div class="p-5 border-b border-gray-100">
+    <h2 class="font-bold text-gray-900">Referral History</h2>
+  </div>
+
+  {% if referrals %}
+  <!-- Table (sm and up) -->
+  <div class="hidden sm:block overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-gray-100 bg-gray-50/60">
+          <th class="text-left font-semibold text-gray-500 text-xs uppercase tracking-wide px-5 py-3">Name</th>
+          <th class="text-left font-semibold text-gray-500 text-xs uppercase tracking-wide px-5 py-3">Joined</th>
+          <th class="text-left font-semibold text-gray-500 text-xs uppercase tracking-wide px-5 py-3">Status</th>
+          <th class="text-right font-semibold text-gray-500 text-xs uppercase tracking-wide px-5 py-3">Commission Earned</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for ref in referrals %}
+        <tr class="hover:bg-gray-50/50 transition-colors">
+          <td class="px-5 py-3.5">
+            <div class="flex items-center gap-2.5">
+              <span class="w-8 h-8 rounded-full bg-forest-100 text-forest-700 font-bold text-xs flex items-center justify-center flex-shrink-0">
+                {{ ref.full_name[0] | upper }}
+              </span>
+              <span class="font-medium text-gray-800">{{ ref.full_name }}</span>
+            </div>
+          </td>
+          <td class="px-5 py-3.5 text-gray-400 text-xs">{{ ref.created_at | date_fmt }}</td>
+          <td class="px-5 py-3.5">
+            {% if ref.status == 'active' %}
+            <span class="badge-success badge">Active</span>
+            {% else %}
+            <span class="badge-warning badge">Pending First Investment</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3.5 text-right font-bold text-emerald-600">{{ ref.commission | naira }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Card view (mobile) -->
+  <div class="sm:hidden divide-y divide-gray-50">
+    {% for ref in referrals %}
+    <div class="p-4">
+      <div class="flex items-center justify-between mb-1.5">
+        <div class="flex items-center gap-2.5">
+          <span class="w-8 h-8 rounded-full bg-forest-100 text-forest-700 font-bold text-xs flex items-center justify-center flex-shrink-0">
+            {{ ref.full_name[0] | upper }}
+          </span>
+          <span class="font-medium text-gray-800 text-sm">{{ ref.full_name }}</span>
+        </div>
+        {% if ref.status == 'active' %}
+        <span class="badge-success badge">Active</span>
+        {% else %}
+        <span class="badge-warning badge">Pending</span>
+        {% endif %}
+      </div>
+      <div class="flex items-center justify-between mt-2 pl-[42px]">
+        <span class="text-gray-400 text-xs">{{ ref.created_at | date_fmt }}</span>
+        <span class="font-bold text-emerald-600 text-sm">{{ ref.commission | naira }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-20 px-6">
+    <i data-lucide="user-plus" class="w-12 h-12 text-gray-200 mx-auto mb-4"></i>
+    <p class="text-gray-400 font-medium">No referrals yet</p>
+    <p class="text-gray-400 text-sm mt-1">Share your link above to start earning commissions.</p>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  function copyReferralLink() {
+    const link = document.getElementById('ref-link').textContent.trim();
+    navigator.clipboard.writeText(link).then(() => {
+      document.getElementById('copy-icon').setAttribute('data-lucide', 'check');
+      document.getElementById('copy-text').textContent = 'Copied!';
+      if (window.lucide) lucide.createIcons();
+      if (window.showToast) showToast('Referral link copied to clipboard!', 'success');
+      setTimeout(() => {
+        document.getElementById('copy-icon').setAttribute('data-lucide', 'copy');
+        document.getElementById('copy-text').textContent = 'Copy Link';
+        if (window.lucide) lucide.createIcons();
+      }, 2000);
+    }).catch(() => {
+      if (window.showToast) showToast('Could not copy — please copy manually.', 'error');
+    });
+  }
+</script>
+{% endblock %}

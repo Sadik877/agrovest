@@ -49,12 +49,24 @@
         <a href="{{ url_for('all_transactions_page') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all {% if request.endpoint == 'all_transactions_page' %}bg-gold-500 text-forest-950{% else %}text-gray-300 hover:bg-white/10 hover:text-white{% endif %}">
           <i data-lucide="receipt" class="w-4 h-4 flex-shrink-0"></i> Transactions
         </a>
+        <a href="{{ url_for('referral_page') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all {% if request.endpoint == 'referral_page' %}bg-gold-500 text-forest-950{% else %}text-gray-300 hover:bg-white/10 hover:text-white{% endif %}">
+          <i data-lucide="users" class="w-4 h-4 flex-shrink-0"></i> Referrals
+        </a>
+        <a href="{{ url_for('announcement_list') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all {% if request.endpoint in ['announcement_list', 'announcement_detail'] %}bg-gold-500 text-forest-950{% else %}text-gray-300 hover:bg-white/10 hover:text-white{% endif %}">
+          <i data-lucide="megaphone" class="w-4 h-4 flex-shrink-0"></i> Announcements
+          {% if unread_announcement_count and unread_announcement_count > 0 %}
+          <span class="ml-auto bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{{ unread_announcement_count }}</span>
+          {% endif %}
+        </a>
 
         <div class="pt-4 pb-2">
           <p class="text-xs text-gray-600 uppercase tracking-widest px-3">Account</p>
         </div>
         <a href="{{ url_for('plans') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-white/10 hover:text-white transition-all">
           <i data-lucide="package" class="w-4 h-4 flex-shrink-0"></i> View Plans
+        </a>
+        <a href="{{ url_for('profile') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all {% if request.endpoint == 'profile' %}bg-gold-500 text-forest-950{% else %}text-gray-300 hover:bg-white/10 hover:text-white{% endif %}">
+          <i data-lucide="user-circle" class="w-4 h-4 flex-shrink-0"></i> Profile
         </a>
         <a href="{{ url_for('index') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-white/10 hover:text-white transition-all">
           <i data-lucide="home" class="w-4 h-4 flex-shrink-0"></i> Homepage

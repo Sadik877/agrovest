@@ -81,7 +81,7 @@
               class="w-full appearance-none border-2 border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-sm font-medium focus:outline-none focus:border-forest-500 transition-colors bg-white">
               <option value="">Select your bank...</option>
               {% for bank in ['Access Bank', 'First Bank', 'GTBank', 'Zenith Bank', 'UBA', 'Fidelity Bank', 'Union Bank', 'Stanbic IBTC', 'Sterling Bank', 'Wema Bank', 'Keystone Bank', 'Polaris Bank', 'Ecobank', 'FCMB', 'Jaiz Bank', 'Opay', 'Palmpay', 'Kuda Bank', 'Moniepoint'] %}
-              <option value="{{ bank }}">{{ bank }}</option>
+              <option value="{{ bank }}" {{ 'selected' if user.bank_name == bank else '' }}>{{ bank }}</option>
               {% endfor %}
             </select>
             <svg class="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -99,6 +99,7 @@
             pattern="\d{10}"
             inputmode="numeric"
             placeholder="10-digit account number"
+            value="{{ user.bank_account_number or '' }}"
             oninput="this.value = this.value.replace(/\D/g, '')"
             class="w-full border-2 border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-base font-mono font-semibold tracking-wider focus:outline-none focus:border-forest-500 transition-colors placeholder:font-sans placeholder:font-normal placeholder:tracking-normal"
           />
@@ -112,6 +113,7 @@
             name="account_name"
             required
             placeholder="Name on bank account"
+            value="{{ user.bank_account_name or '' }}"
             class="w-full border-2 border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-sm font-medium focus:outline-none focus:border-forest-500 transition-colors"
           />
         </div>

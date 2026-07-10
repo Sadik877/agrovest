@@ -1,0 +1,41 @@
+{% extends "dashboard_base.html" %}
+{% block page_title %}Announcements{% endblock %}
+{% block page_subtitle %}Updates and news from the AgroVest team{% endblock %}
+
+{% block dashboard_content %}
+<div class="max-w-2xl mx-auto">
+  {% if announcements %}
+  <div class="space-y-3">
+    {% for a in announcements %}
+    <a href="{{ url_for('announcement_detail', announcement_id=a.id) }}"
+       class="card-premium interactive p-5 flex items-start gap-4 block {{ 'border-gold-200 ring-1 ring-gold-100' if not a.is_read else '' }}">
+      <span class="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0
+        {{ 'bg-red-50 text-red-600' if a.is_important else 'bg-forest-50 text-forest-700' }}">
+        <i data-lucide="{{ 'alert-triangle' if a.is_important else 'megaphone' }}" class="w-5 h-5"></i>
+      </span>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <p class="font-bold text-gray-900 text-sm truncate">{{ a.title }}</p>
+          {% if a.is_important %}
+          <span class="badge-error badge flex-shrink-0">Important</span>
+          {% endif %}
+          {% if not a.is_read %}
+          <span class="w-2 h-2 rounded-full bg-gold-500 flex-shrink-0"></span>
+          {% endif %}
+        </div>
+        <p class="text-gray-500 text-sm mt-1 line-clamp-2">{{ a.message }}</p>
+        <p class="text-xs text-gray-400 mt-1.5">{{ a.created_at | date_fmt('%d %b %Y, %I:%M %p') }}</p>
+      </div>
+      <i data-lucide="chevron-right" class="w-4 h-4 text-gray-300 flex-shrink-0 mt-1"></i>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card-premium p-16 text-center">
+    <i data-lucide="megaphone-off" class="w-12 h-12 text-gray-200 mx-auto mb-4"></i>
+    <p class="text-gray-400 font-medium">No announcements yet</p>
+    <p class="text-gray-400 text-sm mt-1">Updates from the AgroVest team will show up here.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
