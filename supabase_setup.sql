@@ -372,4 +372,58 @@ ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS max_investors INTEGER;
 ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS is_popular BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- USERS — saved bank details (Phase 9, Profile page). Optional/nullable —
+-- users who never save these still withdraw exactly as before, just
+-- re-entering bank details each time on the withdraw form. If saved,
+-- the withdraw form pre-fills from these as a convenience only.
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS bank_name TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS bank_account_number TEXT;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS bank_account_name TEXT;
+
+-- ANNOUNCEMENTS — Phase 10. A full, manageable announcement system,
+-- distinct from the single sitewide banner (`settings.notice_*`, admin
+-- page "Site Banner") built earlier. Each announcement is a persistent,
+-- editable record; target_user_ids is only used when target_type =
+-- 'selected'. Read state is tracked lazily — a row in
+-- announcement_reads only exists once a user has actually opened it,
+-- so broadcasting to "all" never requires inserting one row per user
+-- up front.
+CREATE TABLE IF NOT EXISTS public.announcements (
+    id               BIGSERIAL PRIMARY KEY,
+    title            TEXT NOT NULL,
+    message          TEXT NOT NULL,
+    is_important     BOOLEAN NOT NULL DEFAULT FALSE,
+    target_type      TEXT NOT NULL DEFAULT 'all',   -- 'all' | 'selected'
+    target_user_ids  INTEGER[],                      -- used only when target_type = 'selected'
+    scheduled_at     TIMESTAMPTZ,                     -- NULL or in the past = published immediately
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by       BIGINT
+);
+ALTER TABLE public.announcements DISABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.announcement_reads (
+    id              BIGSERIAL PRIMARY KEY,
+    announcement_id BIGINT NOT NULL REFERENCES public.announcements(id) ON DELETE CASCADE,
+    user_id         BIGINT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    read_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (announcement_id, user_id)
+);
+ALTER TABLE public.announcement_reads DISABLE ROW LEVEL SECURITY;
+
+-- BANNERS — Phase 11 Banner Manager. Powers the promotional slider on
+-- the dashboard (frontend already built in Phase 4, was passed an empty
+-- list until this existed). is_active controls whether a banner shows;
+-- sort_order controls slide order. Reuses the same public image-upload
+-- path already used for plan images (upload_plan_image()).
+CREATE TABLE IF NOT EXISTS public.banners (
+    id          BIGSERIAL PRIMARY KEY,
+    image_filename TEXT NOT NULL,
+    title       TEXT,
+    link_url    TEXT,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.banners DISABLE ROW LEVEL SECURITY;
+
 SELECT 'Gift Codes & Daily Check-in migration applied successfully!' AS status;

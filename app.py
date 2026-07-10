@@ -873,6 +873,7 @@ def get_current_user():
 @app.context_processor
 def inject_globals():
     user, unread, plans, notice, site_settings = None, 0, [], None, SITE_SETTINGS_DEFAULTS
+    unread_announcements = 0
     try:
         user = get_current_user()
     except Exception as e:
@@ -883,6 +884,11 @@ def inject_globals():
                               [('user_id', 'eq', user['id']), ('is_read', 'eq', False)])
     except Exception as e:
         print(f"inject_globals unread count error: {e}")
+    try:
+        if user:
+            unread_announcements = get_unread_announcement_count(user['id'])
+    except Exception as e:
+        print(f"inject_globals unread_announcements error: {e}")
     try:
         plans = get_plans()
     except Exception as e:
@@ -896,7 +902,8 @@ def inject_globals():
     except Exception as e:
         print(f"inject_globals site_settings error: {e}")
     return dict(current_user=user, unread_count=unread, plans=plans,
-               active_notice=notice, site_settings=site_settings)
+               active_notice=notice, site_settings=site_settings,
+               unread_announcement_count=unread_announcements)
 
 # ─────────────────────────────────────────────
 # Serve Uploads
@@ -1076,6 +1083,101 @@ def get_referral_percent():
         return max(0.0, float(get_setting('referral_percent', REFERRAL_COMMISSION) or REFERRAL_COMMISSION))
     except (TypeError, ValueError):
         return float(REFERRAL_COMMISSION)
+
+
+# ─────────────────────────────────────────────
+# Announcements (Phase 10) — a full, manageable announcement system.
+# Distinct from the single sitewide banner (get_active_notice() /
+# `settings.notice_*`, admin "Site Banner" page) built earlier: each
+# announcement here is its own persistent, editable record with optional
+# scheduling, "selected users" targeting, and per-user read tracking.
+# ─────────────────────────────────────────────
+def get_visible_announcements(user_id=None):
+    """Announcements currently visible to `user_id`: published (no
+    schedule, or the scheduled time has already passed) and targeted at
+    this user (either 'all', or 'selected' with this user's id included).
+    The announcements table is small (bounded by how many an admin
+    actually creates, not per-transaction like notifications), so
+    fetching all of them and filtering in Python is intentional — same
+    style already used elsewhere in this app (e.g. sb_sum())."""
+    now = datetime.utcnow()
+    rows = sb_all('announcements', order=('created_at', 'desc'))
+    visible = []
+    for a in rows:
+        sched = a.get('scheduled_at')
+        if sched:
+            try:
+                sched_dt = datetime.fromisoformat(str(sched).replace('Z', '+00:00')).replace(tzinfo=None)
+                if sched_dt > now:
+                    continue  # scheduled for the future — not published yet
+            except Exception:
+                pass
+        if a.get('target_type') == 'selected':
+            target_ids = a.get('target_user_ids') or []
+            if user_id not in target_ids:
+                continue
+        visible.append(a)
+    return visible
+
+
+def get_announcement_read_ids(user_id):
+    rows = sb_all('announcement_reads', filters=[('user_id', 'eq', user_id)])
+    return {r['announcement_id'] for r in rows}
+
+
+def get_unread_announcement_count(user_id):
+    if not user_id:
+        return 0
+    visible = get_visible_announcements(user_id)
+    read_ids = get_announcement_read_ids(user_id)
+    return sum(1 for a in visible if a['id'] not in read_ids)
+
+
+def mark_announcement_read(announcement_id, user_id):
+    if sb_one('announcement_reads', [('announcement_id', 'eq', announcement_id), ('user_id', 'eq', user_id)]):
+        return True
+    return sb_insert('announcement_reads', {'announcement_id': announcement_id, 'user_id': user_id}) is not None
+
+
+def get_active_banners():
+    """Active banners for the dashboard slider (Phase 4's frontend, Phase 11's
+    admin backend), ordered for display. Reuses the same public image-upload
+    path as plan images — resolve_plan_image_url() works on any filename
+    saved via upload_plan_image() regardless of which table stored it."""
+    rows = sb_all('banners', filters=[('is_active', 'eq', True)],
+                  order=[('sort_order', 'asc'), ('id', 'asc')])
+    for b in rows:
+        b['image_url'] = resolve_plan_image_url(b.get('image_filename'))
+    return rows
+
+
+def get_daily_trend(table, days=7, status_filter=None):
+    """Sum of `amount` per calendar day (admin timezone) for the last
+    `days` days, oldest first — powers the admin dashboard trend chart.
+    One fetch, bucketed in Python, same style as sb_sum()."""
+    tz = get_display_timezone()
+    today_local = datetime.now(tz).date()
+    start_local = today_local - timedelta(days=days - 1)
+    start_utc = datetime.combine(start_local, datetime.min.time(), tzinfo=tz).astimezone(timezone.utc)
+
+    filters = [('created_at', 'gte', start_utc.isoformat())]
+    if status_filter:
+        filters.append(('status', 'eq', status_filter))
+    try:
+        rows = sb_all(table, filters=filters)
+    except Exception as e:
+        print(f'get_daily_trend({table}) error: {e}')
+        rows = []
+
+    buckets = {start_local + timedelta(days=i): 0.0 for i in range(days)}
+    for r in rows:
+        try:
+            dt = datetime.fromisoformat(str(r['created_at']).replace('Z', '+00:00')).astimezone(tz).date()
+            if dt in buckets:
+                buckets[dt] += float(r.get('amount') or 0)
+        except Exception:
+            continue
+    return [{'label': d.strftime('%b %d'), 'amount': round(v, 2)} for d, v in sorted(buckets.items())]
 
 
 def get_withdrawal_limits():
@@ -1606,8 +1708,7 @@ def dashboard():
         today_profit=today_profit, profit_change_pct=profit_change_pct,
         recent_transactions=recent_transactions,
         checkin_status=get_checkin_status(uid),
-        banners=[],  # Banner Manager (upload/activate/reorder) is Phase 11 —
-                     # slider renders empty-state until that backend exists
+        banners=get_active_banners(),
         now_utc=datetime.utcnow())
 
 
@@ -1653,6 +1754,158 @@ def all_transactions_page():
 
     unified.sort(key=lambda x: x['created_at'] or '', reverse=True)
     return render_template('transactions.html', transactions=unified)
+
+
+@app.route('/referral')
+@login_required
+def referral_page():
+    """Dedicated Referral page (Phase 8) — link, copy button, stats,
+    earnings, and full history. Same referrals data shape already used by
+    the dashboard leaderboard widget, just with its own full page/table."""
+    user = get_current_user()
+    uid = user['id']
+
+    raw_refs = sb_all('referrals', filters=[('referrer_id', 'eq', uid)],
+                      order=('created_at', 'desc'))
+    referrals = []
+    for r in raw_refs:
+        referred_user = sb_one('users', [('id', 'eq', r['referred_id'])])
+        referrals.append({
+            **r,
+            'full_name': referred_user['full_name'] if referred_user else 'Unknown',
+            'email': referred_user['email'] if referred_user else '',
+        })
+
+    total_referred = len(referrals)
+    active_referrals = sum(1 for r in referrals if r.get('status') == 'active')
+    pending_referrals = total_referred - active_referrals
+
+    return render_template('referral.html', user=user, referrals=referrals,
+                           total_referred=total_referred,
+                           active_referrals=active_referrals,
+                           pending_referrals=pending_referrals,
+                           referral_percent=get_referral_percent())
+
+
+@app.route('/profile')
+@login_required
+def profile():
+    """Modern Profile page (Phase 9) — edit profile, change password, saved
+    bank details, referral code, and an account-info summary. No KYC."""
+    user = get_current_user()
+    return render_template('profile.html', user=user)
+
+
+@app.route('/profile/update', methods=['POST'])
+@login_required
+def profile_update():
+    user = get_current_user()
+    full_name = request.form.get('full_name', '').strip()
+    phone     = request.form.get('phone', '').strip()
+
+    if not full_name or len(full_name) < 3:
+        flash('Full name must be at least 3 characters.', 'error')
+        return redirect(url_for('profile'))
+    if phone and not re.match(r'^[0-9+\-\s]{7,20}$', phone):
+        flash('Enter a valid phone number.', 'error')
+        return redirect(url_for('profile'))
+
+    if sb_update('users', {'full_name': full_name, 'phone': phone}, [('id', 'eq', user['id'])]):
+        flash('Profile updated successfully.', 'success')
+    else:
+        flash('Could not update your profile — please try again.', 'error')
+    return redirect(url_for('profile'))
+
+
+@app.route('/profile/password', methods=['POST'])
+@login_required
+def profile_change_password():
+    user = get_current_user()
+    current_password = request.form.get('current_password', '')
+    new_password      = request.form.get('new_password', '')
+    confirm_password  = request.form.get('confirm_new_password', '')
+
+    if not check_password_hash(user['password_hash'], current_password):
+        flash('Current password is incorrect.', 'error')
+        return redirect(url_for('profile'))
+    if len(new_password) < 8:
+        flash('New password must be at least 8 characters.', 'error')
+        return redirect(url_for('profile'))
+    if new_password != confirm_password:
+        flash('New passwords do not match.', 'error')
+        return redirect(url_for('profile'))
+
+    if sb_update('users', {'password_hash': generate_password_hash(new_password)},
+                [('id', 'eq', user['id'])]):
+        notify(user['id'], 'Your password was changed successfully.', 'security')
+        flash('Password changed successfully.', 'success')
+    else:
+        flash('Could not change your password — please try again.', 'error')
+    return redirect(url_for('profile'))
+
+
+@app.route('/profile/bank-details', methods=['POST'])
+@login_required
+def profile_bank_details():
+    """Saves the user's preferred payout bank details, purely for
+    convenience — the withdraw form pre-fills from these if present, but
+    users can still edit/override them at withdrawal time exactly as
+    before this existed. Nothing about the withdraw flow itself changed."""
+    user = get_current_user()
+    bank_name      = request.form.get('bank_name', '').strip()
+    account_number = request.form.get('account_number', '').strip()
+    account_name   = request.form.get('account_name', '').strip()
+
+    if not (bank_name and account_number and account_name):
+        flash('Please fill in all bank detail fields.', 'error')
+        return redirect(url_for('profile'))
+    if not re.match(r'^\d{10}$', account_number):
+        flash('Account number must be exactly 10 digits.', 'error')
+        return redirect(url_for('profile'))
+
+    if sb_update('users', {
+        'bank_name': bank_name, 'bank_account_number': account_number,
+        'bank_account_name': account_name,
+    }, [('id', 'eq', user['id'])]):
+        flash('Bank details saved.', 'success')
+    else:
+        flash('Could not save your bank details — please try again.', 'error')
+    return redirect(url_for('profile'))
+
+
+@app.route('/announcements')
+@login_required
+def announcement_list():
+    """Full Announcements list (Phase 10) — every announcement currently
+    visible to this user, newest first, with read/unread state."""
+    user = get_current_user()
+    visible = get_visible_announcements(user['id'])
+    read_ids = get_announcement_read_ids(user['id'])
+    for a in visible:
+        a['is_read'] = a['id'] in read_ids
+    return render_template('announcements.html', announcements=visible)
+
+
+@app.route('/announcements/<int:announcement_id>')
+@login_required
+def announcement_detail(announcement_id):
+    """Opening an announcement marks it read — same pattern as email."""
+    user = get_current_user()
+    announcement = sb_one('announcements', [('id', 'eq', announcement_id)])
+    if not announcement:
+        flash('Announcement not found.', 'error')
+        return redirect(url_for('announcement_list'))
+
+    # Make sure this announcement is actually visible to this user before
+    # showing it (respects 'selected users' targeting).
+    if announcement.get('target_type') == 'selected':
+        target_ids = announcement.get('target_user_ids') or []
+        if user['id'] not in target_ids:
+            flash('Announcement not found.', 'error')
+            return redirect(url_for('announcement_list'))
+
+    mark_announcement_read(announcement_id, user['id'])
+    return render_template('announcement_detail.html', announcement=announcement)
 
 
 @app.route('/checkin', methods=['POST'])
@@ -2276,6 +2529,20 @@ def admin_dashboard():
         print(f'Admin maintenance-state error: {e}')
         maintenance_mode, maintenance_message = False, None
 
+    try:
+        deposit_trend = get_daily_trend('deposits', 7, status_filter='approved')
+        withdrawal_trend = get_daily_trend('withdrawals', 7, status_filter='approved')
+    except Exception as e:
+        print(f'Admin chart trend error: {e}')
+        deposit_trend, withdrawal_trend = [], []
+
+    investment_breakdown = {
+        'active': stats.get('active_investments', 0),
+        'completed': stats.get('completed_investments', 0),
+    }
+    investment_breakdown['other'] = max(
+        stats.get('total_investments', 0) - investment_breakdown['active'] - investment_breakdown['completed'], 0)
+
     return render_template('admin/dashboard.html',
         stats=stats, recent_users=recent_users, users=all_users,
         pending_deps=pending_deps, pending_wds=pending_wds,
@@ -2283,7 +2550,9 @@ def admin_dashboard():
         latest_deposits=latest_deposits, latest_withdrawals=latest_withdrawals,
         latest_investments=latest_investments,
         recent_contact_messages=recent_contact_messages,
-        maintenance_mode=maintenance_mode, maintenance_message=maintenance_message)
+        maintenance_mode=maintenance_mode, maintenance_message=maintenance_message,
+        deposit_trend=deposit_trend, withdrawal_trend=withdrawal_trend,
+        investment_breakdown=investment_breakdown)
 
 
 @app.route('/admin/messages')
@@ -2654,6 +2923,200 @@ def admin_announcements():
                            notice_enabled=is_enabled,
                            notice_message=get_setting('notice_message', '') or '',
                            notice_type=get_setting('notice_type', 'info') or 'info')
+
+
+# ═════════════════════════════════════════════
+# ADMIN — Announcements CRUD (Phase 10)
+# ═════════════════════════════════════════════
+@app.route('/admin/announcement-list')
+@admin_required
+def admin_announcement_list():
+    all_announcements = sb_all('announcements', order=('created_at', 'desc'))
+    now = datetime.utcnow()
+    for a in all_announcements:
+        sched = a.get('scheduled_at')
+        a['is_scheduled_future'] = False
+        if sched:
+            try:
+                sched_dt = datetime.fromisoformat(str(sched).replace('Z', '+00:00')).replace(tzinfo=None)
+                a['is_scheduled_future'] = sched_dt > now
+            except Exception:
+                pass
+        reads = sb_count('announcement_reads', [('announcement_id', 'eq', a['id'])])
+        a['read_count'] = reads
+    users = sb_all('users', filters=[('is_admin', 'eq', False)], order=('full_name', 'asc'))
+    return render_template('admin/announcement_list.html', announcements=all_announcements, users=users)
+
+
+@app.route('/admin/announcement-list/add', methods=['POST'])
+@admin_required
+def admin_announcement_add():
+    data, error = _announcement_from_form(request.form)
+    if error:
+        flash(error, 'error')
+        return redirect(url_for('admin_announcement_list'))
+    data['created_by'] = session.get('user_id')
+    sb_insert('announcements', data)
+    flash(f'Announcement "{data["title"]}" created.', 'success')
+    return redirect(url_for('admin_announcement_list'))
+
+
+@app.route('/admin/announcement-list/<int:announcement_id>/edit', methods=['POST'])
+@admin_required
+def admin_announcement_edit(announcement_id):
+    if not sb_one('announcements', [('id', 'eq', announcement_id)]):
+        flash('Announcement not found.', 'error')
+        return redirect(url_for('admin_announcement_list'))
+    data, error = _announcement_from_form(request.form)
+    if error:
+        flash(error, 'error')
+        return redirect(url_for('admin_announcement_list'))
+    sb_update('announcements', data, [('id', 'eq', announcement_id)])
+    flash(f'Announcement "{data["title"]}" updated.', 'success')
+    return redirect(url_for('admin_announcement_list'))
+
+
+@app.route('/admin/announcement-list/<int:announcement_id>/delete', methods=['POST'])
+@admin_required
+def admin_announcement_delete(announcement_id):
+    announcement = sb_one('announcements', [('id', 'eq', announcement_id)])
+    if not announcement:
+        flash('Announcement not found.', 'error')
+        return redirect(url_for('admin_announcement_list'))
+    sb_delete('announcements', [('id', 'eq', announcement_id)])
+    flash(f'Announcement "{announcement["title"]}" deleted.', 'success')
+    return redirect(url_for('admin_announcement_list'))
+
+
+def _announcement_from_form(form):
+    """Parse and validate the announcement create/edit form. Returns
+    (data_dict, error_str)."""
+    title   = form.get('title', '').strip()
+    message = form.get('message', '').strip()
+    is_important = form.get('is_important') == 'on'
+    target_type = form.get('target_type', 'all').strip()
+    if target_type not in ('all', 'selected'):
+        target_type = 'all'
+
+    if not title:
+        return None, 'Title is required.'
+    if not message:
+        return None, 'Message is required.'
+
+    target_user_ids = None
+    if target_type == 'selected':
+        raw_ids = form.getlist('target_user_ids')
+        try:
+            target_user_ids = [int(i) for i in raw_ids]
+        except ValueError:
+            return None, 'Invalid recipient selection.'
+        if not target_user_ids:
+            return None, 'Select at least one recipient for a targeted announcement.'
+
+    scheduled_raw = form.get('scheduled_at', '').strip()
+    scheduled_at = None
+    if scheduled_raw:
+        try:
+            naive_dt = datetime.fromisoformat(scheduled_raw)
+            local_dt = naive_dt.replace(tzinfo=get_display_timezone())
+            scheduled_at = local_dt.astimezone(timezone.utc).isoformat()
+        except ValueError:
+            return None, 'Scheduled date/time is invalid.'
+
+    return {
+        'title': title, 'message': message, 'is_important': is_important,
+        'target_type': target_type, 'target_user_ids': target_user_ids,
+        'scheduled_at': scheduled_at,
+    }, None
+
+
+# ═════════════════════════════════════════════
+# ADMIN — Banner Manager (Phase 11)
+# ═════════════════════════════════════════════
+@app.route('/admin/banners')
+@admin_required
+def admin_banners():
+    all_banners = sb_all('banners', order=[('sort_order', 'asc'), ('id', 'asc')])
+    for b in all_banners:
+        b['image_url'] = resolve_plan_image_url(b.get('image_filename'))
+    return render_template('admin/banners.html', banners=all_banners)
+
+
+@app.route('/admin/banners/add', methods=['POST'])
+@admin_required
+def admin_banner_add():
+    image_file = request.files.get('image')
+    if not image_file or not image_file.filename:
+        flash('Please choose an image to upload.', 'error')
+        return redirect(url_for('admin_banners'))
+    if not is_allowed_plan_image(image_file.filename):
+        flash('Banner image must be a PNG, JPG, JPEG or WEBP file.', 'error')
+        return redirect(url_for('admin_banners'))
+
+    image_filename = upload_plan_image(image_file)
+    if not image_filename:
+        flash('Could not upload that image — please try again.', 'error')
+        return redirect(url_for('admin_banners'))
+
+    title    = request.form.get('title', '').strip()
+    link_url = request.form.get('link_url', '').strip()
+    sort_order = request.form.get('sort_order', 0, type=int)
+
+    # First banner ever added is active automatically so the dashboard
+    # slider has something to show as soon as one exists.
+    is_active = not sb_count('banners')
+
+    sb_insert('banners', {
+        'image_filename': image_filename, 'title': title or None,
+        'link_url': link_url or None, 'sort_order': sort_order,
+        'is_active': is_active,
+    })
+    flash('Banner added.', 'success')
+    return redirect(url_for('admin_banners'))
+
+
+@app.route('/admin/banners/<int:banner_id>/toggle', methods=['POST'])
+@admin_required
+def admin_banner_toggle(banner_id):
+    banner = sb_one('banners', [('id', 'eq', banner_id)])
+    if not banner:
+        flash('Banner not found.', 'error')
+        return redirect(url_for('admin_banners'))
+    sb_update('banners', {'is_active': not banner.get('is_active')}, [('id', 'eq', banner_id)])
+    flash(f'Banner {"activated" if not banner.get("is_active") else "deactivated"}.', 'success')
+    return redirect(url_for('admin_banners'))
+
+
+@app.route('/admin/banners/<int:banner_id>/reorder', methods=['POST'])
+@admin_required
+def admin_banner_reorder(banner_id):
+    """Move a banner up or down in slide order by swapping sort_order with
+    its neighbor — simple and safe, avoids needing to renumber the whole
+    list on every move."""
+    direction = request.form.get('direction')
+    all_banners = sb_all('banners', order=[('sort_order', 'asc'), ('id', 'asc')])
+    idx = next((i for i, b in enumerate(all_banners) if b['id'] == banner_id), None)
+    if idx is None:
+        flash('Banner not found.', 'error')
+        return redirect(url_for('admin_banners'))
+
+    swap_idx = idx - 1 if direction == 'up' else idx + 1
+    if 0 <= swap_idx < len(all_banners):
+        a, b = all_banners[idx], all_banners[swap_idx]
+        sb_update('banners', {'sort_order': b['sort_order']}, [('id', 'eq', a['id'])])
+        sb_update('banners', {'sort_order': a['sort_order']}, [('id', 'eq', b['id'])])
+    return redirect(url_for('admin_banners'))
+
+
+@app.route('/admin/banners/<int:banner_id>/delete', methods=['POST'])
+@admin_required
+def admin_banner_delete(banner_id):
+    if not sb_one('banners', [('id', 'eq', banner_id)]):
+        flash('Banner not found.', 'error')
+        return redirect(url_for('admin_banners'))
+    sb_delete('banners', [('id', 'eq', banner_id)])
+    flash('Banner deleted.', 'success')
+    return redirect(url_for('admin_banners'))
 
 
 @app.route('/admin/settings', methods=['GET', 'POST'])
@@ -3150,6 +3613,38 @@ def admin_reject_withdrawal(wd_id):
                       'please refund the user manually and check the logs.', 'error')
         else:
             flash('This withdrawal was already processed.', 'warning')
+    return redirect(url_for('admin_withdrawals'))
+
+
+@app.route('/admin/withdrawals/bulk-approve', methods=['POST'])
+@admin_required
+def admin_bulk_approve_withdrawals():
+    """Bulk Actions (Phase 11) — approves multiple pending withdrawals in
+    one request. Reuses the exact same atomic compare-and-swap pattern as
+    the single-approve route above (one at a time, in a loop) rather than
+    a different bulk-specific code path, so the safety guarantees are
+    identical: each withdrawal can only be approved once, and a failure
+    on one doesn't roll back the others."""
+    ids = request.form.getlist('withdrawal_ids', type=int)
+    if not ids:
+        flash('No withdrawals selected.', 'error')
+        return redirect(url_for('admin_withdrawals'))
+
+    approved_count = 0
+    for wd_id in ids:
+        wd = sb_one('withdrawals', [('id', 'eq', wd_id)])
+        if not wd or wd['status'] != 'pending':
+            continue
+        amount = r2(wd['amount'])
+        updated = sb_update('withdrawals', {'status': 'approved'},
+                             [('id', 'eq', wd_id), ('status', 'eq', 'pending')])
+        if updated:
+            if sb_adjust_balance(wd['user_id'], total_earnings_delta=amount):
+                notify(wd['user_id'], f'Withdrawal of ₦{amount:,.2f} approved and sent!', 'success')
+                approved_count += 1
+
+    flash(f'{approved_count} of {len(ids)} withdrawal(s) approved.',
+          'success' if approved_count == len(ids) else 'warning')
     return redirect(url_for('admin_withdrawals'))
 
 
