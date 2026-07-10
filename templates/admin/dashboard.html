@@ -525,6 +525,59 @@
 </div>
 
 <!-- ════════════════════════════════════════════
+     CHARTS
+════════════════════════════════════════════ -->
+<div class="grid lg:grid-cols-3 gap-5 mb-8 anim-fade-up" style="animation-delay:.16s">
+  <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+    <h3 class="font-semibold text-gray-900 text-sm mb-4">Deposits vs Withdrawals — Last 7 Days</h3>
+    <canvas id="trend-chart" height="90"></canvas>
+  </div>
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+    <h3 class="font-semibold text-gray-900 text-sm mb-4">Investment Status</h3>
+    <canvas id="breakdown-chart" height="200"></canvas>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  (function () {
+    const trendLabels = {{ (deposit_trend | map(attribute='label') | list) | tojson }};
+    const depositData = {{ (deposit_trend | map(attribute='amount') | list) | tojson }};
+    const withdrawalData = {{ (withdrawal_trend | map(attribute='amount') | list) | tojson }};
+
+    new Chart(document.getElementById('trend-chart'), {
+      type: 'line',
+      data: {
+        labels: trendLabels,
+        datasets: [
+          { label: 'Deposits', data: depositData, borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.08)', tension: 0.35, fill: true, pointRadius: 3 },
+          { label: 'Withdrawals', data: withdrawalData, borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.05)', tension: 0.35, fill: true, pointRadius: 3 },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+        scales: { y: { beginAtZero: true, ticks: { callback: (v) => '₦' + v.toLocaleString() } } },
+      },
+    });
+
+    const breakdown = {{ investment_breakdown | tojson }};
+    new Chart(document.getElementById('breakdown-chart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Active', 'Completed', 'Other'],
+        datasets: [{ data: [breakdown.active, breakdown.completed, breakdown.other],
+                     backgroundColor: ['#16a34a', '#d4af37', '#e5e7eb'] }],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+      },
+    });
+  })();
+</script>
+
+<!-- ════════════════════════════════════════════
      QUICK ACTIONS
 ════════════════════════════════════════════ -->
 <div class="section-label anim-fade-up" style="animation-delay:.18s">Quick Actions</div>

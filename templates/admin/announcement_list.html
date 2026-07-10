@@ -1,0 +1,155 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Announcements{% endblock %}
+
+{% block admin_content %}
+<div class="mb-6">
+  <h1 class="font-display font-bold text-lg text-gray-900">Announcements</h1>
+  <p class="text-gray-500 text-sm">Create, schedule, and target announcements — separate from the sitewide Site Banner.</p>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+  <div class="mb-5 px-4 py-3 rounded-xl text-sm font-medium
+    {% if category == 'success' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+    {% else %}bg-red-50 text-red-700 border border-red-200{% endif %}">
+    {{ message }}
+  </div>
+  {% endfor %}
+{% endwith %}
+
+<div class="flex items-center justify-end mb-4">
+  <button onclick="document.getElementById('create-modal').classList.remove('hidden')"
+          class="inline-flex items-center gap-2 bg-gradient-to-r from-forest-950 to-forest-800 hover:from-forest-900 hover:to-forest-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition-all shadow-sm hover:shadow-lg hover:-translate-y-0.5">
+    <i data-lucide="plus" class="w-4 h-4"></i> New Announcement
+  </button>
+</div>
+
+<!-- List -->
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+  {% if announcements %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-gray-100 bg-gray-50/60">
+          <th class="text-left font-semibold text-gray-500 text-xs uppercase tracking-wide px-5 py-3">Title</th>
+          <th class="text-left font-semibold text-gray-500 text-xs uppercase tracking-wide px-5 py-3">Target</th>
+          <th class="text-left font-semibold text-gray-500 text-xs uppercase tracking-wide px-5 py-3">Status</th>
+          <th class="text-left font-semibold text-gray-500 text-xs uppercase tracking-wide px-5 py-3">Reads</th>
+          <th class="text-left font-semibold text-gray-500 text-xs uppercase tracking-wide px-5 py-3">Created</th>
+          <th class="text-right font-semibold text-gray-500 text-xs uppercase tracking-wide px-5 py-3">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for a in announcements %}
+        <tr class="hover:bg-gray-50/50 transition-colors">
+          <td class="px-5 py-3.5">
+            <div class="flex items-center gap-2">
+              <p class="font-medium text-gray-800">{{ a.title }}</p>
+              {% if a.is_important %}<span class="badge-error badge">Important</span>{% endif %}
+            </div>
+          </td>
+          <td class="px-5 py-3.5 text-gray-500 text-xs">
+            {% if a.target_type == 'selected' %}
+            {{ (a.target_user_ids | length) if a.target_user_ids else 0 }} selected user(s)
+            {% else %}
+            All Users
+            {% endif %}
+          </td>
+          <td class="px-5 py-3.5">
+            {% if a.is_scheduled_future %}
+            <span class="badge-warning badge">Scheduled</span>
+            {% else %}
+            <span class="badge-success badge">Published</span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3.5 text-gray-500 text-xs">{{ a.read_count }} read</td>
+          <td class="px-5 py-3.5 text-gray-400 text-xs">{{ a.created_at | date_fmt }}</td>
+          <td class="px-5 py-3.5 text-right">
+            <div class="flex items-center justify-end gap-1.5">
+              <button onclick="document.getElementById('edit-modal-{{ a.id }}').classList.remove('hidden')"
+                      class="w-8 h-8 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 flex items-center justify-center transition-colors">
+                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="confirmDeleteAnnouncement({{ a.id }}, {{ a.title | tojson }})"
+                      class="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 flex items-center justify-center transition-colors">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-16 px-6">
+    <i data-lucide="megaphone-off" class="w-12 h-12 text-gray-200 mx-auto mb-4"></i>
+    <p class="text-gray-400 font-medium">No announcements yet</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Create Modal -->
+<div id="create-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+  <div class="bg-white rounded-2xl w-full max-w-lg my-8 shadow-2xl">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-bold text-gray-900">New Announcement</h2>
+      <button onclick="document.getElementById('create-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_announcement_add') }}" class="p-6 space-y-4">
+      {% include "admin/_announcement_form_fields.html" with context %}
+      <button type="submit" class="btn-primary w-full">Create Announcement</button>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Modals (one per announcement) -->
+{% for a in announcements %}
+<div id="edit-modal-{{ a.id }}" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+  <div class="bg-white rounded-2xl w-full max-w-lg my-8 shadow-2xl">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-bold text-gray-900">Edit Announcement</h2>
+      <button onclick="document.getElementById('edit-modal-{{ a.id }}').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_announcement_edit', announcement_id=a.id) }}" class="p-6 space-y-4">
+      {% include "admin/_announcement_form_fields.html" with context %}
+      <button type="submit" class="btn-primary w-full">Save Changes</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+
+<!-- Delete Confirm Modal -->
+<div id="delete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+    <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+      <i data-lucide="trash-2" class="w-6 h-6 text-red-600"></i>
+    </div>
+    <h2 class="font-bold text-lg text-gray-900 text-center mb-1">Delete Announcement</h2>
+    <p class="text-gray-500 text-sm text-center mb-1">Are you sure you want to delete</p>
+    <p class="font-bold text-gray-900 text-center mb-5" id="delete-announcement-title"></p>
+    <form method="POST" id="delete-announcement-form" class="flex gap-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="button" onclick="document.getElementById('delete-modal').classList.add('hidden')"
+        class="flex-1 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600">Cancel</button>
+      <button type="submit" class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold">Delete</button>
+    </form>
+  </div>
+</div>
+
+<script>
+function confirmDeleteAnnouncement(id, title) {
+  document.getElementById('delete-modal').classList.remove('hidden');
+  document.getElementById('delete-announcement-title').textContent = '"' + title + '"';
+  document.getElementById('delete-announcement-form').action = '/admin/announcement-list/' + id + '/delete';
+}
+function toggleTargetFields(form) {
+  const type = form.querySelector('[name="target_type"]:checked').value;
+  form.querySelector('.target-selected-users').classList.toggle('hidden', type !== 'selected');
+}
+</script>
+{% endblock %}

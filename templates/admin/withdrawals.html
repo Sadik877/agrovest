@@ -18,11 +18,23 @@
   {% endfor %}
 </div>
 
+<div id="bulk-bar" class="hidden items-center justify-between bg-forest-950 text-white rounded-2xl px-5 py-3 mb-4">
+  <p class="text-sm"><span id="bulk-count">0</span> selected</p>
+  <form method="POST" action="{{ url_for('admin_bulk_approve_withdrawals') }}" id="bulk-approve-form" onsubmit="return confirm('Approve all selected pending withdrawals?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <span id="bulk-hidden-inputs"></span>
+    <button type="submit" class="bg-gold-500 hover:bg-gold-600 text-forest-950 font-bold text-xs px-4 py-2 rounded-lg">✓ Bulk Approve Selected</button>
+  </form>
+</div>
+
 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
   <div class="overflow-x-auto">
     <table class="w-full text-sm">
       <thead>
         <tr class="text-left text-xs text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100">
+          <th class="px-5 py-3 font-medium w-8">
+            <input type="checkbox" id="select-all" onchange="toggleAllWd(this)" class="w-4 h-4 rounded border-gray-300" />
+          </th>
           <th class="px-5 py-3 font-medium">User</th>
           <th class="px-5 py-3 font-medium">Amount</th>
           <th class="px-5 py-3 font-medium">Bank Details</th>
@@ -34,6 +46,11 @@
       <tbody class="divide-y divide-gray-50">
         {% for wd in withdrawals %}
         <tr class="hover:bg-gray-50 wd-row" data-status="{{ wd.status }}">
+          <td class="px-5 py-4">
+            {% if wd.status == 'pending' %}
+            <input type="checkbox" class="wd-checkbox w-4 h-4 rounded border-gray-300" value="{{ wd.id }}" onchange="updateBulkBar()" />
+            {% endif %}
+          </td>
           <td class="px-5 py-4">
             <p class="font-medium text-gray-900">{{ wd.full_name }}</p>
             <p class="text-xs text-gray-400">{{ wd.email }}</p>
@@ -117,6 +134,23 @@ function filterRows(status) {
 function openRejectModal(id) {
   document.getElementById('reject-modal').classList.remove('hidden');
   document.getElementById('reject-form').action = '/admin/withdrawals/' + id + '/reject';
+}
+
+function toggleAllWd(master) {
+  document.querySelectorAll('.wd-checkbox').forEach(cb => {
+    if (cb.closest('tr').style.display !== 'none') cb.checked = master.checked;
+  });
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const checked = Array.from(document.querySelectorAll('.wd-checkbox:checked'));
+  const bar = document.getElementById('bulk-bar');
+  document.getElementById('bulk-count').textContent = checked.length;
+  bar.classList.toggle('hidden', checked.length === 0);
+  bar.classList.toggle('flex', checked.length > 0);
+  document.getElementById('bulk-hidden-inputs').innerHTML = checked
+    .map(cb => `<input type="hidden" name="withdrawal_ids" value="${cb.value}">`).join('');
 }
 </script>
 {% endblock %}
