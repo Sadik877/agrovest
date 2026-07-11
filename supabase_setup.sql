@@ -426,4 +426,13 @@ CREATE TABLE IF NOT EXISTS public.banners (
 );
 ALTER TABLE public.banners DISABLE ROW LEVEL SECURITY;
 
+-- Announcement Popup fields — extends the existing `announcements` table
+-- (Phase 10) rather than creating a new system. All nullable/optional:
+-- an announcement with none of these set just shows as a plain text
+-- popup (title + message), same as before this existed.
+ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS image_filename TEXT;
+ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS telegram_channel_url TEXT;
+ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS telegram_group_url TEXT;
+ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS learn_more_url TEXT;
+
 SELECT 'Gift Codes & Daily Check-in migration applied successfully!' AS status;

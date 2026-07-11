@@ -112,55 +112,106 @@
 </div>
 
 <!-- ── Announcement Card ── -->
-{% if active_notice %}
-<div class="card-premium p-5 mb-6 flex items-start gap-4
-  {% if active_notice.color == 'red' %}border-red-200 bg-red-50/40
-  {% elif active_notice.color == 'amber' %}border-amber-200 bg-amber-50/40
-  {% elif active_notice.color == 'emerald' %}border-emerald-200 bg-emerald-50/40
-  {% else %}border-blue-200 bg-blue-50/40{% endif %}">
+{% if popup_announcement %}
+<a href="{{ url_for('announcement_detail', announcement_id=popup_announcement.id) }}"
+   class="card-premium p-5 mb-6 flex items-start gap-4 block hover:shadow-md transition-shadow
+   {{ 'border-red-200 bg-red-50/40' if popup_announcement.is_important else 'border-forest-100 bg-forest-50/30' }}">
   <span class="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0
-    {% if active_notice.color == 'red' %}bg-red-100 text-red-600
-    {% elif active_notice.color == 'amber' %}bg-amber-100 text-amber-600
-    {% elif active_notice.color == 'emerald' %}bg-emerald-100 text-emerald-600
-    {% else %}bg-blue-100 text-blue-600{% endif %}">
-    <i data-lucide="{{ active_notice.icon }}" class="w-5 h-5"></i>
+    {{ 'bg-red-100 text-red-600' if popup_announcement.is_important else 'bg-forest-100 text-forest-700' }}">
+    <i data-lucide="{{ 'alert-triangle' if popup_announcement.is_important else 'megaphone' }}" class="w-5 h-5"></i>
   </span>
   <div class="min-w-0">
-    <p class="text-xs font-bold uppercase tracking-wide text-gray-500">{{ active_notice.label }}</p>
-    <p class="text-sm text-gray-800 mt-0.5">{{ active_notice.message }}</p>
+    <p class="text-xs font-bold uppercase tracking-wide text-gray-500">
+      {{ 'Important Announcement' if popup_announcement.is_important else 'Announcement' }}
+    </p>
+    <p class="text-sm font-semibold text-gray-900 mt-0.5">{{ popup_announcement.title }}</p>
+    <p class="text-sm text-gray-600 mt-0.5 line-clamp-1">{{ popup_announcement.message }}</p>
   </div>
-</div>
+</a>
 {% endif %}
 
-<!-- ── Promotional Banner Slider ── -->
-{% if banners %}
-<div class="relative rounded-[24px] overflow-hidden mb-6 shadow-lg" id="banner-slider">
-  {% for b in banners %}
-  <a href="{{ b.link_url or '#' }}" class="banner-slide {{ 'block' if loop.first else 'hidden' }}" data-index="{{ loop.index0 }}">
-    <img src="{{ b.image_url }}" alt="{{ b.title or 'Promotion' }}" loading="lazy" class="w-full h-40 sm:h-52 object-cover" />
-  </a>
-  {% endfor %}
-  {% if banners | length > 1 %}
-  <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5" id="banner-dots">
-    {% for b in banners %}
-    <button onclick="goToBanner({{ loop.index0 }})" class="w-1.5 h-1.5 rounded-full {{ 'bg-white' if loop.first else 'bg-white/40' }} transition-colors" data-dot="{{ loop.index0 }}" aria-label="Go to slide {{ loop.index }}"></button>
-    {% endfor %}
+<!-- ── Announcement Popup (Phase: replaces the old Banner Manager slider) ──
+     Shows the single latest announcement visible to this user as a
+     centered modal, once per announcement id (tracked in localStorage so
+     it doesn't need a server round-trip or a new DB column). A newly
+     published announcement always has a different id, so it reappears
+     automatically even if an older one was dismissed. -->
+{% if popup_announcement %}
+<div id="announcement-popup" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
+  <div id="announcement-popup-overlay" class="absolute inset-0 bg-forest-950/70 backdrop-blur-sm"></div>
+  <div id="announcement-popup-card" class="relative w-full max-w-md glass rounded-[24px] shadow-2xl overflow-hidden opacity-0 scale-95 transition-all duration-300 ease-out">
+    <button onclick="closeAnnouncementPopup()" aria-label="Close"
+      class="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center backdrop-blur-sm">
+      <i data-lucide="x" class="w-4 h-4"></i>
+    </button>
+
+    {% if popup_announcement.image_url %}
+    <img src="{{ popup_announcement.image_url }}" alt="{{ popup_announcement.title }}" class="w-full h-44 object-cover" />
+    {% endif %}
+
+    <div class="p-6">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0
+          {{ 'bg-red-50 text-red-600' if popup_announcement.is_important else 'bg-forest-50 text-forest-700' }}">
+          <i data-lucide="{{ 'alert-triangle' if popup_announcement.is_important else 'megaphone' }}" class="w-4.5 h-4.5"></i>
+        </span>
+        {% if popup_announcement.is_important %}
+        <span class="badge-error badge">Important</span>
+        {% endif %}
+      </div>
+      <h2 class="font-display font-bold text-xl text-gray-900 mb-1.5">{{ popup_announcement.title }}</h2>
+      <p class="text-gray-600 text-sm leading-relaxed whitespace-pre-line mb-3">{{ popup_announcement.message }}</p>
+      <p class="text-xs text-gray-400 mb-5">{{ popup_announcement.created_at | date_fmt('%d %b %Y, %I:%M %p') }}</p>
+
+      <div class="flex flex-col gap-2.5">
+        {% if popup_announcement.telegram_channel_url %}
+        <a href="{{ popup_announcement.telegram_channel_url }}" target="_blank" rel="noopener"
+           style="background: #229ED9;" class="w-full inline-flex items-center justify-center gap-2 text-white font-bold py-3 rounded-2xl text-sm shadow-lg hover:brightness-105 transition-all">
+          <i data-lucide="send" class="w-4 h-4"></i> Join Telegram Channel
+        </a>
+        {% endif %}
+        {% if popup_announcement.telegram_group_url %}
+        <a href="{{ popup_announcement.telegram_group_url }}" target="_blank" rel="noopener" class="btn-secondary w-full text-sm">
+          <i data-lucide="users" class="w-4 h-4"></i> Join Telegram Group
+        </a>
+        {% endif %}
+        {% if popup_announcement.learn_more_url %}
+        <a href="{{ popup_announcement.learn_more_url }}" target="_blank" rel="noopener" class="text-center text-forest-700 hover:text-forest-900 text-sm font-semibold py-1">
+          Learn More →
+        </a>
+        {% endif %}
+      </div>
+    </div>
   </div>
-  {% endif %}
 </div>
 <script>
   (function () {
-    const slides = document.querySelectorAll('#banner-slider .banner-slide');
-    const dots = document.querySelectorAll('#banner-dots [data-dot]');
-    let current = 0;
-    window.goToBanner = function (i) {
-      slides.forEach((s, idx) => s.classList.toggle('hidden', idx !== i));
-      dots.forEach((d, idx) => d.classList.toggle('bg-white', idx === i) & d.classList.toggle('bg-white/40', idx !== i));
-      current = i;
-    };
-    if (slides.length > 1) {
-      setInterval(() => window.goToBanner((current + 1) % slides.length), 5000);
+    const ANNOUNCEMENT_ID = {{ popup_announcement.id | tojson }};
+    const STORAGE_KEY = 'agrovest_last_seen_announcement_id';
+
+    let lastSeen = null;
+    try { lastSeen = localStorage.getItem(STORAGE_KEY); } catch (e) { /* localStorage unavailable — just show it */ }
+
+    if (String(lastSeen) !== String(ANNOUNCEMENT_ID)) {
+      const popup = document.getElementById('announcement-popup');
+      const card = document.getElementById('announcement-popup-card');
+      popup.classList.remove('hidden');
+      requestAnimationFrame(() => {
+        card.classList.remove('opacity-0', 'scale-95');
+        card.classList.add('opacity-100', 'scale-100');
+      });
     }
+
+    window.closeAnnouncementPopup = function () {
+      const popup = document.getElementById('announcement-popup');
+      const card = document.getElementById('announcement-popup-card');
+      card.classList.add('opacity-0', 'scale-95');
+      card.classList.remove('opacity-100', 'scale-100');
+      try { localStorage.setItem(STORAGE_KEY, String(ANNOUNCEMENT_ID)); } catch (e) { /* ignore */ }
+      setTimeout(() => popup.classList.add('hidden'), 250);
+    };
+
+    document.getElementById('announcement-popup-overlay').addEventListener('click', window.closeAnnouncementPopup);
   })();
 </script>
 {% endif %}

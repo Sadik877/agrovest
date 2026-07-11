@@ -1133,6 +1133,22 @@ def get_unread_announcement_count(user_id):
     return sum(1 for a in visible if a['id'] not in read_ids)
 
 
+def get_latest_announcement_for_popup(user_id):
+    """The single most recent announcement visible to this user, enriched
+    with a resolved image URL — used for the dashboard popup. Returns None
+    if there's nothing currently visible (no popup shown in that case).
+    Whether it's actually *displayed* (vs already dismissed) is decided
+    client-side via localStorage, keyed by this announcement's id — so a
+    newly published announcement (different id) always reappears even if
+    an older one was dismissed."""
+    visible = get_visible_announcements(user_id)
+    if not visible:
+        return None
+    latest = dict(visible[0])  # get_visible_announcements() already orders newest-first
+    latest['image_url'] = resolve_plan_image_url(latest.get('image_filename'))
+    return latest
+
+
 def mark_announcement_read(announcement_id, user_id):
     if sb_one('announcement_reads', [('announcement_id', 'eq', announcement_id), ('user_id', 'eq', user_id)]):
         return True
@@ -1708,7 +1724,7 @@ def dashboard():
         today_profit=today_profit, profit_change_pct=profit_change_pct,
         recent_transactions=recent_transactions,
         checkin_status=get_checkin_status(uid),
-        banners=get_active_banners(),
+        popup_announcement=get_latest_announcement_for_popup(uid),
         now_utc=datetime.utcnow())
 
 
@@ -1905,6 +1921,7 @@ def announcement_detail(announcement_id):
             return redirect(url_for('announcement_list'))
 
     mark_announcement_read(announcement_id, user['id'])
+    announcement['image_url'] = resolve_plan_image_url(announcement.get('image_filename'))
     return render_template('announcement_detail.html', announcement=announcement)
 
 
@@ -2944,6 +2961,7 @@ def admin_announcement_list():
                 pass
         reads = sb_count('announcement_reads', [('announcement_id', 'eq', a['id'])])
         a['read_count'] = reads
+        a['image_url'] = resolve_plan_image_url(a.get('image_filename'))
     users = sb_all('users', filters=[('is_admin', 'eq', False)], order=('full_name', 'asc'))
     return render_template('admin/announcement_list.html', announcements=all_announcements, users=users)
 
@@ -2951,23 +2969,24 @@ def admin_announcement_list():
 @app.route('/admin/announcement-list/add', methods=['POST'])
 @admin_required
 def admin_announcement_add():
-    data, error = _announcement_from_form(request.form)
+    data, error = _announcement_from_form(request.form, request.files)
     if error:
         flash(error, 'error')
         return redirect(url_for('admin_announcement_list'))
     data['created_by'] = session.get('user_id')
     sb_insert('announcements', data)
-    flash(f'Announcement "{data["title"]}" created.', 'success')
+    flash(f'Announcement "{data["title"]}" published — now live on every user\'s dashboard.', 'success')
     return redirect(url_for('admin_announcement_list'))
 
 
 @app.route('/admin/announcement-list/<int:announcement_id>/edit', methods=['POST'])
 @admin_required
 def admin_announcement_edit(announcement_id):
-    if not sb_one('announcements', [('id', 'eq', announcement_id)]):
+    existing = sb_one('announcements', [('id', 'eq', announcement_id)])
+    if not existing:
         flash('Announcement not found.', 'error')
         return redirect(url_for('admin_announcement_list'))
-    data, error = _announcement_from_form(request.form)
+    data, error = _announcement_from_form(request.form, request.files, existing=existing)
     if error:
         flash(error, 'error')
         return redirect(url_for('admin_announcement_list'))
@@ -2988,9 +3007,11 @@ def admin_announcement_delete(announcement_id):
     return redirect(url_for('admin_announcement_list'))
 
 
-def _announcement_from_form(form):
+def _announcement_from_form(form, files=None, existing=None):
     """Parse and validate the announcement create/edit form. Returns
-    (data_dict, error_str)."""
+    (data_dict, error_str). `existing` is the current row when editing —
+    used to keep the current image if no new one is uploaded, same
+    pattern as _plan_from_form()."""
     title   = form.get('title', '').strip()
     message = form.get('message', '').strip()
     is_important = form.get('is_important') == 'on'
@@ -3023,10 +3044,26 @@ def _announcement_from_form(form):
         except ValueError:
             return None, 'Scheduled date/time is invalid.'
 
+    # Optional popup image — keeps the current one on edit unless a new
+    # file is uploaded, same pattern as plan images.
+    image_filename = existing.get('image_filename') if existing else None
+    image_file = files.get('image') if files else None
+    if image_file and image_file.filename:
+        if not is_allowed_plan_image(image_file.filename):
+            return None, 'Announcement image must be a PNG, JPG, JPEG or WEBP file.'
+        image_filename = upload_plan_image(image_file)
+
+    telegram_channel_url = form.get('telegram_channel_url', '').strip() or None
+    telegram_group_url   = form.get('telegram_group_url', '').strip() or None
+    learn_more_url        = form.get('learn_more_url', '').strip() or None
+
     return {
         'title': title, 'message': message, 'is_important': is_important,
         'target_type': target_type, 'target_user_ids': target_user_ids,
-        'scheduled_at': scheduled_at,
+        'scheduled_at': scheduled_at, 'image_filename': image_filename,
+        'telegram_channel_url': telegram_channel_url,
+        'telegram_group_url': telegram_group_url,
+        'learn_more_url': learn_more_url,
     }, None
 
 

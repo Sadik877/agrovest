@@ -98,7 +98,7 @@
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
     </div>
-    <form method="POST" action="{{ url_for('admin_announcement_add') }}" class="p-6 space-y-4">
+    <form method="POST" action="{{ url_for('admin_announcement_add') }}" enctype="multipart/form-data" class="p-6 space-y-4">
       {% include "admin/_announcement_form_fields.html" with context %}
       <button type="submit" class="btn-primary w-full">Create Announcement</button>
     </form>
@@ -115,7 +115,7 @@
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
     </div>
-    <form method="POST" action="{{ url_for('admin_announcement_edit', announcement_id=a.id) }}" class="p-6 space-y-4">
+    <form method="POST" action="{{ url_for('admin_announcement_edit', announcement_id=a.id) }}" enctype="multipart/form-data" class="p-6 space-y-4">
       {% include "admin/_announcement_form_fields.html" with context %}
       <button type="submit" class="btn-primary w-full">Save Changes</button>
     </form>

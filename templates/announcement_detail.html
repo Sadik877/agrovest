@@ -8,7 +8,11 @@
     <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Announcements
   </a>
 
-  <div class="card-premium p-7">
+  <div class="card-premium overflow-hidden">
+    {% if announcement.image_url %}
+    <img src="{{ announcement.image_url }}" alt="{{ announcement.title }}" class="w-full h-48 object-cover" />
+    {% endif %}
+    <div class="p-7">
     <div class="flex items-start gap-4 mb-5">
       <span class="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0
         {{ 'bg-red-50 text-red-600' if announcement.is_important else 'bg-forest-50 text-forest-700' }}">
@@ -25,6 +29,28 @@
       </div>
     </div>
     <p class="text-gray-700 leading-relaxed whitespace-pre-line">{{ announcement.message }}</p>
+
+    {% if announcement.telegram_channel_url or announcement.telegram_group_url or announcement.learn_more_url %}
+    <div class="flex flex-col gap-2.5 mt-6">
+      {% if announcement.telegram_channel_url %}
+      <a href="{{ announcement.telegram_channel_url }}" target="_blank" rel="noopener"
+         style="background: #229ED9;" class="w-full inline-flex items-center justify-center gap-2 text-white font-bold py-3 rounded-2xl text-sm shadow-lg hover:brightness-105 transition-all">
+        <i data-lucide="send" class="w-4 h-4"></i> Join Telegram Channel
+      </a>
+      {% endif %}
+      {% if announcement.telegram_group_url %}
+      <a href="{{ announcement.telegram_group_url }}" target="_blank" rel="noopener" class="btn-secondary w-full text-sm">
+        <i data-lucide="users" class="w-4 h-4"></i> Join Telegram Group
+      </a>
+      {% endif %}
+      {% if announcement.learn_more_url %}
+      <a href="{{ announcement.learn_more_url }}" target="_blank" rel="noopener" class="text-center text-forest-700 hover:text-forest-900 text-sm font-semibold py-1">
+        Learn More →
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+    </div>
   </div>
 </div>
 {% endblock %}
