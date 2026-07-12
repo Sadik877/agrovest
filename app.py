@@ -369,6 +369,14 @@ def _record_roi_transaction(user_id, investment_id, plan_name, amount):
             'plan_name':        plan_name,
             'amount':           r2(amount),
             'transaction_type': 'ROI',
+            'type':             'ROI',  # legacy column name that also exists on some
+                                         # live databases, NOT NULL with no default —
+                                         # without this, every insert here silently
+                                         # failed (caught by the except below), which
+                                         # meant Today's Profit and the transaction
+                                         # history page were both missing every ROI
+                                         # credit. Harmless duplicate write if your
+                                         # table only has transaction_type.
             'status':           'Completed',
             'description':      f'Daily profit credited from {plan_name}',
         })

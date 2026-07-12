@@ -361,6 +361,17 @@ ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS plan_name TEXT;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS transaction_type TEXT NOT NULL DEFAULT 'ROI';
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'Completed';
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS description TEXT;
+-- Legacy 'type' column — some deployments of this table have both `type`
+-- and `transaction_type` as separate NOT NULL columns with no shared
+-- default. The app now writes the same value to both on every insert, but
+-- this ALTER covers two cases in one shot: (1) a fresh install gets a
+-- `type` column with a default so it's never NULL even before the app's
+-- fix is deployed, and (2) an existing table where `type` was NOT NULL
+-- with NO default (the actual production error this fixes) gets that
+-- constraint relaxed so old rows and any other insert path can't violate it.
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'ROI';
+ALTER TABLE public.transactions ALTER COLUMN type SET DEFAULT 'ROI';
+ALTER TABLE public.transactions ALTER COLUMN type DROP NOT NULL;
 ALTER TABLE public.transactions DISABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON public.transactions(user_id, created_at DESC);
 
